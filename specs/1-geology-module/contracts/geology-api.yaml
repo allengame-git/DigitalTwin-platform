@@ -1,0 +1,307 @@
+openapi: 3.0.3
+info:
+  title: Geology Module API
+  description: LLRWD DigitalTwin Platform - 地質資料展示模組 API
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: Development server
+
+paths:
+  /boreholes:
+    get:
+      summary: 取得鑽孔列表
+      description: 支援分頁與空間過濾
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+        - name: bbox
+          in: query
+          description: "Bounding box: west,south,east,north"
+          schema:
+            type: string
+            example: "120.1,23.5,121.2,24.5"
+        - name: fields
+          in: query
+          description: 回傳欄位 (預設只回傳基本資訊)
+          schema:
+            type: string
+            enum: [basic, full]
+            default: basic
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BoreholeListItem'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /boreholes/{id}:
+    get:
+      summary: 取得鑽孔詳細資訊
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoreholeDetail'
+        '404':
+          description: 鑽孔不存在
+
+  /boreholes/{id}/layers:
+    get:
+      summary: 取得鑽孔地層資料
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Layer'
+
+  /boreholes/{id}/photos:
+    get:
+      summary: 取得鑽孔岩芯照片
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Photo'
+
+  /geology-models:
+    get:
+      summary: 取得地質模型列表
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GeologyModel'
+
+  /structures:
+    get:
+      summary: 取得地質構造
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [fault, fold, strike_dip]
+        - name: bbox
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [FeatureCollection]
+                  features:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StructureFeature'
+
+components:
+  schemas:
+    BoreholeListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        coordinates:
+          type: object
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+            z:
+              type: number
+        depth:
+          type: number
+        waterLevel:
+          type: number
+          nullable: true
+
+    BoreholeDetail:
+      allOf:
+        - $ref: '#/components/schemas/BoreholeListItem'
+        - type: object
+          properties:
+            drillingDate:
+              type: string
+              format: date
+              nullable: true
+            layers:
+              type: array
+              items:
+                $ref: '#/components/schemas/Layer'
+            photos:
+              type: array
+              items:
+                $ref: '#/components/schemas/Photo'
+
+    Layer:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        boreholeId:
+          type: string
+          format: uuid
+        topDepth:
+          type: number
+        bottomDepth:
+          type: number
+        lithology:
+          type: string
+        lithologyCode:
+          type: string
+          nullable: true
+        properties:
+          type: object
+          additionalProperties:
+            type: number
+
+    Photo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        boreholeId:
+          type: string
+          format: uuid
+        depthFrom:
+          type: number
+        depthTo:
+          type: number
+        imageUrl:
+          type: string
+          format: uri
+        thumbnailUrl:
+          type: string
+          format: uri
+          nullable: true
+
+    GeologyModel:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        tilesetUrl:
+          type: string
+          format: uri
+        layerCount:
+          type: integer
+        boundingBox:
+          type: object
+          properties:
+            west:
+              type: number
+            south:
+              type: number
+            east:
+              type: number
+            north:
+              type: number
+
+    StructureFeature:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [Feature]
+        id:
+          type: string
+          format: uuid
+        geometry:
+          type: object
+        properties:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [fault, fold, strike_dip]
+            name:
+              type: string
+              nullable: true
+            strike:
+              type: number
+              nullable: true
+            dip:
+              type: number
+              nullable: true
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer

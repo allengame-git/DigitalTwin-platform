@@ -1,0 +1,310 @@
+openapi: 3.0.3
+info:
+  title: User Roles & Auth API
+  description: LLRWD DigitalTwin Platform - 使用者角色與權限系統 API
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: Development server
+
+paths:
+  /auth/login:
+    post:
+      summary: 使用者登入
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: 登入成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: 帳號或密碼錯誤
+
+  /auth/refresh:
+    post:
+      summary: 刷新 Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Refresh Token 無效或過期
+
+  /auth/logout:
+    post:
+      summary: 使用者登出
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: 登出成功
+
+  /auth/me:
+    get:
+      summary: 取得當前使用者資訊
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: 未認證
+
+  /invite/validate:
+    post:
+      summary: 驗證邀請連結
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: 邀請連結有效，回傳 Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: 邀請連結無效或已過期
+
+  /annotations:
+    get:
+      summary: 取得標註列表
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: projectId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: isResolved
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Annotation'
+        '403':
+          description: 無權限 (僅 reviewer 與 engineer 可存取)
+
+    post:
+      summary: 建立標註
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAnnotation'
+      responses:
+        '201':
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Annotation'
+        '403':
+          description: 無權限 (僅 reviewer 可建立)
+
+  /annotations/{id}:
+    patch:
+      summary: 更新標註
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                isResolved:
+                  type: boolean
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Annotation'
+        '403':
+          description: 無權限
+        '404':
+          description: 標註不存在
+
+    delete:
+      summary: 刪除標註
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: 刪除成功
+        '403':
+          description: 無權限 (僅建立者可刪除)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+          description: Access token 過期秒數
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [engineer, reviewer, public]
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    Annotation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        userName:
+          type: string
+        projectId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [text, arrow, region]
+        content:
+          type: string
+        position:
+          type: object
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+            z:
+              type: number
+        cameraState:
+          type: object
+          description: 當時的相機視角狀態
+        createdAt:
+          type: string
+          format: date-time
+        isResolved:
+          type: boolean
+
+    CreateAnnotation:
+      type: object
+      required: [projectId, type, content, position]
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [text, arrow, region]
+        content:
+          type: string
+        position:
+          type: object
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+            z:
+              type: number
+        cameraState:
+          type: object
