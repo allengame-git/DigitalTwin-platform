@@ -1,0 +1,93 @@
+/**
+ * Auth API
+ * 
+ * API client for authentication endpoints.
+ * @see specs/4-user-roles-system/contracts/auth-api.yaml
+ */
+
+import type {
+    LoginCredentials,
+    LoginResponse,
+    RefreshResponse,
+    User
+} from '../types/auth';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+
+/**
+ * HTTP client with default options
+ */
+async function fetchApi<T>(
+    endpoint: string,
+    options: RequestInit = {}
+): Promise<T> {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+        credentials: 'include', // For httpOnly cookies
+        headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+        },
+        ...options,
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Request failed' }));
+        throw new Error(error.message || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+/**
+ * Login with email and password
+ */
+export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
+    return fetchApi<LoginResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials),
+    });
+}
+
+/**
+ * Logout and invalidate refresh token
+ */
+export async function logout(): Promise<void> {
+    await fetchApi<void>('/auth/logout', {
+        method: 'POST',
+    });
+}
+
+/**
+ * Refresh access token using httpOnly cookie
+ */
+export async function refresh(): Promise<RefreshResponse> {
+    return fetchApi<RefreshResponse>('/auth/refresh', {
+        method: 'POST',
+    });
+}
+
+/**
+ * Get current authenticated user
+ */
+export async function getCurrentUser(): Promise<User> {
+    return fetchApi<User>('/auth/me');
+}
+
+/**
+ * Validate invite link and get session
+ */
+export async function validateInvite(token: string): Promise<LoginResponse> {
+    return fetchApi<LoginResponse>('/invite/validate', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+    });
+}
+
+/**
+ * Set authorization header for authenticated requests
+ */
+export function getAuthHeader(accessToken: string): Record<string, string> {
+    return {
+        Authorization: `Bearer ${accessToken}`,
+    };
+}

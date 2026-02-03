@@ -10,11 +10,12 @@
   - Frontend: React 18 + TypeScript + Vite
   - State: Zustand
   - UI: Tailwind CSS + Shadcn/ui
-  - 3D: @react-three/fiber (體積渲染), Resium (地圖底圖)
+  - 3D Engine: @react-three/fiber (Three.js) + @react-three/drei
+  - Volume Rendering: Three.js VolumeRenderShader1
   - Charts: ECharts-for-React (時間歷線、統計圖)
-  - Volume Rendering: three.js VolumeRenderShader1 或 vtk.js
+- **Coordinate System**: TWD97 Local Cartesian (EPSG:3826)
 - **Key Dependencies**:
-  - Backend API (Node.js + Express/NestJS)
+  - Backend API (NestJS)
   - 預處理的模擬資料 (抽稀後的 3D Texture / JSON)
   - 情境配置 JSON
 
@@ -25,7 +26,7 @@
   - Scene (Volume/Heatmap) 與 Overlay (Dashboard, ScenarioSelector) 分離
   - Zustand: `useScenarioStore`, `useTimeStepStore`, `useDashboardStore`
 - [x] Aligns with Principle 2: 效能至上 (Performance)
-  - 體積渲染使用 GPU Shader
+  - 體積渲染使用 GPU Shader (Three.js)
   - 分級載入 (LOD) 模擬資料
   - React.memo 優化圖表重繪
 - [x] Aligns with Principle 3: 測試標準 (Testing)
@@ -37,7 +38,7 @@
 
 ## Architecture & Data Flow
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                        React Application                         │
 ├─────────────────────────────────────────────────────────────────┤
@@ -55,19 +56,18 @@
 │         │                 │ 雙向連動                              │
 │         ▼                 ▼                                      │
 │  ┌──────────────────────────────────────────────────────────────┤
-│  │   3D Scene                        Dashboard Panel            │
+│  │   @react-three/fiber Canvas        Dashboard Panel           │
 │  │  ┌────────────────────────┐   ┌────────────────────────────┐ │
-│  │  │ R3F Canvas             │   │  ECharts 時間歷線           │ │
-│  │  │ - Volume Rendering     │   │  Ag-Grid 參數表格          │ │
-│  │  │ - Isosurface           │   │  統計圖表                   │ │
-│  │  │ - Heatmap (Cesium)     │   │                            │ │
+│  │  │ Volume Rendering      │   │  ECharts 時間歷線           │ │
+│  │  │ Isosurface           │   │  Ag-Grid 參數表格          │ │
+│  │  │ Heatmap (Plane mesh) │   │  統計圖表                   │ │
 │  │  └────────────────────────┘   └────────────────────────────┘ │
 │  └──────────────────────────────────────────────────────────────┤
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Backend API (REST)                          │
+│                      Backend API (NestJS)                        │
 │  GET /api/scenarios           → 情境列表 (20 種)                 │
 │  GET /api/scenarios/:id       → 情境詳細 + 參數 + 時間步         │
 │  GET /api/scenarios/:id/volume/:step → 該時間步的體積資料       │

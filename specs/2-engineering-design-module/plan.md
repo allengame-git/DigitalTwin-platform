@@ -10,10 +10,12 @@
   - Frontend: React 18 + TypeScript + Vite
   - State: Zustand
   - UI: Tailwind CSS + Shadcn/ui
-  - 3D/GIS: Resium (Cesium), @react-three/fiber (細節檢視)
+  - 3D Engine: @react-three/fiber (Three.js) + @react-three/drei
+  - Large Models: 3d-tiles-renderer (大型工區 3D Tiles)
   - Charts: ECharts-for-React (施工進度甘特圖)
+- **Coordinate System**: TWD97 Local Cartesian (EPSG:3826)
 - **Key Dependencies**:
-  - Backend API (Node.js + Express/NestJS)
+  - Backend API (NestJS)
   - glTF/3D Tiles 工程模型
   - 施工階段 JSON 配置
   - PDF.js 或外部連結開啟設計圖說
@@ -22,10 +24,10 @@
 
 - [x] Aligns with Principle 1: 程式碼品質與架構 (Code Quality)
   - EngineeringModel, Component, ConstructionPhase interfaces
-  - Scene (3D Tiles Viewer) 與 Overlay (Timeline, InfoPanel) 分離
+  - Scene (3D Canvas) 與 Overlay (Timeline, InfoPanel) 分離
   - Zustand: `useModelStore`, `useTimelineStore`
 - [x] Aligns with Principle 2: 效能至上 (Performance)
-  - Cesium 3D Tiles 漸進式載入
+  - 3d-tiles-renderer 漸進式載入大型 3D Tiles
   - React.memo 避免 Timeline 滑動時重渲染 3D 場景
 - [x] Aligns with Principle 3: 測試標準 (Testing)
   - Timeline 時間計算邏輯測試
@@ -36,7 +38,7 @@
 
 ## Architecture & Data Flow
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                        React Application                         │
 ├─────────────────────────────────────────────────────────────────┤
@@ -53,12 +55,11 @@
 │         │                                                        │
 │         ▼                                                        │
 │  ┌──────────────────────────────────────────────────────────────┤
-│  │                    3D Scene Container                         │
+│  │                @react-three/fiber Canvas                      │
 │  │  ┌────────────────────────────────────────────────────────┐  │
-│  │  │  Resium Cesium3DTileset                                 │  │
+│  │  │  3d-tiles-renderer + glTF Loader                          │  │
 │  │  │  - 工程模型 (壩體/廠房/隧道)                             │  │
-│  │  │  - Terrain Clamping                                     │  │
-│  │  │  - 構件高亮 (Hover/Select)                              │  │
+│  │  │  - Raycaster Picking + 高亮                              │  │
 │  │  │  - 時序顯示/隱藏控制                                    │  │
 │  │  └────────────────────────────────────────────────────────┘  │
 │  └──────────────────────────────────────────────────────────────┤
@@ -66,7 +67,7 @@
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Backend API (REST)                          │
+│                      Backend API (NestJS)                        │
 │  GET /api/models              → 工程模型列表                      │
 │  GET /api/models/:id          → 模型詳細 + 構件 + 階段            │
 │  GET /api/models/:id/phases   → 施工階段 JSON                    │
@@ -77,11 +78,11 @@
 ## Phase 0: Research & Discovery
 
 - [x] Resolve: glTF 構件 Picking 機制
-  - **Decision**: 使用 Cesium scene.pick() + 3D Tiles feature metadata
-- [x] Resolve: Timeline 與 3D Tiles 顯示同步
-  - **Decision**: 透過 tileset.style 動態設定 `show` 條件
-- [x] Resolve: Terrain Clamping 精度
-  - **Decision**: 使用 Cesium heightReference: CLAMP_TO_GROUND
+  - **Decision**: 使用 R3F raycaster + mesh.name 辨識構件
+- [x] Resolve: Timeline 與 3D 模型顯示同步
+  - **Decision**: 透過 Zustand store 控制 mesh.visible 屬性
+- [x] Resolve: 地形吳合方式
+  - **Decision**: 使用 raycasting 對地形 mesh 求取高度，設定模型 Y 座標
 
 ## Phase 1: Core Implementation
 
@@ -102,9 +103,10 @@
 
 ### 1.4 3D Scene Components
 
-- [ ] 建立 `src/components/scene/EngineeringViewer.tsx` — 工程模型 3D Tiles
-- [ ] 實作構件 Picking 與高亮
-- [ ] 實作 Terrain Clamping
+- [ ] 建立 `src/components/scene/EngineeringCanvas.tsx` — R3F Canvas 封裝
+- [ ] 建立 `src/components/scene/ModelLoader.tsx` — 3d-tiles-renderer/glTF 載入
+- [ ] 實作構件 Picking 與高亮 (raycaster)
+- [ ] 實作地形吳合 (terrain raycasting)
 
 ### 1.5 UI Overlay Components
 

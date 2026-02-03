@@ -130,7 +130,7 @@ EngineeringModel (工程模型)
 ├── name: string (模型名稱)
 ├── type: 'dam' | 'plant' | 'tunnel' | 'other'
 ├── modelUrl: string (glTF/3D Tiles URL)
-├── position: { longitude, latitude, altitude }
+├── position: { x, y, z } (TWD97 EPSG:3826)
 ├── components: Component[]
 └── constructionPhases: ConstructionPhase[]
 

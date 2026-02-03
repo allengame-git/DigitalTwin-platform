@@ -149,7 +149,7 @@
 Borehole (鑽孔)
 ├── id: string (唯一識別碼)
 ├── name: string (孔位名稱)
-├── coordinates: { x, y, z } (孔口座標，WGS84)
+├── coordinates: { x, y, z } (孔口座標，TWD97 EPSG:3826)
 ├── depth: number (總深度，公尺)
 ├── waterLevel: number (地下水位深度)
 ├── layers: Layer[] (地層陣列)
@@ -177,3 +177,7 @@ GeologicalStructure (地質構造)
 - Q: 系統首期需要支援的鑽孔數量上限？ → A: 800 個孔位 (對齊實際專案需求)
 - Q: 導覽模式內容如何維護？ → A: JSON 配置檔外部載入
 - Q: 3D 資產載入失敗時如何處理？ → A: 友善錯誤 + 重試按鈕 + 降級顯示 (2D 地圖)
+
+### Session 2026-02-03
+
+- Q: 系統座標系統採用？ → A: TWD97 投影座標 (EPSG:3826)

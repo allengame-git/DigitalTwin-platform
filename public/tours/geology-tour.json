@@ -1,0 +1,87 @@
+{
+    "id": "geology-tour",
+    "name": "地質導覽",
+    "description": "透過自動導覽了解本區域的地質特徵與鑽孔分佈",
+    "steps": [
+        {
+            "id": "overview",
+            "title": "區域概覽",
+            "description": "歡迎來到地質資料展示系統！這是研究區域的全景視角，您可以看到所有 800+ 個鑽孔點位的分佈情況。藍色圓柱體代表個別鑽孔，高度對應其總深度。",
+            "cameraPosition": {
+                "x": 0,
+                "y": 800,
+                "z": 1200
+            },
+            "cameraTarget": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+            },
+            "duration": 6
+        },
+        {
+            "id": "borehole-detail",
+            "title": "鑽孔細節",
+            "description": "讓我們靠近看看鑽孔的細節。每個鑽孔包含完整的地層資訊、岩芯照片與物性曲線。點擊任一鑽孔可以查看詳細資料。",
+            "cameraPosition": {
+                "x": 150,
+                "y": 200,
+                "z": 300
+            },
+            "cameraTarget": {
+                "x": 50,
+                "y": -20,
+                "z": 50
+            },
+            "duration": 6
+        },
+        {
+            "id": "fault-zone",
+            "title": "斷層構造",
+            "description": "紅色線條標示區域內的主要斷層構造。斷層是地質調查的重要參考，與地下水流動和地層穩定性密切相關。",
+            "cameraPosition": {
+                "x": -200,
+                "y": 300,
+                "z": 400
+            },
+            "cameraTarget": {
+                "x": 0,
+                "y": -30,
+                "z": 0
+            },
+            "duration": 6
+        },
+        {
+            "id": "underground-view",
+            "title": "地下透視",
+            "description": "調整透明度可以查看地下結構。3D 地質模型顯示了不同地層的空間分佈，幫助理解地下環境的複雜性。",
+            "cameraPosition": {
+                "x": 100,
+                "y": 100,
+                "z": 200
+            },
+            "cameraTarget": {
+                "x": 0,
+                "y": -50,
+                "z": 0
+            },
+            "duration": 6
+        },
+        {
+            "id": "conclusion",
+            "title": "導覽結束",
+            "description": "感謝您參與導覽！您可以自由探索場景，點擊鑽孔查看詳情，或使用圖層控制面板調整顯示內容。如有任何問題，請聯繫管理人員。",
+            "cameraPosition": {
+                "x": 0,
+                "y": 600,
+                "z": 800
+            },
+            "cameraTarget": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+            },
+            "duration": 5
+        }
+    ]
+}

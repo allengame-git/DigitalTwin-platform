@@ -10,10 +10,13 @@
   - Frontend: React 18 + TypeScript + Vite
   - State: Zustand
   - UI: Tailwind CSS + Shadcn/ui
-  - 3D/GIS: Resium (Cesium), Deck.gl, @react-three/fiber
+  - 3D Engine: @react-three/fiber (Three.js) + @react-three/drei
+  - Large Models: 3d-tiles-renderer (NASA/Google)
+  - Massive Data: InstancedMesh (GPU Instancing, 800+ 鑽孔)
   - Charts: ECharts-for-React
+- **Coordinate System**: TWD97 Local Cartesian (EPSG:3826)
 - **Key Dependencies**:
-  - Backend API (Node.js + Express/NestJS)
+  - Backend API (NestJS)
   - PostgreSQL + PostGIS (空間查詢)
   - 預處理的 glTF/3D Tiles 地質模型
 
@@ -24,11 +27,12 @@
   - 3D Scene 與 UI Overlay 分離架構
   - Zustand stores: `useBoreholeStore`, `useLayerStore`, `useViewerStore`
 - [x] Aligns with Principle 2: 效能至上 (Performance)
-  - Cesium 負責底圖與地形
-  - Deck.gl IconLayer/ColumnLayer 處理 800+ 鑽孔 LOD
+  - 統一使用 @react-three/fiber (Three.js)
+  - InstancedMesh 處理 800+ 鑽孔 (單一 Draw Call)
+  - 3d-tiles-renderer 漸進式載入大型地質模型
   - React.memo 優化重渲染
 - [x] Aligns with Principle 3: 測試標準 (Testing)
-  - 座標轉換 (WGS84 → ECEF) 單元測試
+  - TWD97 座標轉換單元測試
   - LOD 切換邏輯測試
 - [x] Aligns with Principle 4: 一致的使用者體驗 (UX Consistency)
   - 載入進度條 (Suspense + 自訂進度)
@@ -37,13 +41,13 @@
 
 ## Architecture & Data Flow
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                        React Application                         │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐   ┌─────────────┐   ┌─────────────────────────┐│
 │  │ LayerPanel  │   │ DetailPanel │   │      GuidedTour         ││
-│  │ (Overlay)   │   │ (Overlay)   │   │      (Overlay)          ││
+│  │ (HTML Overlay)│   │ (HTML Overlay)│   │      (Overlay)          ││
 │  └──────┬──────┘   └──────┬──────┘   └───────────┬─────────────┘│
 │         │                 │                       │              │
 │         ▼                 ▼                       ▼              │
@@ -54,18 +58,18 @@
 │         │                                                        │
 │         ▼                                                        │
 │  ┌──────────────────────────────────────────────────────────────┤
-│  │                    3D Scene Container                         │
+│  │             @react-three/fiber Canvas                        │
 │  │  ┌────────────┐  ┌────────────┐  ┌────────────────────────┐  │
-│  │  │  Resium    │  │  Deck.gl   │  │  R3F (Modal only)      │  │
-│  │  │  Terrain   │  │  800孔位    │  │  Detail Inspection     │  │
-│  │  │  Imagery   │  │  LOD Icons │  │                        │  │
+│  │  │ 3d-tiles- │  │InstancedMesh│  │  @react-three/drei     │  │
+│  │  │ renderer  │  │  800孔位    │  │  MapControls/Html/Env │  │
+│  │  │ 地質模型  │  │  LOD Icons │  │                        │  │
 │  │  └────────────┘  └────────────┘  └────────────────────────┘  │
 │  └──────────────────────────────────────────────────────────────┤
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Backend API (REST)                          │
+│                      Backend API (NestJS)                        │
 │  GET /api/boreholes       → 鑽孔列表 (分頁/bbox)                  │
 │  GET /api/boreholes/:id   → 鑽孔詳細 + 地層 + 照片                │
 │  GET /api/geology-model   → 3D 地質模型 URL                      │
@@ -81,12 +85,12 @@
 
 ## Phase 0: Research & Discovery
 
-- [x] Resolve: Deck.gl 與 Cesium 整合方式 (MapboxOverlay vs 獨立 canvas)
-  - **Decision**: 使用 `@deck.gl/carto` CesiumWidget 整合模式
+- [x] Resolve: @react-three/fiber + InstancedMesh 800 孔位效能驗證
+  - **Decision**: 使用 InstancedMesh + GPU Instancing，單一 Draw Call 渲染 800+ 圓柱體
 - [x] Resolve: LOD 切換觸發機制
-  - **Decision**: 監聽 Cesium Camera.changed 事件，計算距離後更新 Deck.gl layer props
-- [x] Resolve: 800 孔位效能驗證
-  - **Decision**: 使用 Deck.gl IconLayer (Instanced)，測試通過
+  - **Decision**: 監聽 R3F useFrame 中的 camera distance，動態更新 InstancedMesh 屬性
+- [x] Resolve: 3D Tiles 在 R3F 中載入方式
+  - **Decision**: 使用 3d-tiles-renderer 的 TilesRenderer 整合至 R3F scene
 
 ## Phase 1: Core Implementation
 
@@ -110,10 +114,10 @@
 
 ### 1.4 3D Scene Components
 
-- [ ] 建立 `src/components/scene/CesiumViewer.tsx` — Resium 封裝
-- [ ] 建立 `src/components/scene/BoreholeLayer.tsx` — Deck.gl IconLayer
-- [ ] 建立 `src/components/scene/GeologyModelLayer.tsx` — 3D Tiles Primitive
-- [ ] 實作 LOD 切換邏輯
+- [ ] 建立 `src/components/scene/GeologyCanvas.tsx` — R3F Canvas 封裝
+- [ ] 建立 `src/components/scene/BoreholeInstances.tsx` — InstancedMesh 800 孔位
+- [ ] 建立 `src/components/scene/GeologyTiles.tsx` — 3d-tiles-renderer 地質模型
+- [ ] 實作 LOD 切換邏輯 (基於 camera distance)
 
 ### 1.5 UI Overlay Components
 
@@ -154,7 +158,7 @@
 ### Unit Tests
 
 - [ ] `geology.ts` types — 驗證 interface 完整性
-- [ ] `coordinateUtils.ts` — WGS84/ECEF 轉換正確性
+- [ ] `coordinateUtils.ts` — TWD97 座標處理正確性
 - [ ] `lodCalculator.ts` — LOD 等級判斷邏輯
 
 ### Integration Tests

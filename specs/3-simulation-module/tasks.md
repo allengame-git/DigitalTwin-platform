@@ -114,8 +114,8 @@
 
 **Goal**: 提供替代視覺化方式 (2D 熱圖、流線)
 
-- [ ] T038 [P] [US6] Create 2D heatmap layer using Deck.gl HeatmapLayer in `src/components/scene/HeatmapLayer.tsx`
-- [ ] T039 [P] [US6] Create streamline visualization in `src/components/scene/StreamlineRenderer.tsx`
+- [ ] T038 [P] [US6] Create 2D heatmap using R3F Plane with DataTexture in `src/components/scene/HeatmapPlane.tsx`
+- [ ] T039 [P] [US6] Create streamline visualization using drei Line in `src/components/scene/StreamlineRenderer.tsx`
 - [ ] T040 [US6] Add visualization mode toggle (volume/isosurface/heatmap/streamline)
 - [ ] T041 [US6] Use heatmap as fallback when volume rendering fails
 
@@ -138,8 +138,8 @@
 
 ## Phase 10: Polish & Cross-Cutting Concerns
 
-- [ ] T046 Create SimulationFallback2D using shared `FallbackMap2D` with fallbackType='simulation' in `src/components/scene/SimulationFallback2D.tsx`
-- [ ] T047 Integrate `SceneErrorBoundary` wrapper in simulation viewer entry point
+- [ ] T046 Create SimulationFallback2D using Canvas 2D in `src/components/scene/SimulationFallback2D.tsx`
+- [ ] T047 Integrate `ErrorBoundary` wrapper in simulation viewer entry point
 - [ ] T048 Add WebGL 2.0 capability detection and warning
 
 ---

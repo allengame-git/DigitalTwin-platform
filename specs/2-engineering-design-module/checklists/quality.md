@@ -8,7 +8,7 @@
 
 - [ ] CHK001 - 是否定義支援的 glTF 版本與擴展 (Draco 壓縮等)？ [Gap, Spec §FR-01]
 - [ ] CHK002 - 是否定義 3D Tiles 版本與 LOD 切換策略？ [Gap, Spec §FR-02]
-- [ ] CHK003 - Terrain Clamping 是否定義高程容差與邊緣處理？ [Gap, Spec §FR-03]
+- [ ] CHK003 - Raycasting 地形吻合是否定義高程容差與邊緣處理？ [Gap, Spec §FR-03]
 - [ ] CHK004 - 構件分組是否定義標準分類代碼 (IFC class 或自訂)？ [Gap, Spec §FR-04]
 - [ ] CHK005 - 時間軸是否定義時間單位 (日/週/月) 與起訖範圍？ [Gap, Spec §FR-05]
 - [ ] CHK006 - 施工狀態顏色是否定義具體色碼與圖例？ [Gap, Spec §FR-08]

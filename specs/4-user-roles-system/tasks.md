@@ -1,7 +1,7 @@
 # Implementation Tasks: 使用者角色與權限系統 (User Roles System)
 
 **Feature Branch**: `4-user-roles-system`  
-**Status**: NOT_STARTED  
+**Status**: IN_PROGRESS (Phase 1-6 Complete)  
 **Total Tasks**: 50  
 **Estimated Effort**: 2 sprints
 
@@ -9,11 +9,11 @@
 
 ## Phase 1: Setup & Configuration
 
-- [ ] T001 Create feature branch `4-user-roles-system` from main
-- [ ] T002 Install auth dependencies: `jsonwebtoken`, `bcryptjs` in backend `package.json`
-- [ ] T003 Install Sentry SDK: `@sentry/react`, `@sentry/browser` in frontend `package.json`
-- [ ] T004 Configure Sentry DSN in `.env` as `VITE_SENTRY_DSN`
-- [ ] T005 Create JWT_SECRET and JWT_REFRESH_SECRET in `.env`
+- [x] T001 Create feature branch `4-user-roles-system` from main
+- [x] T002 Install auth dependencies: `jsonwebtoken`, `bcryptjs` in backend `package.json`
+- [x] T003 Install Sentry SDK: `@sentry/react`, `@sentry/browser` in frontend `package.json`
+- [x] T004 Configure Sentry DSN in `.env` as `VITE_SENTRY_DSN`
+- [x] T005 Create JWT_SECRET and JWT_REFRESH_SECRET in `.env`
 
 ---
 
@@ -21,31 +21,31 @@
 
 ### Backend Types & Models
 
-- [ ] T006 [P] Create User model with role enum in `server/models/User.ts`
-- [ ] T007 [P] Create Annotation model in `server/models/Annotation.ts`
-- [ ] T008 [P] Create InviteLink model in `server/models/InviteLink.ts`
-- [ ] T009 [P] Create Session model for token tracking in `server/models/Session.ts`
+- [x] T006 [P] Create User model with role enum in `server/models/User.ts`
+- [x] T007 [P] Create Annotation model in `server/models/Annotation.ts`
+- [x] T008 [P] Create InviteLink model in `server/models/InviteLink.ts`
+- [x] T009 [P] Create Session model for token tracking in `server/models/Session.ts`
 
 ### Frontend Types
 
-- [ ] T010 [P] Create auth types: User, Role, AuthState in `src/types/auth.ts`
-- [ ] T011 [P] Create annotation types: Annotation, CreateAnnotation in `src/types/annotation.ts`
+- [x] T010 [P] Create auth types: User, Role, AuthState in `src/types/auth.ts`
+- [x] T011 [P] Create annotation types: Annotation, CreateAnnotation in `src/types/annotation.ts`
 
 ### Zustand Stores
 
-- [ ] T012 [P] Create authStore with actions: login, logout, refreshToken, checkAuth in `src/stores/authStore.ts`
-- [ ] T013 [P] Create annotationStore with actions: fetchAnnotations, createAnnotation, resolveAnnotation in `src/stores/annotationStore.ts`
+- [x] T012 [P] Create authStore with actions: login, logout, refreshToken, checkAuth in `src/stores/authStore.ts`
+- [x] T013 [P] Create annotationStore with actions: fetchAnnotations, createAnnotation, resolveAnnotation in `src/stores/annotationStore.ts`
 
 ### API Layer
 
-- [ ] T014 Create auth API: login, logout, refresh, validateInvite in `src/api/auth.ts`
-- [ ] T015 Create annotation API: getAnnotations, createAnnotation, updateAnnotation in `src/api/annotation.ts`
+- [x] T014 Create auth API: login, logout, refresh, validateInvite in `src/api/auth.ts`
+- [x] T015 Create annotation API: getAnnotations, createAnnotation, updateAnnotation in `src/api/annotation.ts`
 
 ### Database Schema
 
-- [ ] T016 Create database migration for users table in `server/migrations/001_create_users.sql`
-- [ ] T017 Create database migration for annotations table in `server/migrations/002_create_annotations.sql`
-- [ ] T018 Create database migration for invite_links table in `server/migrations/003_create_invite_links.sql`
+- [x] T016 Create database migration for users table in `server/migrations/001_create_users.sql`
+- [x] T017 Create database migration for annotations table in `server/migrations/002_create_annotations.sql`
+- [x] T018 Create database migration for invite_links table in `server/migrations/003_create_invite_links.sql`
 
 ---
 
@@ -55,17 +55,17 @@
 
 ### Backend
 
-- [ ] T019 [US1] Create auth middleware for JWT validation in `server/middleware/auth.ts`
-- [ ] T020 [US1] Create login endpoint with password verification in `server/routes/auth.ts`
-- [ ] T021 [US1] Create refresh token endpoint with 8-hour expiry for engineer in `server/routes/auth.ts`
-- [ ] T022 [US1] Create logout endpoint to invalidate refresh token in `server/routes/auth.ts`
+- [x] T019 [US1] Create auth middleware for JWT validation in `server/middleware/auth.ts`
+- [x] T020 [US1] Create login endpoint with password verification in `server/routes/auth.ts`
+- [x] T021 [US1] Create refresh token endpoint with 8-hour expiry for engineer in `server/routes/auth.ts`
+- [x] T022 [US1] Create logout endpoint to invalidate refresh token in `server/routes/auth.ts`
 
 ### Frontend
 
-- [ ] T023 [P] [US1] Create login form component in `src/components/auth/LoginForm.tsx`
-- [ ] T024 [P] [US1] Create auth context provider in `src/contexts/AuthContext.tsx`
-- [ ] T025 [US1] Implement token refresh timer based on role
-- [ ] T026 [US1] Create logout confirmation modal in `src/components/auth/LogoutModal.tsx`
+- [x] T023 [P] [US1] Create login form component in `src/components/auth/LoginForm.tsx`
+- [x] T024 [P] [US1] Create auth context provider in `src/contexts/AuthContext.tsx`
+- [x] T025 [US1] Implement token refresh timer based on role
+- [x] T026 [US1] Create logout confirmation modal in `src/components/auth/LogoutModal.tsx`
 
 **Independent Test Criteria**: 工程師可登入並在 8 小時後自動登出
 
@@ -75,11 +75,11 @@
 
 **Goal**: 審查委員透過邀請連結登入，1 小時 Session
 
-- [ ] T027 [US2] Create invite link generation endpoint in `server/routes/invite.ts`
-- [ ] T028 [US2] Create invite link validation endpoint in `server/routes/invite.ts`
-- [ ] T029 [US2] Create invite landing page component in `src/pages/InvitePage.tsx`
-- [ ] T030 [US2] Implement 1-hour session timeout for reviewer role
-- [ ] T031 [US2] Create session expiry warning modal (5 min before) in `src/components/auth/SessionWarning.tsx`
+- [x] T027 [US2] Create invite link generation endpoint in `server/routes/invite.ts`
+- [x] T028 [US2] Create invite link validation endpoint in `server/routes/invite.ts`
+- [x] T029 [US2] Create invite landing page component in `src/pages/InvitePage.tsx`
+- [x] T030 [US2] Implement 1-hour session timeout for reviewer role
+- [x] T031 [US2] Create session expiry warning modal (5 min before) in `src/components/auth/SessionWarning.tsx`
 
 **Independent Test Criteria**: 審查委員點邀請連結進入系統，1 小時後登出
 
@@ -89,10 +89,10 @@
 
 **Goal**: 民眾無需登入即可存取導覽模式
 
-- [ ] T032 [US3] Create public route configuration (no auth required) in `src/routes/publicRoutes.ts`
-- [ ] T033 [US3] Create public layout with simplified UI in `src/layouts/PublicLayout.tsx`
-- [ ] T034 [US3] Auto-start guided tour for public users
-- [ ] T035 [US3] Hide complex tools (量測、匯出) for public role
+- [x] T032 [US3] Create public route configuration (no auth required) in `src/routes/publicRoutes.ts`
+- [x] T033 [US3] Create public layout with simplified UI in `src/layouts/PublicLayout.tsx`
+- [x] T034 [US3] Auto-start guided tour for public users
+- [x] T035 [US3] Hide complex tools (量測、匯出) for public role
 
 **Independent Test Criteria**: 民眾直接存取 /public 路徑進入導覽模式
 
@@ -102,11 +102,11 @@
 
 **Goal**: 依角色限制功能存取
 
-- [ ] T036 [US4] Create ProtectedRoute component with role checking in `src/components/auth/ProtectedRoute.tsx`
-- [ ] T037 [US4] Create RoleBasedUI HOC for conditional rendering in `src/components/auth/RoleBasedUI.tsx`
-- [ ] T038 [US4] Create permission config mapping roles to features in `src/config/permissions.ts`
-- [ ] T039 [US4] Create unauthorized access page with friendly message in `src/pages/UnauthorizedPage.tsx`
-- [ ] T040 [US4] Apply ProtectedRoute to all feature routes
+- [x] T036 [US4] Create ProtectedRoute component with role checking in `src/components/auth/ProtectedRoute.tsx`
+- [x] T037 [US4] Create RoleBasedUI HOC for conditional rendering in `src/components/auth/RoleBasedUI.tsx`
+- [x] T038 [US4] Create permission config mapping roles to features in `src/config/permissions.ts`
+- [x] T039 [US4] Create unauthorized access page with friendly message in `src/pages/UnauthorizedPage.tsx`
+- [x] T040 [US4] Apply ProtectedRoute to all feature routes
 
 **Independent Test Criteria**: 審查委員無法存取工程師專屬功能
 
@@ -117,7 +117,7 @@
 **Goal**: 審查委員可在 3D 場景中建立標註
 
 - [ ] T041 [P] [US5] Create annotation toolbar (text/arrow/region) in `src/components/annotation/AnnotationToolbar.tsx`
-- [ ] T042 [P] [US5] Create annotation renderer for 3D scene in `src/components/annotation/AnnotationRenderer.tsx`
+- [ ] T042 [P] [US5] Create annotation renderer using R3F/drei Html in `src/components/annotation/AnnotationRenderer.tsx`
 - [ ] T043 [US5] Create annotation entry form with camera state capture in `src/components/annotation/AnnotationForm.tsx`
 - [ ] T044 [US5] Create annotation list panel in `src/components/annotation/AnnotationList.tsx`
 - [ ] T045 [US5] Implement click-to-navigate to annotation position

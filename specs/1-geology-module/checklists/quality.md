@@ -7,9 +7,11 @@
 ## Requirement Completeness 需求完整性
 
 - [ ] CHK001 - 是否明確規定 LOD 距離閾值 (>2km 與 <2km) 的確切判定邏輯？ [Clarity, Spec §FR-06]
-- [ ] CHK002 - 切片工具是否定義支援的剖面角度範圍與限制？ [Gap, Spec §FR-02]
+- [x] CHK002 - 切片工具是否定義支援的剖面角度範圍與限制？ [Gap, Spec §FR-02]  
+  **Clarified**: 首期支援垂直剖面 (0-90° 傾角)，水平切片可透過高程滑桿控制
 - [ ] CHK003 - 爆炸圖模式是否定義地層分離距離與動畫行為？ [Gap, Spec §FR-04]
-- [ ] CHK004 - 是否定義鑽探資料 CSV/Excel 的標準化欄位名稱與格式？ [Gap, Spec §FR-13]
+- [x] CHK004 - 是否定義鑽探資料 CSV/Excel 的標準化欄位名稱與格式？ [Gap, Spec §FR-13]  
+  **Deferred**: 此需求屬於 Phase 2 (資料處理) 範圍，首期不需實作
 - [ ] CHK005 - 地質構造符號 (Strike/Dip) 是否定義顏色編碼與尺寸規範？ [Gap, Spec §FR-12]
 - [ ] CHK006 - 導覽模式 JSON 配置是否定義 Schema 結構？ [Gap, Spec §FR-18]
 
@@ -24,7 +26,7 @@
 ## Requirement Consistency 需求一致性
 
 - [ ] CHK012 - FR-05 (500孔位) 與更新後的 800 孔位需求是否在所有相關章節同步？ [Consistency]
-- [ ] CHK013 - 3D 場景的座標系統 (WGS84) 是否與資料模型定義一致？ [Consistency, Data Model]
+- [ ] CHK013 - 3D 場景的座標系統 (TWD97) 是否與資料模型定義一致？ [Consistency, Data Model]
 - [ ] CHK014 - 圖層控制面板的圖層列表是否與各 FR 定義的圖層類型完全對應？ [Consistency, Spec §FR-16]
 - [ ] CHK015 - Loading States 需求 (NFR-06) 是否涵蓋所有異步載入操作？ [Consistency with Constitution §4]
 
@@ -61,5 +63,5 @@
 
 - [ ] CHK033 - 是否明確定義所有 Interface (Borehole, Layer 等) 的必填/選填欄位？ [Constitution §1]
 - [ ] CHK034 - 是否明確定義 JSDoc 註釋的必要區塊 (座標轉換邏輯)？ [Constitution §1]
-- [ ] CHK035 - 是否明確定義 Deck.gl vs Three.js 的使用場景分界？ [Constitution §2]
+- [ ] CHK035 - 是否明確定義 InstancedMesh vs 3d-tiles-renderer 的使用場景分界？ [Constitution §2]
 - [ ] CHK036 - 是否定義 Tooltip 內容格式與顯示時機？ [Constitution §4]

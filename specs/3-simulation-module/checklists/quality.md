@@ -15,7 +15,8 @@
 
 ## Requirement Clarity 需求清晰度
 
-- [ ] CHK007 - 「30 FPS 體積渲染」是否定義測量條件 (體積大小、解析度)？ [Ambiguity, Spec §NFR-01]
+- [x] CHK007 - 「30 FPS 體積渲染」是否定義測量條件 (體積大小、解析度)？ [Ambiguity, Spec §NFR-01]  
+  **Clarified**: 測量條件為 128×128×64 體積網格 + 中階獨顯 (GTX 1650 等級) + 1080p 解析度
 - [ ] CHK008 - 「2 秒內完成情境切換」是否定義網路條件與資料預載策略？ [Clarity, Spec §NFR-02]
 - [ ] CHK009 - 「無明顯掉幀」的具體定義是否與 NFR-01 一致？ [Ambiguity, Spec §NFR-03]
 - [ ] CHK010 - 「分級載入」是否定義 LOD 層級數量與切換條件？ [Clarity, Spec §NFR-04]

@@ -30,7 +30,7 @@ Sync Impact Report: 2026-02-02
 
 ### 2. 效能至上 (Performance Quality)
 
-- **Rendering Strategy**: 分級渲染策略——Cesium 用於底圖與地形，Deck.gl 用於大量數據點 (>100)，Three.js 僅用於局部細節檢視。
+- **Rendering Strategy**: 統一使用 @react-three/fiber (Three.js)——InstancedMesh 用於大量重複物件 (800+)，3d-tiles-renderer 用於超大型 3D Tiles 模型。
 - **Asset Optimization**: 優先使用 Draco 壓縮的 `.glb` 或 `3D Tiles`，並配合 `Suspense` 實作非同步載入。
 - **Memory Management**: 組件卸載時必須 Dispose 幾何與材質；重複物件必須使用 `InstancedMesh`。
 

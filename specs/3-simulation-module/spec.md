@@ -162,7 +162,7 @@ TimeStep (時間步)
 ObservationPoint (觀測點)
 ├── id: string
 ├── name: string
-├── coordinates: { longitude, latitude, depth }
+├── coordinates: { x, y, depth } (TWD97 EPSG:3826)
 ├── timeSeries: { time: Date, value: number }[]
 └── unit: string (單位)
 ```

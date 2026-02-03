@@ -10,7 +10,7 @@
 ## Phase 1: Setup & Configuration
 
 - [ ] T001 Create feature branch `2-engineering-design-module` from main
-- [ ] T002 Verify Cesium 3D Tiles dependencies are installed (from geology module)
+- [ ] T002 Verify R3F and 3d-tiles-renderer dependencies are installed (from geology module)
 - [ ] T003 Add PDF.js dependency for document viewing in `package.json`
 
 ---
@@ -37,10 +37,10 @@
 
 **Goal**: 載入並顯示工程模型 (壩體、廠房、隧道)
 
-- [ ] T009 [US1] Create 3D Tiles loader for engineering models in `src/components/scene/EngineeringViewer.tsx`
-- [ ] T010 [US1] Implement terrain clamping for model placement
+- [ ] T009 [US1] Create R3F Canvas with 3d-tiles-renderer for engineering models in `src/components/scene/EngineeringCanvas.tsx`
+- [ ] T010 [US1] Implement terrain mesh and raycasting for model placement
 - [ ] T011 [US1] Create model loading progress indicator in `src/components/overlay/ModelLoadingProgress.tsx`
-- [ ] T012 [US1] Add model to scene with proper positioning
+- [ ] T012 [US1] Add model to scene with proper TWD97 positioning
 
 **Independent Test Criteria**: 工程模型成功載入並顯示於地形上
 
@@ -50,8 +50,8 @@
 
 **Goal**: 點擊構件顯示設計參數與相關資料
 
-- [ ] T013 [US2] Implement component picking via Cesium scene.pick in `src/components/scene/EngineeringViewer.tsx`
-- [ ] T014 [US2] Create component highlight shader effect
+- [ ] T013 [US2] Implement component picking via R3F raycaster in `src/components/scene/EngineeringCanvas.tsx`
+- [ ] T014 [US2] Create component highlight using emissive material effect
 - [ ] T015 [P] [US2] Create component info panel with parameters in `src/components/overlay/ComponentInfo.tsx`
 - [ ] T016 [P] [US2] Create document link component for design drawings in `src/components/overlay/DocumentLink.tsx`
 - [ ] T017 [US2] Connect picking to modelStore selection state
@@ -115,10 +115,10 @@
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T035 Create EngineeringFallback2D using shared `FallbackMap2D` with fallbackType='engineering' in `src/components/scene/EngineeringFallback2D.tsx`
-- [ ] T036 Integrate `SceneErrorBoundary` wrapper in engineering viewer entry point
+- [ ] T035 Create EngineeringFallback2D using Canvas 2D in `src/components/scene/EngineeringFallback2D.tsx`
+- [ ] T036 Integrate `ErrorBoundary` wrapper in engineering viewer entry point
 - [ ] T037 Create loading progress percentage display
-- [ ] T038 Optimize 3D Tiles LOD for performance
+- [ ] T038 Optimize 3d-tiles-renderer LOD for performance
 - [ ] T039 Accessibility review: keyboard timeline controls
 - [ ] T040 Create construction phase JSON schema in `src/schemas/phase-schema.json`
 - [ ] T041 Create SketchUp to glTF conversion guide in `docs/sketchup-conversion.md`
