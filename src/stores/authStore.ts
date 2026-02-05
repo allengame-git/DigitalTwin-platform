@@ -16,6 +16,7 @@ interface AuthStore extends AuthState {
     accessToken: string | null;
     tokenExpiresAt: number | null;
     sessionExpiresAt: number | null;
+    _hasHydrated: boolean;
 
     // Actions
     login: (credentials: LoginCredentials) => Promise<void>;
@@ -24,6 +25,7 @@ interface AuthStore extends AuthState {
     refreshToken: () => Promise<void>;
     checkAuth: () => Promise<void>;
     setPublicUser: () => void;
+    setHasHydrated: (state: boolean) => void;
 
     // Session management
     isSessionExpiringSoon: () => boolean;
@@ -49,6 +51,7 @@ export const useAuthStore = create<AuthStore>()(
             accessToken: null,
             tokenExpiresAt: null,
             sessionExpiresAt: null,
+            _hasHydrated: false,
 
             login: async (credentials: LoginCredentials) => {
                 set({ isLoading: true, error: null });
@@ -128,6 +131,9 @@ export const useAuthStore = create<AuthStore>()(
             },
 
             checkAuth: async () => {
+                // 如果還沒水合完成，先跳過，等下一次調用
+                if (!get()._hasHydrated) return;
+
                 const { accessToken, tokenExpiresAt, sessionExpiresAt } = get();
 
                 // No token or session expired
@@ -144,7 +150,7 @@ export const useAuthStore = create<AuthStore>()(
 
                 // Token still valid, verify with server
                 try {
-                    const user = await authApi.getCurrentUser();
+                    const user = await authApi.getCurrentUser(accessToken);
                     set({ user, isAuthenticated: true, isLoading: false });
                 } catch {
                     await get().logout();
@@ -165,6 +171,14 @@ export const useAuthStore = create<AuthStore>()(
                     isLoading: false,
                     error: null,
                 });
+            },
+
+            setHasHydrated: (state: boolean) => {
+                set({ _hasHydrated: state });
+                // 水合完成後立刻檢查一次權限
+                if (state) {
+                    get().checkAuth();
+                }
             },
 
             isSessionExpiringSoon: () => {
@@ -199,12 +213,15 @@ export const useAuthStore = create<AuthStore>()(
         {
             name: 'auth-storage',
             partialize: (state) => ({
-                // Persist auth data
                 user: state.user,
+                isAuthenticated: state.isAuthenticated,
                 accessToken: state.accessToken,
                 tokenExpiresAt: state.tokenExpiresAt,
                 sessionExpiresAt: state.sessionExpiresAt,
             }),
+            onRehydrateStorage: () => (state) => {
+                state?.setHasHydrated(true);
+            },
         }
     )
 );

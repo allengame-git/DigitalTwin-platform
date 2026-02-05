@@ -25,7 +25,7 @@ async function fetchApi<T>(
         credentials: 'include', // For httpOnly cookies
         headers: {
             'Content-Type': 'application/json',
-            ...options.headers,
+            ...(options.headers || {}),
         },
         ...options,
     });
@@ -69,8 +69,9 @@ export async function refresh(): Promise<RefreshResponse> {
 /**
  * Get current authenticated user
  */
-export async function getCurrentUser(): Promise<User> {
-    return fetchApi<User>('/auth/me');
+export async function getCurrentUser(token?: string): Promise<User> {
+    const headers = token ? getAuthHeader(token) : {};
+    return fetchApi<User>('/auth/me', { headers });
 }
 
 /**

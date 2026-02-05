@@ -37,7 +37,7 @@ const defaultLayers: Record<LayerType, LayerConfig> = {
     boreholes: { id: 'boreholes', name: '鑽孔點位', visible: true, opacity: 1 },
     geology3d: { id: 'geology3d', name: '3D 地質模型', visible: true, opacity: 1 },
     faults: { id: 'faults', name: '斷層線', visible: true, opacity: 1 },
-    attitudes: { id: 'attitudes', name: '位態符號', visible: false, opacity: 1 },
+    attitudes: { id: 'attitudes', name: '位態符號', visible: true, opacity: 1 },
     terrain: { id: 'terrain', name: 'DEM 地形', visible: true, opacity: 1 },
     imagery: { id: 'imagery', name: '航照圖', visible: false, opacity: 0.7 },
 };
