@@ -9,6 +9,9 @@
 import React, { useState } from 'react';
 import { useLayerStore, LayerType } from '../../stores/layerStore';
 import { useViewerStore } from '../../stores/viewerStore';
+import { MultiSectionPanel } from '../controls/MultiSectionPanel';
+import { ImagerySelector } from '../controls/ImagerySelector';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface LayerPanelProps {
     position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -23,6 +26,7 @@ const LAYER_ICONS: Record<LayerType, string> = {
     attitudes: '📐',
     terrain: '⛰️',
     imagery: '🛰️',
+    geophysics: '📡',
 };
 
 export const LayerPanel: React.FC<LayerPanelProps> = ({
@@ -182,6 +186,12 @@ export const LayerPanel: React.FC<LayerPanelProps> = ({
 
                     {/* Auto LOD Toggle */}
                     <AutoLodToggle />
+
+                    {/* Multi Section Panel */}
+                    <MultiSectionPanel mode="embedded" />
+
+                    {/* Imagery Selector - Admin/Engineer only */}
+                    <ImagerySelectorTrigger />
                 </div>
             )}
         </div>
@@ -269,6 +279,49 @@ const AutoLodToggle: React.FC = () => {
                     style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
             </label>
+        </div>
+    );
+};
+
+// Sub-component for Imagery Selector (Admin/Engineer only)
+const ImagerySelectorTrigger: React.FC = () => {
+    const { user } = useAuth();
+    const [isOpen, setIsOpen] = useState(false);
+
+    // 權限檢查
+    const canAccess = user?.role === 'admin' || user?.role === 'engineer';
+    if (!canAccess) return null;
+
+    return (
+        <div
+            style={{
+                marginTop: '12px',
+                paddingTop: '12px',
+                borderTop: '1px solid #e5e7eb',
+            }}
+        >
+            <button
+                onClick={() => setIsOpen(true)}
+                style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    background: '#f1f5f9',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: '#374151',
+                }}
+            >
+                <span>⚙️ 圖資設定</span>
+                <span style={{ color: '#9ca3af', fontSize: '11px' }}>admin/engineer</span>
+            </button>
+
+            <ImagerySelector isOpen={isOpen} onClose={() => setIsOpen(false)} />
         </div>
     );
 };

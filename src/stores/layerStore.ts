@@ -11,7 +11,8 @@ export type LayerType =
     | 'faults'
     | 'attitudes'
     | 'terrain'
-    | 'imagery';
+    | 'imagery'
+    | 'geophysics';
 
 interface LayerConfig {
     id: LayerType;
@@ -40,6 +41,7 @@ const defaultLayers: Record<LayerType, LayerConfig> = {
     attitudes: { id: 'attitudes', name: '位態符號', visible: true, opacity: 1 },
     terrain: { id: 'terrain', name: 'DEM 地形', visible: true, opacity: 1 },
     imagery: { id: 'imagery', name: '航照圖', visible: false, opacity: 0.7 },
+    geophysics: { id: 'geophysics', name: '地球物理探查', visible: true, opacity: 1 },
 };
 
 export const useLayerStore = create<LayerState & LayerActions>((set) => ({

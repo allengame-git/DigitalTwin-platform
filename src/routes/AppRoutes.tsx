@@ -17,7 +17,7 @@ const UnauthorizedPage = React.lazy(() => import('../pages/UnauthorizedPage'));
 const DashboardPage = React.lazy(() => import('../pages/DashboardPage'));
 
 // Lazy load placeholder pages
-const DataExplorerPage = React.lazy(() => import('../pages/PlaceholderPages').then(m => ({ default: m.DataExplorerPage })));
+const DataManagementPage = React.lazy(() => import('../pages/DataManagementPage'));
 const GeologyPage = React.lazy(() => import('../pages/GeologyPage'));
 const EngineeringPage = React.lazy(() => import('../pages/PlaceholderPages').then(m => ({ default: m.EngineeringPage })));
 const SimulationPage = React.lazy(() => import('../pages/PlaceholderPages').then(m => ({ default: m.SimulationPage })));
@@ -115,7 +115,7 @@ const router = createBrowserRouter([
                 path: '/data',
                 element: (
                     <ProtectedRoute allowedRoles={['admin', 'engineer']}>
-                        <DataExplorerPage />
+                        <DataManagementPage />
                     </ProtectedRoute>
                 ),
             },

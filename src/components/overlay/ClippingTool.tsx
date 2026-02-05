@@ -19,19 +19,23 @@ export const ClippingTool: React.FC<ClippingToolProps> = ({ mode = 'floating' })
     const [enabled, setEnabled] = useState(false);
     const [axis, setAxis] = useState<ClippingAxis>('y');
     const [position, setPosition] = useState(0);
+    const [invert, setInvert] = useState(false);
     const { setClippingPlane } = useViewerStore();
 
     // 更新 clipping plane
-    const handleUpdate = (newEnabled: boolean, newAxis: ClippingAxis, newPosition: number) => {
+    const handleUpdate = (newEnabled: boolean, newAxis: ClippingAxis, newPosition: number, newInvert: boolean) => {
         if (newEnabled) {
             const normal: [number, number, number] = [0, 0, 0];
             // Swap Y and Z: User 'y' -> Three 'z' (index 2), User 'z' -> Three 'y' (index 1)
             const axisIndex = newAxis === 'x' ? 0 : newAxis === 'y' ? 2 : 1;
-            normal[axisIndex] = 1;
+
+            // Apply inversion
+            normal[axisIndex] = newInvert ? -1 : 1;
+
             setClippingPlane({
                 enabled: true,
                 normal,
-                constant: newPosition,
+                constant: newInvert ? -newPosition : newPosition,
             });
         } else {
             setClippingPlane({
@@ -45,17 +49,23 @@ export const ClippingTool: React.FC<ClippingToolProps> = ({ mode = 'floating' })
     const handleToggle = () => {
         const newEnabled = !enabled;
         setEnabled(newEnabled);
-        handleUpdate(newEnabled, axis, position);
+        handleUpdate(newEnabled, axis, position, invert);
     };
 
     const handleAxisChange = (newAxis: ClippingAxis) => {
         setAxis(newAxis);
-        handleUpdate(enabled, newAxis, position);
+        handleUpdate(enabled, newAxis, position, invert);
     };
 
     const handlePositionChange = (value: number) => {
         setPosition(value);
-        handleUpdate(enabled, axis, value);
+        handleUpdate(enabled, axis, value, invert);
+    };
+
+    const handleInvertToggle = () => {
+        const newInvert = !invert;
+        setInvert(newInvert);
+        handleUpdate(enabled, axis, position, newInvert);
     };
 
     const containerStyle: React.CSSProperties = mode === 'floating'
@@ -167,9 +177,24 @@ export const ClippingTool: React.FC<ClippingToolProps> = ({ mode = 'floating' })
                             style={{ width: '100%', cursor: 'pointer' }}
                         />
                     </div>
+
+                    {/* Invert Direction Toggle */}
+                    <div style={{ marginTop: '12px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={invert}
+                                onChange={handleInvertToggle}
+                                style={{ marginRight: '6px' }}
+                            />
+                            <span style={{ fontSize: '12px', color: '#374151' }}>
+                                反轉切片方向
+                            </span>
+                        </label>
+                    </div>
                 </>
             )}
-        </div>
+        </div >
     );
 };
 

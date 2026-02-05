@@ -9,14 +9,17 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 
+// Load environment variables immediately
+dotenv.config();
+
 import authRoutes from './routes/auth';
 import inviteRoutes from './routes/invite';
 import annotationsRoutes from './routes/annotations';
+import uploadRoutes from './routes/upload';
 import { requestIdMiddleware, requestLogger, errorLogger } from './middleware/errorLogger';
+import path from 'path';
 
-// Load environment variables
-dotenv.config();
-
+// Middleware
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -30,10 +33,14 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+// Static file serving for uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/invite', inviteRoutes);
 app.use('/api/annotations', annotationsRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

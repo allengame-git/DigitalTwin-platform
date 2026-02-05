@@ -1,0 +1,79 @@
+// Prisma Schema for DigitalTwin Platform
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// 航照圖資料
+model Imagery {
+  id           String   @id @default(uuid())
+  filename     String   @unique
+  originalName String?
+  
+  // Metadata (必填)
+  year         Int      // 資料年份
+  name         String   // 資料名稱
+  
+  // Metadata (選填)
+  source       String?  // 資料來源
+  description  String?  // 資料說明
+  
+  // 地理定位資訊 (Optional - 可自動解析或手動輸入)
+  minX         Float?
+  maxX         Float?
+  minY         Float?
+  maxY         Float?
+  
+  // 檔案資訊
+  size         Int
+  url          String
+  thumbnailUrl String
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("imagery")
+}
+
+/// 地球物理探查資料
+model Geophysics {
+  id           String   @id @default(uuid())
+  filename     String   @unique
+  originalName String?
+  
+  // Metadata
+  year         Int              // 資料年份 (必填)
+  name         String           // 資料名稱 (必填)
+  lineId       String?          // 測線編號
+  method       String           // 探查方法 (必填: ERT/GPR/Seismic)
+  description  String?          // 資料說明
+  
+  // 左端點座標 - TWD97 (必填, 公尺)
+  x1           Float
+  y1           Float
+  z1           Float
+  
+  // 右端點座標 - TWD97 (必填, 公尺)
+  x2           Float
+  y2           Float
+  z2           Float
+  
+  // 深度範圍 (可選 - 未填則依圖片比例換算)
+  depthTop     Float?           // 剖面頂部深度 (預設 0)
+  depthBottom  Float?           // 剖面底部深度
+  
+  // 檔案資訊
+  size         Int
+  url          String
+  thumbnailUrl String
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("geophysics")
+}

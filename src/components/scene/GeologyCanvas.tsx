@@ -13,12 +13,14 @@ import { SceneEnvironment } from './SceneEnvironment';
 import { LoadingProgress } from '../overlay/LoadingProgress';
 // Phase 7-10 新增元件
 import { GeologyTiles } from './GeologyTiles';
+import { MockGeologyVolume } from './MockGeologyVolume';
 import { ClippingPlane } from './ClippingPlane';
 import { StructureLines } from './StructureLines';
 import { StrikeDipSymbol } from './StrikeDipSymbol';
 import { ImageryPlane } from './ImageryPlane';
 import { TerrainMesh } from './TerrainMesh';
 import { PerformanceMonitor } from './PerformanceMonitor';
+import { GeophysicsPlane } from './GeophysicsPlane';
 
 interface GeologyCanvasProps {
     /** 是否顯示 FPS 統計 */
@@ -46,6 +48,7 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
                 gl={{
                     antialias: RENDERER_CONFIG.antialias,
                     alpha: RENDERER_CONFIG.alpha,
+                    stencil: true, // For Stencil Cap Rendering
                     powerPreference: RENDERER_CONFIG.powerPreference,
                     logarithmicDepthBuffer: RENDERER_CONFIG.logarithmicDepthBuffer,
                 }}
@@ -57,9 +60,11 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
                     {/* Phase 8.5: Terrain & Imagery (底層) */}
                     <TerrainMesh />
                     <ImageryPlane />
+                    <GeophysicsPlane />
 
-                    {/* Phase 7: 3D 地質模型 */}
-                    <GeologyTiles />
+                    {/* Phase 7: 3D 地質模型 (使用 Mock Volume) */}
+                    {/* <GeologyTiles /> */}
+                    <MockGeologyVolume />
 
                     {/* Phase 3-5: 鑽孔點位 */}
                     <BoreholeInstances />

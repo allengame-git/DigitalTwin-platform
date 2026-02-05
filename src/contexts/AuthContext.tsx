@@ -53,9 +53,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         extendSession,
     } = useAuthStore();
 
-    const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const warningTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const expiryTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Check auth on mount
     useEffect(() => {

@@ -24,6 +24,7 @@ export const LOD_THRESHOLDS = {
 export const RENDERER_CONFIG = {
     antialias: true,
     alpha: false,
+    stencil: true, // 啟用 Stencil Buffer (用於剖面填充)
     powerPreference: 'high-performance' as const,
     logarithmicDepthBuffer: true, // 避免 z-fighting
 };

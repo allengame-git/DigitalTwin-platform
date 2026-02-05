@@ -1,93 +1,192 @@
-# Next Steps & Handover Guide
+# NextSteps.md - 後續開發指引
 
-This document outlines the current state of the LLRWD DigitalTwin Platform (specifically the Geology Module) and provides detailed instructions for the next phase of development.
-
-## 📌 Context for Next Agent
-
-### Current Status (as of 2026-02-05)
-
-The **Geology Module** is robust and functionally complete for an MVP.
-
-- **Borehole Visualization**: Fully implemented with InstancedMesh, LOD, and lithology segmentation.
-- **Reference Data**: TWD97 coordinate conversion, Fault Planes (Normal/Reverse/Slip) with valid 3D geometry and Info Panels.
-- **Interaction**: Robust click/hover handling on Boreholes and Faults.
-- **Authentication**: Secure JWT flow with `httpOnly` cookie refresh, session persistence, and hydration checks.
-- **Data**: Still using **Mock Data** (`boreholeStore.ts`, `StructureLines.tsx`), ready for API insertion.
-- **UI/UX**: Refined premium styling for info panels, Layer management, and performance monitoring.
-
-### Critical Implementation Details
-
-- **Borehole Interaction**: We use `onClick` on `InstancedMesh`. *Important*: We added a `key` prop to the mesh (`key={isIconMode ? 'icon' : 'detail'}`) to force React to remount the component when switching between Geometry types (Sphere vs Cylinder). **Do not remove this key**, or the click handler will break after zooming out/in.
-- **Data Sync**: The Detail Panel uses the *same* layer data as the 3D scene. This is ensured in `boreholeStore.ts` by using `borehole.layers` from the state rather than regenerating it.
-- **Controls**: `MapControls` has `enableDamping={false}` to prevent sliding inertia, providing precise clicking interaction.
-- **Terrain**: The mock terrain has `maxElevation: 300` to match borehole heights, and `raycast={() => null}` to allow clicking through it.
+本文件記錄專案目前的完成狀態與後續待辦事項，供接手的 AI Agent 或開發人員參考。
 
 ---
 
-## 🚀 Immediate Next Steps (Priority High)
+## 📍 目前狀態
 
-### 1. API Integration (Replace Mock Data)
+**最後更新**: 2026-02-05
 
-The current application runs on generated mock data. The most critical next step is to connect to the real backend.
+### 已完成功能
 
-- **Action**: In `src/stores/boreholeStore.ts`, replace `generateMockBoreholes` and the timeout-based `fetchBoreholes` with actual API calls.
-- **Reference**: See `src/types/api.ts` (if exists) or create an API service layer (e.g., using `axios` or `fetch`).
-- **Endpoint Requirements**:
-  - `GET /api/boreholes`: Should return the list of boreholes with basic info (x, y, elevation, totalDepth).
-  - `GET /api/boreholes/{id}`: Should return detailed data including layers, properties, and photos.
+#### 1. 地質模組 (Geology Module)
 
-### 2. Asset Replacement
+- ✅ 3D 場景初始化 (React Three Fiber + Three.js)
+- ✅ 800+ 鑽孔 InstancedMesh 高效渲染
+- ✅ LOD (Level of Detail) 自動切換機制
+- ✅ 鑽孔點選互動與詳細資訊面板
+- ✅ 圖層控制面板 (開關、透明度)
+- ✅ 剖面切片工具 (Clipping Plane)
+- ✅ 斷層線與位態符號視覺化
+- ✅ 導覽模式 (Guided Tour)
 
-Currently using placeholder colors and generated noisemaps.
+#### 2. 資料管理 (Data Management)
 
-- **Terrain**: Replace `TerrainMesh`'s mock elevation generator with a real **DEM (Digital Elevation Model)** loader (e.g., GeoTIFF or Heightmap texture).
-- **Imagery**: Replace `ImageryPlane`'s solid color with actual **Orthophoto Tiles** (e.g., WMTS or static textures).
-- **3D Tiles**: The `GeologyTiles` component is set up but likely needs a real `url` pointing to a Tileset (e.g., Cesium ion or local server) representing the broader geological context.
+- ✅ 航照圖上傳功能
+  - 支援 JPG/PNG/TIF 格式
+  - GeoTIFF 自動解析座標
+  - 手動輸入 TWD97 座標
+  - 縮圖自動產生
+  - 詳細資料 Modal
+  - 刪除功能（含確認 Modal）
 
-### 3. Engineering Module (New Feature)
+- ✅ 地球物理探查資料功能 (New)
+  - Prisma Schema: `Geophysics` model
+  - 後端 API: POST/GET/DELETE `/api/upload/geophysics`
+  - 前端 Store: `uploadStore.ts` (GeophysicsFile, actions)
+  - 資料管理 UI: 上傳區塊、表單 Modal、檔案卡片
+  - 3D 場景: `GeophysicsPlane.tsx` 垂直剖面渲染
+  - 圖層控制: `layerStore` 新增 'geophysics' 類型
 
-Start developing the "Engineering Design" module.
+#### 3. 基礎架構
 
-- **Goal**: Visualize planned structures (tunnels, disposal pits, silos).
-- **Components**: Create new components in `src/components/scene/engineering/` (e.g., `TunnelMesh`, `FacilityModel`).
-- **Integration**: Add a new route/page or a toggle in the UI to switch between "Geology View" and "Engineering View".
+- ✅ 身分驗證 (JWT Token + Refresh)
+- ✅ Docker PostgreSQL 資料庫設定
+- ✅ Prisma 7 ORM 整合
 
----
-
-## 🛠 Technical Debt & Visual Polish
-
-### 1. Color Legend
-
-- **Issue**: Users see colored borehole segments but don't know what rock type "Brown" or "Grey" represents.
-- **Task**: Implement a `Legend` component in the UI (e.g., bottom-right floating panel) mapping `GEOLOGY_COLORS` to lithology names.
-
-### 2. Unit Tests
-
-- **Status**: Zero unit coverage.
-- **Task**: Set up Vitest or Jest. Add tests for:
-  - `utils/coordinates.ts` (TWD97 conversion correctness).
-  - `utils/lod.ts` (Level calculation logic).
-  - `boreholeStore.ts` (State actions).
-
-### 3. Performance Tuning (Large Scale)
-
-- **Monitoring**: Keep an eye on the `PerfromanceMonitor` when loading >2000 boreholes.
-- **Optimization**: If frame drops occur, look into `three-bvh` for raycasting optimization, or use a WebWorker for parsing API data.
-
----
-
-## 📂 File Structure Guidance
-
-If you are adding new features, please follow this structure:
+### 資料庫連線資訊
 
 ```
-src/
-  stores/       # Logic & State (Zustand)
-  components/
-    scene/      # 3D Objects only
-    overlay/    # 2D UI (HTML/CSS)
-  hooks/        # Reusable hook logic
-  utils/        # Pure functions
+Container: llrwd-postgres
+Port: 5433
+Database: llrwddb
+User: postgres
+Password: postgres
 ```
 
-**Good luck!**
+---
+
+## 🔜 待辦事項 (Next Steps)
+
+### 高優先級
+
+#### 1. 地球物理探查功能驗證與優化
+
+- [ ] 實際測試上傳流程（上傳圖片、填入座標、確認 3D 顯示）
+- [ ] 驗證座標轉換正確性（TWD97 → Three.js 世界座標）
+- [ ] 檢查深度計算邏輯（依圖片比例 vs 手動輸入）
+- [ ] 優化剖面圖渲染（可能需要調整 depthWrite、renderOrder 避免 Z-fighting）
+
+#### 2. 真實資料整合
+
+- [ ] 串接真實後端 API 取代 Mock 鑽孔資料
+- [ ] 串接真實航照圖 Tile 服務
+- [ ] 串接真實 3D Tiles 地質模型
+
+#### 3. 航照圖 3D 顯示
+
+- [ ] `ImageryPlane.tsx` 目前使用固定邊界
+- [ ] 應從 `uploadStore` 讀取航照圖的 minX/maxX/minY/maxY 動態定位
+
+### 中優先級
+
+#### 4. 使用者體驗優化
+
+- [ ] 地球物理探查詳細資料 Modal 新增「在 3D 場景中定位」按鈕
+- [ ] 上傳進度條（目前只有 spinner）
+- [ ] 批次上傳功能
+
+#### 5. 圖層面板增強
+
+- [ ] 地球物理探查圖層的子項目展開（顯示各測線）
+- [ ] 單獨控制每條測線的可見性
+
+#### 6. 剖面工具擴展
+
+- [ ] 支援沿地球物理探查測線方向切片
+- [ ] 多剖面同時顯示
+
+### 低優先級
+
+#### 7. 效能優化
+
+- [ ] 地球物理探查資料量大時的分頁載入
+- [ ] 縮圖 Lazy Loading
+
+#### 8. 新模組開發
+
+- [ ] 工程設計模組 (Engineering Design)
+- [ ] 模擬模組 (Simulation)
+
+---
+
+## 📁 關鍵檔案位置
+
+### 後端
+
+| 檔案 | 說明 |
+|------|------|
+| `server/routes/upload.ts` | 航照圖 & 地球物理探查 API 路由 |
+| `server/prisma/schema.prisma` | 資料庫 Schema (Imagery, Geophysics) |
+| `server/prisma.config.ts` | Prisma 設定（讀取 DATABASE_URL） |
+| `server/.env` | 環境變數（DATABASE_URL） |
+
+### 前端 Store
+
+| 檔案 | 說明 |
+|------|------|
+| `src/stores/uploadStore.ts` | 航照圖 & 地球物理探查狀態管理 |
+| `src/stores/layerStore.ts` | 圖層控制（含 'geophysics' 類型） |
+| `src/stores/boreholeStore.ts` | 鑽孔資料 |
+| `src/stores/viewerStore.ts` | 3D 檢視器狀態 (LOD, Clipping) |
+
+### 前端元件
+
+| 檔案 | 說明 |
+|------|------|
+| `src/pages/DataManagementPage.tsx` | 資料管理頁面（航照圖 + 地球物理探查 UI） |
+| `src/components/scene/GeophysicsPlane.tsx` | 地球物理探查 3D 剖面渲染 |
+| `src/components/scene/GeologyCanvas.tsx` | 3D 場景主容器 |
+| `src/components/overlay/LayerPanel.tsx` | 圖層控制面板 |
+
+### 工具函式
+
+| 檔案 | 說明 |
+|------|------|
+| `src/utils/coordinates.ts` | TWD97 ↔ Three.js 座標轉換 |
+
+---
+
+## ⚠️ 已知問題
+
+1. **終端機權限錯誤** (`EPERM: process.cwd failed`)
+   - 原因：目錄被刪除/重建後終端機 session 權限脫節
+   - 解法：關閉並重新開啟 Terminal
+
+2. **Prisma 7 變更**
+   - `schema.prisma` 中不再支援 `url = env("DATABASE_URL")`
+   - 需透過 `prisma.config.ts` 的 `datasource.url` 設定
+
+3. **Docker PostgreSQL**
+   - 使用 Port 5433 避免與系統預設 PostgreSQL (5432) 衝突
+   - 每次重新開機需執行 `docker start llrwd-postgres`
+
+---
+
+## 🔧 開發指令速查
+
+```bash
+# 後端
+cd server
+npm run dev                    # 啟動 (nodemon)
+npx prisma db push             # 同步 Schema
+npx prisma generate            # 產生 Client
+npx prisma studio              # 開啟資料庫 GUI
+
+# 前端
+npm run dev                    # 開發伺服器
+npm run build                  # 生產建置
+npm run lint                   # ESLint 檢查
+
+# Docker 資料庫
+docker start llrwd-postgres    # 啟動
+docker stop llrwd-postgres     # 停止
+docker logs llrwd-postgres     # 查看 logs
+```
+
+---
+
+## 📞 聯絡資訊
+
+如有問題或需要額外說明，請參考專案 README.md 或聯繫專案負責人。

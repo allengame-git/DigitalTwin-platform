@@ -46,11 +46,28 @@ export interface ClippingPlaneConfig {
     constant: number;
 }
 
+/** 多剖面切割設定 */
+export interface MultiSectionConfig {
+    /** 是否啟用 */
+    enabled: boolean;
+    /** 切割軸向 */
+    axis: 'x' | 'y';
+    /** 剖面數量 (1-10) */
+    count: number;
+    /** 剖面間距 (公尺) */
+    spacing: number;
+    /** 間隙寬度 (公尺) - 用於顯示內部剖面 */
+    gapWidth: number;
+    /** 起始位置 (公尺) */
+    startPosition: number;
+}
+
 /** 檢視器狀態 (Zustand store 用) */
 export interface ViewerState {
     camera: CameraState;
     config: ViewerConfig;
     clippingPlane: ClippingPlaneConfig;
+    multiSection: MultiSectionConfig;
     /** 是否正在載入 */
     isLoading: boolean;
     /** 載入進度 (0-100) */
@@ -63,6 +80,7 @@ export interface ViewerActions {
     setConfig: (config: Partial<ViewerConfig>) => void;
     setLODLevel: (level: LODLevel) => void;
     setClippingPlane: (plane: Partial<ClippingPlaneConfig>) => void;
+    setMultiSection: (section: Partial<MultiSectionConfig>) => void;
     setLoading: (isLoading: boolean, progress?: number) => void;
     resetCamera: () => void;
 }
@@ -72,3 +90,4 @@ export interface CameraRef {
     camera: Camera | null;
     updateCamera: (state: Partial<CameraState>) => void;
 }
+

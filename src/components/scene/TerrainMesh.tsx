@@ -9,6 +9,8 @@
 import React, { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useLayerStore } from '../../stores/layerStore';
+import { useViewerStore } from '../../stores/viewerStore';
+import { generateMockElevation } from '../../utils/terrain';
 
 interface TerrainMeshProps {
     width?: number;
@@ -17,32 +19,6 @@ interface TerrainMeshProps {
     heightSegments?: number;
     maxElevation?: number;
     position?: [number, number, number];
-}
-
-// 生成假的高程資料 (Perlin-like noise)
-function generateMockElevation(
-    widthSegments: number,
-    heightSegments: number,
-    maxElevation: number
-): Float32Array {
-    const count = (widthSegments + 1) * (heightSegments + 1);
-    const elevations = new Float32Array(count);
-
-    for (let j = 0; j <= heightSegments; j++) {
-        for (let i = 0; i <= widthSegments; i++) {
-            const index = j * (widthSegments + 1) + i;
-            // 簡單的正弦波組合模擬地形
-            const x = i / widthSegments;
-            const y = j / heightSegments;
-            const elevation =
-                Math.sin(x * Math.PI * 2) * Math.cos(y * Math.PI * 3) * maxElevation * 0.5 +
-                Math.sin(x * Math.PI * 5 + y * Math.PI * 4) * maxElevation * 0.3 +
-                Math.random() * maxElevation * 0.2;
-            elevations[index] = Math.max(0, elevation);
-        }
-    }
-
-    return elevations;
 }
 
 export function TerrainMesh({
@@ -55,6 +31,7 @@ export function TerrainMesh({
 }: TerrainMeshProps) {
     const { layers } = useLayerStore();
     const terrainLayer = layers.terrain;
+    const clippingConfig = useViewerStore(state => state.clippingPlane);
     const meshRef = useRef<THREE.Mesh>(null);
 
     // 建立地形幾何
@@ -75,6 +52,12 @@ export function TerrainMesh({
         return geo;
     }, [width, height, widthSegments, heightSegments, maxElevation]);
 
+    // Clipping setup
+    const clippingPlanes = useMemo(() => {
+        if (!clippingConfig.enabled) return [];
+        return [new THREE.Plane(new THREE.Vector3(...clippingConfig.normal), clippingConfig.constant)];
+    }, [clippingConfig]);
+
     // 材質
     const material = useMemo(() => {
         return new THREE.MeshStandardMaterial({
@@ -85,8 +68,10 @@ export function TerrainMesh({
             transparent: terrainLayer.opacity < 1,
             opacity: terrainLayer.opacity,
             side: THREE.DoubleSide,
+            clippingPlanes: clippingPlanes,
+            clipShadows: true,
         });
-    }, [terrainLayer.opacity]);
+    }, [terrainLayer.opacity, clippingPlanes]);
 
     if (!terrainLayer.visible) return null;
 
