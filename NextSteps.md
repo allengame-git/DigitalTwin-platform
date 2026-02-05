@@ -4,15 +4,16 @@ This document outlines the current state of the LLRWD DigitalTwin Platform (spec
 
 ## 📌 Context for Next Agent
 
-### Current Status (as of 2026-02-03)
+### Current Status (as of 2026-02-05)
 
-The **Geology Module** is largely functionally complete for an MVP.
+The **Geology Module** is robust and functionally complete for an MVP.
 
-- **Borehole Visualization**: Fully implemented with InstancedMesh, LOD (Icon/Column/Detail), and lithology segmentation.
-- **Interaction**: Robust click/hover handling on boreholes (fixed issues with LOD switching key-remounting).
-- **Data**: Currently using synchronized **Mock Data** (generated in `boreholeStore.ts`).
-- **UI/UX**: Collapsible sidebar, Layer management (Opacity/Visibility), Auto-LOD toggle, Performance monitor.
-- **Performance**: Optimized with InstancedMesh and `useFrame` based LOD calculations.
+- **Borehole Visualization**: Fully implemented with InstancedMesh, LOD, and lithology segmentation.
+- **Reference Data**: TWD97 coordinate conversion, Fault Planes (Normal/Reverse/Slip) with valid 3D geometry and Info Panels.
+- **Interaction**: Robust click/hover handling on Boreholes and Faults.
+- **Authentication**: Secure JWT flow with `httpOnly` cookie refresh, session persistence, and hydration checks.
+- **Data**: Still using **Mock Data** (`boreholeStore.ts`, `StructureLines.tsx`), ready for API insertion.
+- **UI/UX**: Refined premium styling for info panels, Layer management, and performance monitoring.
 
 ### Critical Implementation Details
 

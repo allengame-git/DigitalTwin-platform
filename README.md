@@ -89,9 +89,10 @@ npm run build
 - [x] **Core**: 專案基礎建設、TypeScript 設定、3D 場景初始化。
 - [x] **Data**: 鑽孔資料 Store (Mock)、TWD97 座標轉換。
 - [x] **Visualization**: 800+ 鑽孔 InstancedMesh 渲染、LOD 機制。
-- [x] **Interaction**: 點選鑽孔、詳細資訊面板 (地層/物性/照片)。
+- [x] **Interaction**: 點選鑽孔/斷層，檢視詳細資訊面板 (支援自適應 UI)。
 - [x] **Layer Control**: 圖層開關 (Boreholes, Structures, Terrain) 與透明度控制。
 - [x] **Tools**: 剖面切片工具 (Clipping Plane)、斷層線與位態顯示。
+- [x] **Auth**: 完整的身分驗證流程，包含 Token 持久化與背景驗證。
 - [x] **Features**: 導覽模式架構 (Guided Tour)、WebGL 錯誤降級 (Fallback 2D)。
 
 ### Pending Features (Next Steps)
