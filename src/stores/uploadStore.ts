@@ -93,6 +93,51 @@ export interface GeophysicsMetadata {
     depthBottom?: string;
 }
 
+// ===============================
+// 3D 地質模型類型
+// ===============================
+
+export interface GeologyModelFile {
+    id: string;
+    filename: string;
+    originalName?: string;
+    version: string;
+    year: number;
+    name: string;
+    description?: string;
+    sourceData?: string;
+    cellSizeX?: number;
+    cellSizeY?: number;
+    cellSizeZ?: number;
+    minX?: number;
+    maxX?: number;
+    minY?: number;
+    maxY?: number;
+    minZ?: number;
+    maxZ?: number;
+    tilesetUrl?: string;
+    meshUrl?: string;
+    meshFormat?: 'glb' | 'pnts';
+    size: number;
+    conversionStatus: 'pending' | 'processing' | 'completed' | 'failed';
+    conversionProgress: number; // 0-100
+    conversionError?: string;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt?: string;
+}
+
+export interface GeologyModelMetadata {
+    version: string;
+    year: number;
+    name: string;
+    description?: string;
+    sourceData?: string;
+    cellSizeX?: string;
+    cellSizeY?: string;
+    cellSizeZ?: string;
+}
+
 export interface UploadState {
     // 已上傳檔案
     imageryFiles: UploadedFile[];
@@ -101,6 +146,9 @@ export interface UploadState {
     // 地球物理探查資料
     geophysicsFiles: GeophysicsFile[];
     activeGeophysicsId: string | null;
+    // 3D 地質模型
+    geologyModels: GeologyModelFile[];
+    activeGeologyModelId: string | null;
     // 上傳狀態
     isUploading: boolean;
     uploadProgress: number;
@@ -120,6 +168,13 @@ export interface UploadActions {
     deleteGeophysics: (id: string) => Promise<void>;
     setActiveGeophysics: (id: string | null) => void;
     getActiveGeophysics: () => GeophysicsFile | null;
+    // 3D 地質模型
+    fetchGeologyModels: () => Promise<void>;
+    uploadGeologyModel: (file: File, metadata: GeologyModelMetadata) => Promise<void>;
+    deleteGeologyModel: (id: string) => Promise<void>;
+    activateGeologyModel: (id: string) => Promise<void>;
+    pollGeologyModelStatus: (id: string) => Promise<void>;
+    getActiveGeologyModel: () => GeologyModelFile | null;
     // 共用
     clearError: () => void;
 }
@@ -130,6 +185,8 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
     activeImageryId: null,
     geophysicsFiles: [],
     activeGeophysicsId: null,
+    geologyModels: [],
+    activeGeologyModelId: null,
     isUploading: false,
     uploadProgress: 0,
     uploadError: null,
@@ -308,6 +365,133 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
     getActiveGeophysics: () => {
         const state = get();
         return state.geophysicsFiles.find(f => f.id === state.activeGeophysicsId) || null;
+    },
+
+    // ===============================
+    // 3D 地質模型 Actions
+    // ===============================
+    fetchGeologyModels: async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/geology-model`);
+            const data = await res.json();
+            if (data.success) {
+                const models = data.data as GeologyModelFile[];
+                set({ geologyModels: models });
+                // 自動選中 isActive 的模型
+                const activeModel = models.find(m => m.isActive);
+                if (activeModel) {
+                    set({ activeGeologyModelId: activeModel.id });
+                }
+            }
+        } catch (error) {
+            console.error('Fetch geology models error:', error);
+        }
+    },
+
+    uploadGeologyModel: async (file: File, metadata: GeologyModelMetadata) => {
+        set({ isUploading: true, uploadProgress: 0, uploadError: null });
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('version', metadata.version);
+            formData.append('year', metadata.year.toString());
+            formData.append('name', metadata.name);
+            if (metadata.description) formData.append('description', metadata.description);
+            if (metadata.sourceData) formData.append('sourceData', metadata.sourceData);
+            if (metadata.cellSizeX) formData.append('cellSizeX', metadata.cellSizeX);
+            if (metadata.cellSizeY) formData.append('cellSizeY', metadata.cellSizeY);
+            if (metadata.cellSizeZ) formData.append('cellSizeZ', metadata.cellSizeZ);
+
+            const res = await fetch(`${API_BASE}/api/geology-model`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                set(state => ({
+                    geologyModels: [data.data, ...state.geologyModels],
+                    isUploading: false,
+                    uploadProgress: 100,
+                }));
+            } else {
+                throw new Error(data.message || '上傳失敗');
+            }
+        } catch (error) {
+            set({
+                isUploading: false,
+                uploadError: (error as Error).message,
+            });
+        }
+    },
+
+    deleteGeologyModel: async (id: string) => {
+        try {
+            const res = await fetch(`${API_BASE}/api/geology-model/${id}`, {
+                method: 'DELETE',
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                set(state => ({
+                    geologyModels: state.geologyModels.filter(m => m.id !== id),
+                    activeGeologyModelId: state.activeGeologyModelId === id
+                        ? null
+                        : state.activeGeologyModelId,
+                }));
+            }
+        } catch (error) {
+            console.error('Delete geology model error:', error);
+        }
+    },
+
+    activateGeologyModel: async (id: string) => {
+        try {
+            const res = await fetch(`${API_BASE}/api/geology-model/${id}/activate`, {
+                method: 'POST',
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                // 更新所有模型的 isActive 狀態
+                set(state => ({
+                    geologyModels: state.geologyModels.map(m => ({
+                        ...m,
+                        isActive: m.id === id,
+                    })),
+                    activeGeologyModelId: id,
+                }));
+            }
+        } catch (error) {
+            console.error('Activate geology model error:', error);
+        }
+    },
+
+    pollGeologyModelStatus: async (id: string) => {
+        try {
+            const res = await fetch(`${API_BASE}/api/geology-model/${id}/status`);
+            const data = await res.json();
+
+            if (data.success) {
+                // 更新特定模型的狀態
+                set(state => ({
+                    geologyModels: state.geologyModels.map(m =>
+                        m.id === id
+                            ? { ...m, ...data.data }
+                            : m
+                    ),
+                }));
+            }
+        } catch (error) {
+            console.error('Poll geology model status error:', error);
+        }
+    },
+
+    getActiveGeologyModel: () => {
+        const state = get();
+        return state.geologyModels.find(m => m.id === state.activeGeologyModelId) || null;
     },
 
     // ===============================

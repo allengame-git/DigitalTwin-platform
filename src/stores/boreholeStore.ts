@@ -33,19 +33,13 @@ interface BoreholeActions {
 }
 
 // Mock 資料生成 (開發用)
+import { LITHOLOGY_MAP } from '../config/lithologyConfig';
+
 const generateMockBoreholes = (count: number): Borehole[] => {
     const boreholes: Borehole[] = [];
     // TWD97 座標範圍 (與 coordinates.ts TWD97_ORIGIN 一致)
     const baseX = 250000;
     const baseY = 2600000;
-
-    const LITHOLOGIES = [
-        { code: 'CL', name: '黏土', color: '#8b4513' },
-        { code: 'SM', name: '砂質粉土', color: '#c2b280' },
-        { code: 'GP', name: '礫石', color: '#a0522d' },
-        { code: 'SD', name: '砂岩', color: '#f4a460' },
-        { code: 'SH', name: '頁岩', color: '#708090' },
-    ];
 
     for (let i = 0; i < count; i++) {
         const totalDepth = 20 + Math.random() * 80;
@@ -55,7 +49,7 @@ const generateMockBoreholes = (count: number): Borehole[] => {
         while (currentDepth < totalDepth) {
             const thickness = 2 + Math.random() * 10;
             const bottomDepth = Math.min(currentDepth + thickness, totalDepth);
-            const lithology = LITHOLOGIES[Math.floor(Math.random() * LITHOLOGIES.length)];
+            const lithology = LITHOLOGY_MAP[Math.floor(Math.random() * LITHOLOGY_MAP.length)];
 
             layers.push({
                 id: `${i}-${layers.length}`,

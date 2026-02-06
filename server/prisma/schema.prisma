@@ -77,3 +77,49 @@ model Geophysics {
 
   @@map("geophysics")
 }
+
+/// 3D 地質模型 (Voxel 資料)
+model GeologyModel {
+  id           String   @id @default(uuid())
+  filename     String   @unique    // 儲存的檔名
+  originalName String?             // 上傳時原始檔名
+  
+  // Metadata
+  version      String              // 版本號 e.g. "v1.0"
+  year         Int                 // 資料年份
+  name         String              // 模型名稱
+  description  String?             // 說明
+  sourceData   String?             // 資料來源 e.g. "GemPy 模擬"
+  
+  // 網格資訊
+  cellSizeX    Float?              // X 方向解析度 (m)
+  cellSizeY    Float?              // Y 方向解析度 (m)
+  cellSizeZ    Float?              // Z 方向解析度 (m)
+  
+  // 空間範圍 (TWD97, 公尺)
+  minX         Float?
+  maxX         Float?
+  minY         Float?
+  maxY         Float?
+  minZ         Float?
+  maxZ         Float?
+  
+  // 檔案資訊
+  tilesetUrl   String?             // 舊版: 3D Tiles tileset.json 路徑
+  meshUrl      String?             // 新版: GLB mesh 路徑
+  meshFormat   String?             // 格式: 'glb' | 'pnts'
+  size         Int                 // 檔案大小 (bytes)
+  
+  // 轉換狀態: pending | processing | completed | failed
+  conversionStatus String @default("pending")
+  conversionProgress Int @default(0) // 0-100
+  conversionError  String?
+  
+  // 版本控制
+  isActive     Boolean @default(false)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("geology_models")
+}

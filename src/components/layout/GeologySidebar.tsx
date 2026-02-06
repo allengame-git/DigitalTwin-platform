@@ -3,19 +3,89 @@
  * @module components/layout/GeologySidebar
  * 
  * 整合式地質模組側邊欄
- * 包含：標題、圖層控制、工具列
+ * 包含：標題、模型版本選擇器、圖層控制、工具列
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LayerPanel } from '../overlay/LayerPanel';
 import { ClippingTool } from '../overlay/ClippingTool';
 import { usePerformanceStore } from '../../stores/performanceStore';
+import { useUploadStore } from '../../stores/uploadStore';
+import { useCameraStore } from '../../stores/cameraStore';
+
+/**
+ * 模型版本選擇器子元件
+ */
+const ModelVersionSelector: React.FC = () => {
+    const {
+        geologyModels,
+        activeGeologyModelId,
+        fetchGeologyModels,
+        activateGeologyModel,
+    } = useUploadStore();
+
+    useEffect(() => {
+        fetchGeologyModels();
+    }, [fetchGeologyModels]);
+
+    const completedModels = geologyModels.filter(m => m.conversionStatus === 'completed');
+    const activeModel = geologyModels.find(m => m.id === activeGeologyModelId);
+
+    if (completedModels.length === 0) {
+        return (
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid #e5e7eb' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
+                    🧊 3D 地質模型
+                </div>
+                <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                    尚無可用模型，請至資料管理頁面上傳
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid #e5e7eb' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
+                🧊 3D 地質模型版本
+            </div>
+            <select
+                value={activeGeologyModelId || ''}
+                onChange={(e) => {
+                    if (e.target.value) activateGeologyModel(e.target.value);
+                }}
+                style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    background: 'white',
+                    cursor: 'pointer',
+                }}
+            >
+                <option value="" disabled>選擇模型版本</option>
+                {completedModels.map(m => (
+                    <option key={m.id} value={m.id}>
+                        v{m.version} - {m.name} ({m.year}年)
+                    </option>
+                ))}
+            </select>
+            {activeModel && (
+                <div style={{ marginTop: '8px', fontSize: '11px', color: '#6b7280' }}>
+                    目前使用: v{activeModel.version} · {activeModel.name}
+                </div>
+            )}
+        </div>
+    );
+};
 
 export const GeologySidebar: React.FC = () => {
     // 收合狀態
     const [isCollapsed, setIsCollapsed] = React.useState(false);
     const { fps, memory, triangles } = usePerformanceStore();
+    const { resetCamera } = useCameraStore();
 
     return (
         <div
@@ -123,11 +193,47 @@ export const GeologySidebar: React.FC = () => {
                     transition: 'opacity 0.2s ease',
                 }}
             >
+                {/* Model Version Selector Section */}
+                <ModelVersionSelector />
+
                 {/* Layer Control Section */}
                 <LayerPanel mode="embedded" />
 
                 {/* Analysis Tools Section */}
                 <ClippingTool mode="embedded" />
+
+                {/* Camera Tools Section */}
+                <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
+                        📷 相機控制
+                    </div>
+                    <button
+                        onClick={resetCamera}
+                        style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            background: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            transition: 'background 0.2s',
+                        }}
+                        onMouseOver={(e) => (e.currentTarget.style.background = '#2563eb')}
+                        onMouseOut={(e) => (e.currentTarget.style.background = '#3b82f6')}
+                    >
+                        🎯 重置相機位置
+                    </button>
+                    <div style={{ marginTop: '6px', fontSize: '11px', color: '#6b7280' }}>
+                        將相機移動到當前模型的中心位置
+                    </div>
+                </div>
 
                 {/* Future tools can go here */}
             </div>

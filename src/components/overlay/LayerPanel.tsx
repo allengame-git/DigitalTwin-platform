@@ -2,14 +2,14 @@
  * LayerPanel Component
  * @module components/overlay/LayerPanel
  * 
- * 圖層控制面板 - 用於切換圖層顯示與調整透明度
- * Tasks: T033, T034, T035
+ * 圖層控制面板 - 分頁設計
+ * - 圖層頁: 所有使用者 - 圖層開關與透明度
+ * - 設定頁: admin/engineer - 自動 LOD、背景顏色、圖資設定
  */
 
 import React, { useState } from 'react';
 import { useLayerStore, LayerType } from '../../stores/layerStore';
 import { useViewerStore } from '../../stores/viewerStore';
-import { MultiSectionPanel } from '../controls/MultiSectionPanel';
 import { ImagerySelector } from '../controls/ImagerySelector';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -18,6 +18,8 @@ interface LayerPanelProps {
     defaultCollapsed?: boolean;
     mode?: 'floating' | 'embedded';
 }
+
+type TabType = 'layers' | 'settings';
 
 const LAYER_ICONS: Record<LayerType, string> = {
     boreholes: '⚫',
@@ -35,13 +37,10 @@ export const LayerPanel: React.FC<LayerPanelProps> = ({
     mode = 'floating',
 }) => {
     const [collapsed, setCollapsed] = useState(defaultCollapsed);
-    const {
-        layers,
-        undergroundTransparency,
-        toggleLayer,
-        setOpacity,
-        setUndergroundTransparency,
-    } = useLayerStore();
+    const [activeTab, setActiveTab] = useState<TabType>('layers');
+    const { user } = useAuth();
+
+    const canAccessSettings = user?.role === 'admin' || user?.role === 'engineer';
 
     const positionStyles: Record<string, React.CSSProperties> = {
         'top-left': { top: 80, left: 16 },
@@ -57,7 +56,7 @@ export const LayerPanel: React.FC<LayerPanelProps> = ({
             background: 'rgba(255, 255, 255, 0.95)',
             borderRadius: '8px',
             boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
-            minWidth: collapsed ? 'auto' : '240px',
+            minWidth: collapsed ? 'auto' : '260px',
             zIndex: 100,
             pointerEvents: 'auto',
             fontFamily: 'system-ui, sans-serif',
@@ -89,7 +88,7 @@ export const LayerPanel: React.FC<LayerPanelProps> = ({
                 onClick={() => setCollapsed(!collapsed)}
             >
                 <span style={{ fontWeight: 600, fontSize: '14px', color: '#1f2937' }}>
-                    🗂️ 圖層控制
+                    🗂️ 控制面板
                 </span>
                 <span style={{ fontSize: '12px', color: '#6b7280' }}>
                     {collapsed ? '▼' : '▲'}
@@ -98,103 +97,217 @@ export const LayerPanel: React.FC<LayerPanelProps> = ({
 
             {/* Content */}
             {!collapsed && (
-                <div style={{ padding: '8px 12px 12px' }}>
-                    {/* Layer Toggles */}
-                    {Object.values(layers).map((layer) => (
-                        <div
-                            key={layer.id}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '6px 0',
-                                borderBottom: '1px solid #f3f4f6',
-                            }}
-                        >
-                            <label
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    cursor: 'pointer',
-                                    flex: 1,
-                                }}
+                <>
+                    {/* Tab Navigation */}
+                    {canAccessSettings && (
+                        <div style={{
+                            display: 'flex',
+                            borderBottom: '1px solid #e5e7eb',
+                        }}>
+                            <TabButton
+                                active={activeTab === 'layers'}
+                                onClick={() => setActiveTab('layers')}
                             >
-                                <input
-                                    type="checkbox"
-                                    checked={layer.visible}
-                                    onChange={() => toggleLayer(layer.id)}
-                                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                                />
-                                <span style={{ fontSize: '13px' }}>
-                                    {LAYER_ICONS[layer.id]} {layer.name}
-                                </span>
-                            </label>
-
-                            {/* Opacity Slider (只在可見時顯示) */}
-                            {layer.visible && (
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="1"
-                                    step="0.1"
-                                    value={layer.opacity}
-                                    onChange={(e) => setOpacity(layer.id, parseFloat(e.target.value))}
-                                    style={{ width: '60px', cursor: 'pointer' }}
-                                    title={`透明度: ${Math.round(layer.opacity * 100)}%`}
-                                />
-                            )}
+                                🗂️ 圖層
+                            </TabButton>
+                            <TabButton
+                                active={activeTab === 'settings'}
+                                onClick={() => setActiveTab('settings')}
+                            >
+                                ⚙️ 設定
+                            </TabButton>
                         </div>
-                    ))}
+                    )}
 
-                    {/* Underground Transparency */}
-                    <div
+                    {/* Tab Content */}
+                    <div style={{ padding: '8px 12px 12px' }}>
+                        {activeTab === 'layers' && <LayersTab />}
+                        {activeTab === 'settings' && canAccessSettings && <SettingsTab />}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
+// Tab Button Component
+const TabButton: React.FC<{
+    active: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+}> = ({ active, onClick, children }) => (
+    <button
+        onClick={onClick}
+        style={{
+            flex: 1,
+            padding: '8px 12px',
+            background: active ? '#f8fafc' : 'transparent',
+            border: 'none',
+            borderBottom: active ? '2px solid #3b82f6' : '2px solid transparent',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: active ? 600 : 400,
+            color: active ? '#1f2937' : '#6b7280',
+            transition: 'all 0.2s',
+        }}
+    >
+        {children}
+    </button>
+);
+
+// ===============================
+// 圖層頁面
+// ===============================
+const LayersTab: React.FC = () => {
+    const {
+        layers,
+        undergroundTransparency,
+        toggleLayer,
+        setOpacity,
+        setUndergroundTransparency,
+    } = useLayerStore();
+
+    return (
+        <>
+            {/* Layer Toggles */}
+            {Object.values(layers).map((layer) => (
+                <div
+                    key={layer.id}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 0',
+                        borderBottom: '1px solid #f3f4f6',
+                    }}
+                >
+                    <label
                         style={{
-                            marginTop: '12px',
-                            paddingTop: '12px',
-                            borderTop: '1px solid #e5e7eb',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            cursor: 'pointer',
+                            flex: 1,
                         }}
                     >
-                        <div
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                marginBottom: '6px',
-                            }}
-                        >
-                            <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
-                                🌐 地下透視
-                            </span>
-                            <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                                {Math.round(undergroundTransparency * 100)}%
-                            </span>
-                        </div>
+                        <input
+                            type="checkbox"
+                            checked={layer.visible}
+                            onChange={() => toggleLayer(layer.id)}
+                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: '13px' }}>
+                            {LAYER_ICONS[layer.id]} {layer.name}
+                        </span>
+                    </label>
+
+                    {layer.visible && (
                         <input
                             type="range"
                             min="0"
                             max="1"
-                            step="0.05"
-                            value={undergroundTransparency}
-                            onChange={(e) => setUndergroundTransparency(parseFloat(e.target.value))}
-                            style={{ width: '100%', cursor: 'pointer' }}
+                            step="0.1"
+                            value={layer.opacity}
+                            onChange={(e) => setOpacity(layer.id, parseFloat(e.target.value))}
+                            style={{ width: '60px', cursor: 'pointer' }}
+                            title={`透明度: ${Math.round(layer.opacity * 100)}%`}
                         />
-                    </div>
-
-                    {/* Background Color Picker */}
-                    <BackgroundColorPicker />
-
-                    {/* Auto LOD Toggle */}
-                    <AutoLodToggle />
-
-                    {/* Multi Section Panel */}
-                    <MultiSectionPanel mode="embedded" />
-
-                    {/* Imagery Selector - Admin/Engineer only */}
-                    <ImagerySelectorTrigger />
+                    )}
                 </div>
-            )}
-        </div>
+            ))}
+
+            {/* Underground Transparency */}
+            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '6px',
+                }}>
+                    <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+                        🌐 地下透視
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                        {Math.round(undergroundTransparency * 100)}%
+                    </span>
+                </div>
+                <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={undergroundTransparency}
+                    onChange={(e) => setUndergroundTransparency(parseFloat(e.target.value))}
+                    style={{ width: '100%', cursor: 'pointer' }}
+                />
+            </div>
+        </>
+    );
+};
+
+// ===============================
+// 設定頁面 (admin/engineer only)
+// ===============================
+const SettingsTab: React.FC = () => {
+    const [imageryOpen, setImageryOpen] = useState(false);
+
+    return (
+        <>
+            {/* Auto LOD Toggle */}
+            <AutoLodToggle />
+
+            {/* Background Color Picker */}
+            <BackgroundColorPicker />
+
+            {/* Imagery Selector */}
+            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
+                <button
+                    onClick={() => setImageryOpen(true)}
+                    style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        background: '#f1f5f9',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        color: '#374151',
+                    }}
+                >
+                    <span>🛰️ 圖資管理</span>
+                    <span style={{ fontSize: '18px' }}>→</span>
+                </button>
+                <ImagerySelector isOpen={imageryOpen} onClose={() => setImageryOpen(false)} />
+            </div>
+
+            {/* Model Management Link */}
+            <div style={{ marginTop: '12px' }}>
+                <a
+                    href="/data"
+                    style={{
+                        display: 'flex',
+                        width: '100%',
+                        padding: '10px 12px',
+                        background: '#f1f5f9',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        textDecoration: 'none',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        color: '#374151',
+                    }}
+                >
+                    <span>🗄️ 資料管理</span>
+                    <span style={{ fontSize: '18px' }}>→</span>
+                </a>
+            </div>
+        </>
     );
 };
 
@@ -203,16 +316,14 @@ const BackgroundColorPicker: React.FC = () => {
     const { config, setConfig } = useViewerStore();
 
     return (
-        <div
-            style={{
-                marginTop: '12px',
-                paddingTop: '12px',
-                borderTop: '1px solid #e5e7eb',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-            }}
-        >
+        <div style={{
+            marginTop: '12px',
+            paddingTop: '12px',
+            borderTop: '1px solid #e5e7eb',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+        }}>
             <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
                 🎨 背景顏色
             </span>
@@ -246,22 +357,16 @@ const AutoLodToggle: React.FC = () => {
     const handleToggle = (checked: boolean) => {
         setConfig({ autoLOD: checked });
         if (!checked) {
-            // 關閉自動 LOD 時，強制切換到詳細模式
             setLODLevel('detail');
         }
     };
 
     return (
-        <div
-            style={{
-                marginTop: '12px',
-                paddingTop: '12px',
-                borderTop: '1px solid #e5e7eb',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-            }}
-        >
+        <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+        }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
                     👁️ 自動 LOD
@@ -270,7 +375,6 @@ const AutoLodToggle: React.FC = () => {
                     {config.autoLOD ? '根據距離切換細節' : '強制顯示詳細模型'}
                 </span>
             </div>
-
             <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                 <input
                     type="checkbox"
@@ -279,49 +383,6 @@ const AutoLodToggle: React.FC = () => {
                     style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
             </label>
-        </div>
-    );
-};
-
-// Sub-component for Imagery Selector (Admin/Engineer only)
-const ImagerySelectorTrigger: React.FC = () => {
-    const { user } = useAuth();
-    const [isOpen, setIsOpen] = useState(false);
-
-    // 權限檢查
-    const canAccess = user?.role === 'admin' || user?.role === 'engineer';
-    if (!canAccess) return null;
-
-    return (
-        <div
-            style={{
-                marginTop: '12px',
-                paddingTop: '12px',
-                borderTop: '1px solid #e5e7eb',
-            }}
-        >
-            <button
-                onClick={() => setIsOpen(true)}
-                style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    background: '#f1f5f9',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    color: '#374151',
-                }}
-            >
-                <span>⚙️ 圖資設定</span>
-                <span style={{ color: '#9ca3af', fontSize: '11px' }}>admin/engineer</span>
-            </button>
-
-            <ImagerySelector isOpen={isOpen} onClose={() => setIsOpen(false)} />
         </div>
     );
 };

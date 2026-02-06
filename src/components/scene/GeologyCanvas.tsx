@@ -13,7 +13,6 @@ import { SceneEnvironment } from './SceneEnvironment';
 import { LoadingProgress } from '../overlay/LoadingProgress';
 // Phase 7-10 新增元件
 import { GeologyTiles } from './GeologyTiles';
-import { MockGeologyVolume } from './MockGeologyVolume';
 import { ClippingPlane } from './ClippingPlane';
 import { StructureLines } from './StructureLines';
 import { StrikeDipSymbol } from './StrikeDipSymbol';
@@ -21,6 +20,7 @@ import { ImageryPlane } from './ImageryPlane';
 import { TerrainMesh } from './TerrainMesh';
 import { PerformanceMonitor } from './PerformanceMonitor';
 import { GeophysicsPlane } from './GeophysicsPlane';
+import { CameraController } from './CameraController';
 
 interface GeologyCanvasProps {
     /** 是否顯示 FPS 統計 */
@@ -62,9 +62,8 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
                     <ImageryPlane />
                     <GeophysicsPlane />
 
-                    {/* Phase 7: 3D 地質模型 (使用 Mock Volume) */}
-                    {/* <GeologyTiles /> */}
-                    <MockGeologyVolume />
+                    {/* Phase 7: 3D 地質模型 (使用上傳的模型) */}
+                    <GeologyTiles />
 
                     {/* Phase 3-5: 鑽孔點位 */}
                     <BoreholeInstances />
@@ -89,6 +88,7 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
                 />
 
                 <PerformanceMonitor />
+                <CameraController />
             </Canvas>
 
             {/* 載入進度 */}
