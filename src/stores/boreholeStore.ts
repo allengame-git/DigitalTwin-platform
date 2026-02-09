@@ -7,6 +7,8 @@ import { create } from 'zustand';
 import type { Borehole, BoreholeDetail } from '../types/geology';
 import type { RequestStatus } from '../types/api';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 interface BoreholeState {
     // 資料
     boreholes: Borehole[];
@@ -25,57 +27,95 @@ interface BoreholeState {
 }
 
 interface BoreholeActions {
-    fetchBoreholes: () => Promise<void>;
+    fetchBoreholes: (projectId?: string) => Promise<void>;
     selectBorehole: (id: string) => Promise<void>;
     clearSelection: () => void;
     setFilter: (filter: Partial<BoreholeState['filter']>) => void;
     setBoreholes: (boreholes: Borehole[]) => void;
+    createBorehole: (data: CreateBoreholeData) => Promise<Borehole | null>;
+    deleteBorehole: (id: string) => Promise<boolean>;
+    batchImport: (projectId: string, boreholes: CreateBoreholeData[]) => Promise<BatchImportResult>;
+    batchImportLayers: (projectId: string, layers: LayerCsvRow[]) => Promise<BatchImportResult>;
+    batchImportProperties: (projectId: string, properties: PropertyCsvRow[]) => Promise<BatchImportResult>;
 }
 
-// Mock 資料生成 (開發用)
+// Types for API
+interface CreateBoreholeData {
+    projectId?: string;
+    boreholeNo: string;
+    name?: string;
+    x: number;
+    y: number;
+    elevation: number;
+    totalDepth: number;
+    drilledDate?: string;
+    contractor?: string;
+    area?: string;
+    description?: string;
+    layers?: {
+        topDepth: number;
+        bottomDepth: number;
+        lithologyCode: string;
+        lithologyName?: string;
+        description?: string;
+    }[];
+    properties?: {
+        depth: number;
+        nValue?: number;
+        rqd?: number;
+    }[];
+}
+
+interface BatchImportResult {
+    success: number;
+    failed: number;
+    errors: { boreholeNo: string; error: string }[];
+}
+
+interface LayerCsvRow {
+    boreholeNo: string;
+    topDepth: string;
+    bottomDepth: string;
+    lithologyCode: string;
+    lithologyName?: string;
+    description?: string;
+}
+
+interface PropertyCsvRow {
+    boreholeNo: string;
+    depth: string;
+    nValue?: string;
+    rqd?: string;
+}
+
+// Import lithology config for color mapping
 import { LITHOLOGY_MAP } from '../config/lithologyConfig';
 
-const generateMockBoreholes = (count: number): Borehole[] => {
-    const boreholes: Borehole[] = [];
-    // TWD97 座標範圍 (與 coordinates.ts TWD97_ORIGIN 一致)
-    const baseX = 250000;
-    const baseY = 2600000;
-
-    for (let i = 0; i < count; i++) {
-        const totalDepth = 20 + Math.random() * 80;
-        const layers = [];
-        let currentDepth = 0;
-
-        while (currentDepth < totalDepth) {
-            const thickness = 2 + Math.random() * 10;
-            const bottomDepth = Math.min(currentDepth + thickness, totalDepth);
-            const lithology = LITHOLOGY_MAP[Math.floor(Math.random() * LITHOLOGY_MAP.length)];
-
-            layers.push({
-                id: `${i}-${layers.length}`,
-                boreholeId: `BH-${String(i + 1).padStart(3, '0')}`,
-                topDepth: currentDepth,
-                bottomDepth: bottomDepth,
-                lithologyCode: lithology.code,
-                lithologyName: lithology.name,
-                color: lithology.color,
-            });
-
-            currentDepth = bottomDepth;
-        }
-
-        boreholes.push({
-            id: `BH-${String(i + 1).padStart(3, '0')}`,
-            name: `鑽孔 ${i + 1}`,
-            x: baseX + Math.random() * 5000 - 2500,
-            y: baseY + Math.random() * 5000 - 2500,
-            elevation: 100 + Math.random() * 200,
-            totalDepth: totalDepth,
-            area: ['A區', 'B區', 'C區'][Math.floor(Math.random() * 3)],
-            layers: layers,
-        });
-    }
-    return boreholes;
+// Helper to map API response to frontend Borehole type
+const mapApiToBorehole = (apiData: any): Borehole => {
+    return {
+        id: apiData.id,
+        name: apiData.name || apiData.boreholeNo,
+        x: apiData.x,
+        y: apiData.y,
+        elevation: apiData.elevation,
+        totalDepth: apiData.totalDepth,
+        drilledDate: apiData.drilledDate,
+        area: apiData.area,
+        layers: apiData.layers?.map((layer: any) => {
+            const lithology = LITHOLOGY_MAP.find(l => l.code === layer.lithologyCode);
+            return {
+                id: layer.id,
+                boreholeId: apiData.id,
+                topDepth: layer.topDepth,
+                bottomDepth: layer.bottomDepth,
+                lithologyCode: layer.lithologyCode,
+                lithologyName: layer.lithologyName || lithology?.name || layer.lithologyCode,
+                color: lithology?.color || '#888888',
+                description: layer.description,
+            };
+        }) || [],
+    };
 };
 
 export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, get) => ({
@@ -87,18 +127,24 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
     filter: {},
 
     // Actions
-    fetchBoreholes: async () => {
+    fetchBoreholes: async (projectId?: string) => {
         set({ status: 'loading', error: null });
 
         try {
-            // TODO: 替換為實際 API 呼叫
-            // const response = await geologyApi.getBoreholes();
+            const url = projectId
+                ? `${API_BASE}/api/borehole?projectId=${projectId}`
+                : `${API_BASE}/api/borehole`;
 
-            // 開發階段使用 Mock 資料
-            await new Promise(resolve => setTimeout(resolve, 500));
-            const mockData = generateMockBoreholes(800);
+            const response = await fetch(url, { credentials: 'include' });
 
-            set({ boreholes: mockData, status: 'success' });
+            if (!response.ok) {
+                throw new Error('Failed to fetch boreholes');
+            }
+
+            const data = await response.json();
+            const boreholes = data.map(mapApiToBorehole);
+
+            set({ boreholes, status: 'success' });
         } catch (error) {
             set({
                 status: 'error',
@@ -108,31 +154,41 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
     },
 
     selectBorehole: async (id: string) => {
-        const { boreholes } = get();
-        const borehole = boreholes.find(b => b.id === id);
-
-        if (!borehole) {
-            set({ error: `找不到鑽孔 ${id}` });
-            return;
-        }
-
         set({ status: 'loading' });
 
         try {
-            // TODO: 替換為實際 API 呼叫
-            // const detail = await geologyApi.getBoreholeDetail(id);
+            const response = await fetch(`${API_BASE}/api/borehole/${id}`, {
+                credentials: 'include'
+            });
 
-            // Mock 詳細資料
-            await new Promise(resolve => setTimeout(resolve, 200));
+            if (!response.ok) {
+                throw new Error('Failed to fetch borehole detail');
+            }
+
+            const data = await response.json();
+
+            // Map to BoreholeDetail
             const detail: BoreholeDetail = {
-                ...borehole,
-                layers: borehole.layers || [], // 使用現有的層位資料
-                photos: [],
-                properties: Array.from({ length: 10 }, (_, i) => ({
-                    depth: i * (borehole.totalDepth / 10),
-                    nValue: Math.floor(Math.random() * 50),
-                    moisture: 10 + Math.random() * 30,
-                })),
+                ...mapApiToBorehole(data),
+                layers: data.layers?.map((layer: any) => {
+                    const lithology = LITHOLOGY_MAP.find(l => l.code === layer.lithologyCode);
+                    return {
+                        id: layer.id,
+                        boreholeId: data.id,
+                        topDepth: layer.topDepth,
+                        bottomDepth: layer.bottomDepth,
+                        lithologyCode: layer.lithologyCode,
+                        lithologyName: layer.lithologyName || lithology?.name || layer.lithologyCode,
+                        color: lithology?.color || '#888888',
+                        description: layer.description,
+                    };
+                }) || [],
+                photos: data.photos || [],
+                properties: data.properties?.map((prop: any) => ({
+                    depth: prop.depth,
+                    nValue: prop.nValue,
+                    rqd: prop.rqd,
+                })) || [],
             };
 
             set({ selectedBorehole: detail, status: 'success' });
@@ -154,5 +210,126 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
 
     setBoreholes: (boreholes) => {
         set({ boreholes, status: 'success' });
+    },
+
+    createBorehole: async (data: CreateBoreholeData) => {
+        try {
+            const response = await fetch(`${API_BASE}/api/borehole`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(data),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || '新增鑽孔失敗');
+            }
+
+            const created = await response.json();
+            const borehole = mapApiToBorehole(created);
+
+            // Add to local state
+            set(state => ({
+                boreholes: [...state.boreholes, borehole]
+            }));
+
+            return borehole;
+        } catch (error) {
+            set({ error: error instanceof Error ? error.message : '新增鑽孔失敗' });
+            return null;
+        }
+    },
+
+    deleteBorehole: async (id: string) => {
+        try {
+            const response = await fetch(`${API_BASE}/api/borehole/${id}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            });
+
+            if (!response.ok) {
+                throw new Error('刪除鑽孔失敗');
+            }
+
+            // Remove from local state
+            set(state => ({
+                boreholes: state.boreholes.filter(b => b.id !== id)
+            }));
+
+            return true;
+        } catch (error) {
+            set({ error: error instanceof Error ? error.message : '刪除鑽孔失敗' });
+            return false;
+        }
+    },
+
+    batchImport: async (projectId: string, boreholes: CreateBoreholeData[]) => {
+        try {
+            const response = await fetch(`${API_BASE}/api/borehole/batch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ projectId, boreholes }),
+            });
+
+            if (!response.ok) {
+                throw new Error('批次匯入失敗');
+            }
+
+            const result = await response.json();
+
+            // Refresh borehole list
+            get().fetchBoreholes(projectId);
+
+            return result;
+        } catch (error) {
+            set({ error: error instanceof Error ? error.message : '批次匯入失敗' });
+            return { success: 0, failed: boreholes.length, errors: [] };
+        }
+    },
+
+    batchImportLayers: async (projectId: string, layers: LayerCsvRow[]) => {
+        try {
+            const response = await fetch(`${API_BASE}/api/borehole/batch-layers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ projectId, layers }),
+            });
+
+            if (!response.ok) {
+                throw new Error('批次匯入地層資料失敗');
+            }
+
+            const result = await response.json();
+            get().fetchBoreholes(projectId);
+            return result;
+        } catch (error) {
+            set({ error: error instanceof Error ? error.message : '批次匯入地層資料失敗' });
+            return { success: 0, failed: layers.length, errors: [] };
+        }
+    },
+
+    batchImportProperties: async (projectId: string, properties: PropertyCsvRow[]) => {
+        try {
+            const response = await fetch(`${API_BASE}/api/borehole/batch-properties`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ projectId, properties }),
+            });
+
+            if (!response.ok) {
+                throw new Error('批次匯入物性資料失敗');
+            }
+
+            const result = await response.json();
+            get().fetchBoreholes(projectId);
+            return result;
+        } catch (error) {
+            set({ error: error instanceof Error ? error.message : '批次匯入物性資料失敗' });
+            return { success: 0, failed: properties.length, errors: [] };
+        }
     },
 }));

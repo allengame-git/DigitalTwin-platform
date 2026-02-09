@@ -24,7 +24,7 @@ export function PropertyChart({ properties }: PropertyChartProps) {
     // 準備資料
     const depths = properties.map((p) => p.depth);
     const nValues = properties.map((p) => p.nValue ?? null);
-    const moistures = properties.map((p) => p.moisture ?? null);
+    const rqds = properties.map((p) => p.rqd ?? null);
 
     const option: EChartsOption = {
         tooltip: {
@@ -32,7 +32,7 @@ export function PropertyChart({ properties }: PropertyChartProps) {
             axisPointer: { type: 'cross' },
         },
         legend: {
-            data: ['N值', '含水量 (%)'],
+            data: ['N值', 'RQD (%)'],
             bottom: 0,
         },
         grid: {
@@ -52,12 +52,12 @@ export function PropertyChart({ properties }: PropertyChartProps) {
             },
             {
                 type: 'value',
-                name: '含水量 (%)',
+                name: 'RQD (%)',
                 position: 'top',
                 offset: 30,
                 axisLine: { lineStyle: { color: '#91cc75' } },
                 min: 0,
-                max: 50,
+                max: 100,
             },
         ],
         yAxis: {
@@ -78,10 +78,10 @@ export function PropertyChart({ properties }: PropertyChartProps) {
                 symbolSize: 6,
             },
             {
-                name: '含水量 (%)',
+                name: 'RQD (%)',
                 type: 'line',
                 xAxisIndex: 1,
-                data: moistures.map((v, i) => [v, depths[i]]),
+                data: rqds.map((v, i) => [v, depths[i]]),
                 smooth: true,
                 lineStyle: { width: 2 },
                 symbol: 'diamond',
@@ -111,8 +111,7 @@ export function PropertyChart({ properties }: PropertyChartProps) {
                         <tr style={{ background: '#f8f9fa' }}>
                             <th style={thStyle}>深度 (m)</th>
                             <th style={thStyle}>N值</th>
-                            <th style={thStyle}>含水量 (%)</th>
-                            <th style={thStyle}>單位重</th>
+                            <th style={thStyle}>RQD (%)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -120,8 +119,7 @@ export function PropertyChart({ properties }: PropertyChartProps) {
                             <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
                                 <td style={tdStyle}>{prop.depth.toFixed(1)}</td>
                                 <td style={tdStyle}>{prop.nValue ?? '-'}</td>
-                                <td style={tdStyle}>{prop.moisture?.toFixed(1) ?? '-'}</td>
-                                <td style={tdStyle}>{prop.unitWeight?.toFixed(2) ?? '-'}</td>
+                                <td style={tdStyle}>{prop.rqd?.toFixed(1) ?? '-'}</td>
                             </tr>
                         ))}
                     </tbody>

@@ -20,6 +20,7 @@
 - ✅ 剖面切片工具 (Clipping Plane)
 - ✅ 斷層線與位態符號視覺化
 - ✅ 導覽模式 (Guided Tour)
+- ✅ 物理性質圖表更新：顯示 N 值與 RQD
 
 #### 2. 3D 地質模型 (New - 2026-02-06)
 
@@ -60,6 +61,7 @@
   - **Dynamic Config**: 支援專案自定義 TWD97 座標原點
   - **Safeguards**: 專案刪除確認 Modal、Admin 權限刪除防呆
   - **Cleanup**: 移除全域 `/data` 頁面，強化專案隔離
+  - **Navigation**: 子頁面導覽修正，返回按鈕正確導向專案儀表板
 
 #### 6. 基礎架構
 

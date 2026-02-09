@@ -60,6 +60,8 @@ export interface PropertyData {
     depth: number;
     /** N 值 (SPT) */
     nValue?: number;
+    /** RQD (%) */
+    rqd?: number;
     /** 含水量 (%) */
     moisture?: number;
     /** 單位重 (kN/m³) */

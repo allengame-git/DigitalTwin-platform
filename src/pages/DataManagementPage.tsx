@@ -7,7 +7,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
     useUploadStore,
@@ -20,10 +20,14 @@ import {
 } from '../stores/uploadStore';
 import { useProjectStore } from '../stores/projectStore';
 import { setOrigin } from '../utils/coordinates';
+import { BoreholeUploadSection } from '../components/data/BoreholeUploadSection';
+import LithologySection from '../components/data/LithologySection';
+import { useLithologyStore } from '../stores/lithologyStore';
 
 
 export const DataManagementPage: React.FC = () => {
     const { user } = useAuth();
+    const { projectCode } = useParams<{ projectCode: string }>();
     const {
         imageryFiles,
         geophysicsFiles,
@@ -46,6 +50,15 @@ export const DataManagementPage: React.FC = () => {
 
     const { activeProjectId, projects, updateProject } = useProjectStore();
     const activeProject = projects.find(p => p.id === activeProjectId);
+
+    // Lithology Store
+    const { lithologies, fetchLithologies } = useLithologyStore();
+
+    // 檢查設定是否完成（原點已設定 + 至少有一個岩性）
+    const isSetupComplete = activeProject &&
+        activeProject.originX !== 0 &&
+        activeProject.originY !== 0 &&
+        lithologies.length > 0;
 
     // Project Settings State
     const [originForm, setOriginForm] = useState({ x: '', y: '' });
@@ -126,6 +139,13 @@ export const DataManagementPage: React.FC = () => {
         fetchGeophysicsFiles();
         fetchGeologyModels();
     }, [fetchImageryFiles, fetchGeophysicsFiles, fetchGeologyModels]);
+
+    // Fetch lithologies when project changes
+    useEffect(() => {
+        if (activeProjectId) {
+            fetchLithologies(activeProjectId);
+        }
+    }, [activeProjectId, fetchLithologies]);
 
     // 輪詢處理中的地質模型狀態
     useEffect(() => {
@@ -897,8 +917,8 @@ export const DataManagementPage: React.FC = () => {
             {/* Same header... */}
             <header className="dm-header">
                 <div className="dm-header-left">
-                    <Link to="/" className="dm-back-btn">
-                        ← 返回首頁
+                    <Link to={projectCode ? `/project/${projectCode}` : '/'} className="dm-back-btn">
+                        ← 返回{projectCode ? '專案' : '首頁'}
                     </Link>
                     <h1 className="dm-title">資料管理</h1>
                 </div>
@@ -958,280 +978,307 @@ export const DataManagementPage: React.FC = () => {
                     </section>
                 )}
 
-                {/* 航照圖管理 */}
-                <section className="dm-section">
-                    <div className="dm-section-header">
-                        <div className="dm-section-icon">📷</div>
+                {/* 岩性設定 - 必須完成設定 */}
+                <LithologySection />
+
+                {/* Required setup message */}
+                {!isSetupComplete && (
+                    <div style={{
+                        background: '#fef3c7',
+                        border: '1px solid #fcd34d',
+                        borderRadius: '12px',
+                        padding: '20px',
+                        marginBottom: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                    }}>
+                        <span style={{ fontSize: '24px' }}>⚠️</span>
                         <div>
-                            <h2 className="dm-section-title">航照圖管理</h2>
-                            <p className="dm-section-desc">上傳與管理航照底圖，支援 JPG、PNG、TIF 格式</p>
+                            <div style={{ fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>
+                                請先完成專案設定
+                            </div>
+                            <div style={{ color: '#a16207', fontSize: '13px' }}>
+                                需設定 TWD97 座標原點並載入岩性資料後，才可使用以下資料管理功能。
+                            </div>
                         </div>
                     </div>
+                )}
 
-                    {/* 上傳區域 (Same...) */}
-                    <div
-                        className={`dm-upload-zone ${isDragging ? 'dragging' : ''}`}
-                        onDrop={handleDrop}
-                        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                        onDragLeave={() => setIsDragging(false)}
-                        onClick={() => fileInputRef.current?.click()}
-                    >
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".jpg,.jpeg,.png,.tif,.tiff"
-                            onChange={handleInputChange}
-                            style={{ display: 'none' }}
-                        />
-                        <div className="dm-upload-icon">📁</div>
-                        <div className="dm-upload-text">拖放檔案或點擊選擇</div>
-                        <div className="dm-upload-hint">支援 JPG, PNG, TIF (最大 50MB)</div>
-                    </div>
+                {/* 鑽孔資料 */}
+                <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                    <BoreholeUploadSection />
+                </div>
 
-                    {/* 錯誤訊息 */}
-                    {uploadError && (
-                        <div className="dm-error">
-                            <span>{uploadError}</span>
-                            <button onClick={clearError} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}>✕</button>
+                {/* 航照圖管理 */}
+                <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                    <section className="dm-section">
+                        <div className="dm-section-header">
+                            <div className="dm-section-icon">📷</div>
+                            <div>
+                                <h2 className="dm-section-title">航照圖管理</h2>
+                                <p className="dm-section-desc">上傳與管理航照底圖，支援 JPG、PNG、TIF 格式</p>
+                            </div>
                         </div>
-                    )}
 
-                    {/* 已上傳檔案 */}
-                    {imageryFiles.length > 0 ? (
-                        <div className="dm-file-grid">
-                            {imageryFiles.map(file => (
-                                <div key={file.id} className="dm-file-card">
-                                    <img
-                                        className="dm-file-thumb"
-                                        src={file.thumbnailUrl}
-                                        alt={file.name}
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).style.background = '#e2e8f0';
-                                        }}
-                                        onClick={() => handleViewDetail(file)}
-                                        style={{ cursor: 'pointer' }}
-                                    />
-                                    <div className="dm-file-info">
-                                        <div className="dm-file-name">{file.name}</div>
-                                        <div className="dm-file-meta">
-                                            <span className="dm-file-year">{file.year}</span>
-                                            {formatFileSize(file.size)}
-                                            {file.minX && <span className="dm-coords-status">📍 已定位</span>}
-                                        </div>
-                                        {file.source && (
-                                            <div className="dm-file-meta">來源: {file.source}</div>
-                                        )}
-                                        <div className="dm-file-actions">
-                                            <button
-                                                className="dm-file-btn dm-file-btn-delete"
-                                                onClick={() => handleDeleteClick(file.id)}
-                                            >
-                                                刪除
-                                            </button>
+                        {/* 上傳區域 (Same...) */}
+                        <div
+                            className={`dm-upload-zone ${isDragging ? 'dragging' : ''}`}
+                            onDrop={handleDrop}
+                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                            onDragLeave={() => setIsDragging(false)}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".jpg,.jpeg,.png,.tif,.tiff"
+                                onChange={handleInputChange}
+                                style={{ display: 'none' }}
+                            />
+                            <div className="dm-upload-icon">📁</div>
+                            <div className="dm-upload-text">拖放檔案或點擊選擇</div>
+                            <div className="dm-upload-hint">支援 JPG, PNG, TIF (最大 50MB)</div>
+                        </div>
+
+                        {/* 錯誤訊息 */}
+                        {uploadError && (
+                            <div className="dm-error">
+                                <span>{uploadError}</span>
+                                <button onClick={clearError} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}>✕</button>
+                            </div>
+                        )}
+
+                        {/* 已上傳檔案 */}
+                        {imageryFiles.length > 0 ? (
+                            <div className="dm-file-grid">
+                                {imageryFiles.map(file => (
+                                    <div key={file.id} className="dm-file-card">
+                                        <img
+                                            className="dm-file-thumb"
+                                            src={file.thumbnailUrl}
+                                            alt={file.name}
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).style.background = '#e2e8f0';
+                                            }}
+                                            onClick={() => handleViewDetail(file)}
+                                            style={{ cursor: 'pointer' }}
+                                        />
+                                        <div className="dm-file-info">
+                                            <div className="dm-file-name">{file.name}</div>
+                                            <div className="dm-file-meta">
+                                                <span className="dm-file-year">{file.year}</span>
+                                                {formatFileSize(file.size)}
+                                                {file.minX && <span className="dm-coords-status">📍 已定位</span>}
+                                            </div>
+                                            {file.source && (
+                                                <div className="dm-file-meta">來源: {file.source}</div>
+                                            )}
+                                            <div className="dm-file-actions">
+                                                <button
+                                                    className="dm-file-btn dm-file-btn-delete"
+                                                    onClick={() => handleDeleteClick(file.id)}
+                                                >
+                                                    刪除
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="dm-empty">尚無上傳的航照圖</div>
-                    )}
-                </section>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="dm-empty">尚無上傳的航照圖</div>
+                        )}
+                    </section>
 
-                {/* Other sections... */}
-                <section className="dm-section">
-                    <div className="dm-section-header">
-                        <div className="dm-section-icon" style={{ background: '#dcfce7' }}>⛰️</div>
-                        <div>
-                            <h2 className="dm-section-title">DEM 地形資料</h2>
-                            <p className="dm-section-desc">高程模型資料管理</p>
+                    {/* Other sections... */}
+                    <section className="dm-section">
+                        <div className="dm-section-header">
+                            <div className="dm-section-icon" style={{ background: '#dcfce7' }}>⛰️</div>
+                            <div>
+                                <h2 className="dm-section-title">DEM 地形資料</h2>
+                                <p className="dm-section-desc">高程模型資料管理</p>
+                            </div>
                         </div>
-                    </div>
-                    <div className="dm-coming-soon">🚧 功能開發中</div>
-                </section>
-
-                <section className="dm-section">
-                    <div className="dm-section-header">
-                        <div className="dm-section-icon" style={{ background: '#fef3c7' }}>⚫</div>
-                        <div>
-                            <h2 className="dm-section-title">鑽孔資料</h2>
-                            <p className="dm-section-desc">鑽孔位置與岩性資料管理</p>
-                        </div>
-                    </div>
-                    <div className="dm-coming-soon">🚧 功能開發中</div>
-                </section>
+                        <div className="dm-coming-soon">🚧 功能開發中</div>
+                    </section>
+                </div>
 
                 {/* 3D 地質模型 */}
-                <section className="dm-section">
-                    <div className="dm-section-header">
-                        <div className="dm-section-icon" style={{ background: '#dcfce7' }}>🧊</div>
-                        <div>
-                            <h2 className="dm-section-title">3D 地質模型</h2>
-                            <p className="dm-section-desc">Voxel 地質模型版本管理 (CSV 格式: x,y,z,lith_id)</p>
+                <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                    <section className="dm-section">
+                        <div className="dm-section-header">
+                            <div className="dm-section-icon" style={{ background: '#dcfce7' }}>🧊</div>
+                            <div>
+                                <h2 className="dm-section-title">3D 地質模型</h2>
+                                <p className="dm-section-desc">Voxel 地質模型版本管理 (CSV 格式: x,y,z,lith_id)</p>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* 上傳區域 */}
-                    <div
-                        className="dm-upload-zone"
-                        onDrop={handleGeoModelDrop}
-                        onDragOver={e => e.preventDefault()}
-                        onClick={() => geoModelInputRef.current?.click()}
-                    >
-                        <input
-                            type="file"
-                            ref={geoModelInputRef}
-                            style={{ display: 'none' }}
-                            accept=".csv,.json"
-                            onChange={handleGeoModelInputChange}
-                        />
-                        <div className="dm-upload-icon">📤</div>
-                        <div className="dm-upload-text">
-                            拖曳或點擊上傳 Voxel 資料
+                        {/* 上傳區域 */}
+                        <div
+                            className="dm-upload-zone"
+                            onDrop={handleGeoModelDrop}
+                            onDragOver={e => e.preventDefault()}
+                            onClick={() => geoModelInputRef.current?.click()}
+                        >
+                            <input
+                                type="file"
+                                ref={geoModelInputRef}
+                                style={{ display: 'none' }}
+                                accept=".csv,.json"
+                                onChange={handleGeoModelInputChange}
+                            />
+                            <div className="dm-upload-icon">📤</div>
+                            <div className="dm-upload-text">
+                                拖曳或點擊上傳 Voxel 資料
+                            </div>
+                            <div className="dm-upload-hint">
+                                支援 CSV 或 JSON 格式，最大 100MB
+                            </div>
                         </div>
-                        <div className="dm-upload-hint">
-                            支援 CSV 或 JSON 格式，最大 100MB
-                        </div>
-                    </div>
 
-                    {/* 模型列表 */}
-                    {geologyModels.length > 0 && (
-                        <div className="dm-file-list" style={{ marginTop: '16px' }}>
-                            {geologyModels.map((model) => (
-                                <div
-                                    key={model.id}
-                                    className="dm-file-card"
-                                    style={{
-                                        border: model.isActive ? '2px solid #22c55e' : '1px solid #e2e8f0',
-                                        background: model.isActive ? '#f0fdf4' : 'white',
-                                    }}
-                                >
-                                    <div className="dm-file-info" style={{ flex: 1 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <span className="dm-file-name">{model.name}</span>
-                                            <span style={{ fontSize: '11px', color: '#6b7280', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>v{model.version}</span>
-                                            {getStatusBadge(model.conversionStatus)}
-                                            {model.isActive && <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 500 }}>● 使用中</span>}
-                                        </div>
-                                        <div className="dm-file-meta" style={{ marginTop: '4px' }}>
-                                            {model.year}年 · {formatFileSize(model.size)}
-                                            {model.sourceData && ` · ${model.sourceData}`}
-                                        </div>
-                                        {(model.conversionStatus === 'pending' || model.conversionStatus === 'processing') && (
-                                            <div style={{ marginTop: '10px' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>
-                                                    <span>轉換進度...</span>
-                                                    <span>{model.conversionProgress}%</span>
-                                                </div>
-                                                <div className="dm-progress-container" style={{ marginTop: 0 }}>
-                                                    <div
-                                                        className="dm-progress-bar"
-                                                        style={{ width: `${Math.max(5, model.conversionProgress)}%` }}
-                                                    >
-                                                        <div className="dm-progress-shimmer"></div>
+                        {/* 模型列表 */}
+                        {geologyModels.length > 0 && (
+                            <div className="dm-file-list" style={{ marginTop: '16px' }}>
+                                {geologyModels.map((model) => (
+                                    <div
+                                        key={model.id}
+                                        className="dm-file-card"
+                                        style={{
+                                            border: model.isActive ? '2px solid #22c55e' : '1px solid #e2e8f0',
+                                            background: model.isActive ? '#f0fdf4' : 'white',
+                                        }}
+                                    >
+                                        <div className="dm-file-info" style={{ flex: 1 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span className="dm-file-name">{model.name}</span>
+                                                <span style={{ fontSize: '11px', color: '#6b7280', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>v{model.version}</span>
+                                                {getStatusBadge(model.conversionStatus)}
+                                                {model.isActive && <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 500 }}>● 使用中</span>}
+                                            </div>
+                                            <div className="dm-file-meta" style={{ marginTop: '4px' }}>
+                                                {model.year}年 · {formatFileSize(model.size)}
+                                                {model.sourceData && ` · ${model.sourceData}`}
+                                            </div>
+                                            {(model.conversionStatus === 'pending' || model.conversionStatus === 'processing') && (
+                                                <div style={{ marginTop: '10px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>
+                                                        <span>轉換進度...</span>
+                                                        <span>{model.conversionProgress}%</span>
+                                                    </div>
+                                                    <div className="dm-progress-container" style={{ marginTop: 0 }}>
+                                                        <div
+                                                            className="dm-progress-bar"
+                                                            style={{ width: `${Math.max(5, model.conversionProgress)}%` }}
+                                                        >
+                                                            <div className="dm-progress-shimmer"></div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                        {model.conversionError && (
-                                            <div style={{ marginTop: '4px', fontSize: '12px', color: '#dc2626' }}>
-                                                錯誤: {model.conversionError}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="dm-file-actions" style={{ display: 'flex', gap: '8px' }}>
-                                        {model.conversionStatus === 'completed' && !model.isActive && (
+                                            )}
+                                            {model.conversionError && (
+                                                <div style={{ marginTop: '4px', fontSize: '12px', color: '#dc2626' }}>
+                                                    錯誤: {model.conversionError}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="dm-file-actions" style={{ display: 'flex', gap: '8px' }}>
+                                            {model.conversionStatus === 'completed' && !model.isActive && (
+                                                <button
+                                                    className="dm-btn dm-btn-secondary"
+                                                    style={{ fontSize: '12px', padding: '4px 12px' }}
+                                                    onClick={() => handleActivateGeoModel(model.id)}
+                                                >
+                                                    設為使用
+                                                </button>
+                                            )}
                                             <button
                                                 className="dm-btn dm-btn-secondary"
-                                                style={{ fontSize: '12px', padding: '4px 12px' }}
-                                                onClick={() => handleActivateGeoModel(model.id)}
+                                                style={{ fontSize: '12px', padding: '4px 8px', color: '#dc2626' }}
+                                                onClick={() => handleGeoModelDeleteClick(model.id)}
                                             >
-                                                設為使用
-                                            </button>
-                                        )}
-                                        <button
-                                            className="dm-btn dm-btn-secondary"
-                                            style={{ fontSize: '12px', padding: '4px 8px', color: '#dc2626' }}
-                                            onClick={() => handleGeoModelDeleteClick(model.id)}
-                                        >
-                                            🗑
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </section>
-
-                {/* 地球物理探查資料 */}
-                <section className="dm-section">
-                    <div className="dm-section-header">
-                        <div className="dm-section-icon" style={{ background: '#e0e7ff' }}>📡</div>
-                        <div>
-                            <h2 className="dm-section-title">地球物理探查資料</h2>
-                            <p className="dm-section-desc">ERT、GPR、震測剖面圖資料管理</p>
-                        </div>
-                    </div>
-
-                    {/* 上傳區域 */}
-                    <div
-                        className="dm-upload-zone"
-                        onDrop={handleGeoDrop}
-                        onDragOver={(e) => { e.preventDefault(); }}
-                        onClick={() => geoInputRef.current?.click()}
-                    >
-                        <input
-                            ref={geoInputRef}
-                            type="file"
-                            accept=".jpg,.jpeg,.png,.tif,.tiff"
-                            onChange={handleGeoInputChange}
-                            style={{ display: 'none' }}
-                        />
-                        <div className="dm-upload-icon">📊</div>
-                        <div className="dm-upload-text">拖放探查剖面圖或點擊選擇</div>
-                        <div className="dm-upload-hint">支援 JPG, PNG, TIF (最大 50MB)</div>
-                    </div>
-
-                    {/* 已上傳資料 */}
-                    {geophysicsFiles.length > 0 ? (
-                        <div className="dm-file-grid">
-                            {geophysicsFiles.map(gf => (
-                                <div key={gf.id} className="dm-file-card">
-                                    <img
-                                        className="dm-file-thumb"
-                                        src={gf.thumbnailUrl}
-                                        alt={gf.name}
-                                        onClick={() => handleViewGeoDetail(gf)}
-                                        style={{ cursor: 'pointer' }}
-                                    />
-                                    <div className="dm-file-info">
-                                        <div className="dm-file-name">{gf.name}</div>
-                                        <div className="dm-file-meta">
-                                            <span className="dm-file-year">{gf.year}</span>
-                                            <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>{gf.method}</span>
-                                            {gf.lineId && <span style={{ color: '#64748b' }}>#{gf.lineId}</span>}
-                                        </div>
-                                        <div className="dm-file-actions">
-                                            <button
-                                                className="dm-file-btn dm-file-btn-delete"
-                                                onClick={() => handleGeoDeleteClick(gf.id)}
-                                            >
-                                                刪除
+                                                🗑
                                             </button>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                </div>
+
+                {/* 航照圖管理 */}
+                <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                    <section className="dm-section">
+                        <div className="dm-section-header">
+                            <div className="dm-section-icon" style={{ background: '#e0e7ff' }}>📡</div>
+                            <div>
+                                <h2 className="dm-section-title">地球物理探查資料</h2>
+                                <p className="dm-section-desc">ERT、GPR、震測剖面圖資料管理</p>
+                            </div>
                         </div>
-                    ) : (
-                        <div className="dm-empty">尚無上傳的探查資料</div>
-                    )}
-                </section>
+
+                        {/* 上傳區域 */}
+                        <div
+                            className="dm-upload-zone"
+                            onDrop={handleGeoDrop}
+                            onDragOver={(e) => { e.preventDefault(); }}
+                            onClick={() => geoInputRef.current?.click()}
+                        >
+                            <input
+                                ref={geoInputRef}
+                                type="file"
+                                accept=".jpg,.jpeg,.png,.tif,.tiff"
+                                onChange={handleGeoInputChange}
+                                style={{ display: 'none' }}
+                            />
+                            <div className="dm-upload-icon">📊</div>
+                            <div className="dm-upload-text">拖放探查剖面圖或點擊選擇</div>
+                            <div className="dm-upload-hint">支援 JPG, PNG, TIF (最大 50MB)</div>
+                        </div>
+
+                        {/* 已上傳資料 */}
+                        {geophysicsFiles.length > 0 ? (
+                            <div className="dm-file-grid">
+                                {geophysicsFiles.map(gf => (
+                                    <div key={gf.id} className="dm-file-card">
+                                        <img
+                                            className="dm-file-thumb"
+                                            src={gf.thumbnailUrl}
+                                            alt={gf.name}
+                                            onClick={() => handleViewGeoDetail(gf)}
+                                            style={{ cursor: 'pointer' }}
+                                        />
+                                        <div className="dm-file-info">
+                                            <div className="dm-file-name">{gf.name}</div>
+                                            <div className="dm-file-meta">
+                                                <span className="dm-file-year">{gf.year}</span>
+                                                <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>{gf.method}</span>
+                                                {gf.lineId && <span style={{ color: '#64748b' }}>#{gf.lineId}</span>}
+                                            </div>
+                                            <div className="dm-file-actions">
+                                                <button
+                                                    className="dm-file-btn dm-file-btn-delete"
+                                                    onClick={() => handleGeoDeleteClick(gf.id)}
+                                                >
+                                                    刪除
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="dm-empty">尚無上傳的探查資料</div>
+                        )}
+                    </section>
+                </div>
             </main>
 
             {/* 上傳表單 Modal */}
             {showUploadForm && selectedFile && (
-                <div className="dm-modal-overlay" onClick={handleCancelUpload}>
+                <div className="dm-modal-overlay">
                     <div className="dm-modal" onClick={e => e.stopPropagation()}>
                         <div className="dm-modal-header">
                             <h3 className="dm-modal-title">上傳航照圖</h3>
@@ -1399,7 +1446,7 @@ export const DataManagementPage: React.FC = () => {
 
             {/* 地球物理探查上傳表單 Modal */}
             {showGeoForm && geoFile && (
-                <div className="dm-modal-overlay" onClick={handleCancelGeoUpload}>
+                <div className="dm-modal-overlay">
                     <div className="dm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                         <div className="dm-modal-header">
                             <h3 className="dm-modal-title">上傳地球物理探查資料</h3>
@@ -1569,7 +1616,7 @@ export const DataManagementPage: React.FC = () => {
 
             {/* 3D 地質模型上傳表單 Modal */}
             {showGeoModelForm && geoModelFile && (
-                <div className="dm-modal-overlay" onClick={handleCancelGeoModelUpload}>
+                <div className="dm-modal-overlay">
                     <div className="dm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                         <div className="dm-modal-header">
                             <h3 className="dm-modal-title">上傳 3D 地質模型</h3>

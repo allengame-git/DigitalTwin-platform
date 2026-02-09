@@ -27,11 +27,32 @@ model Project {
   geologyModels GeologyModel[]
   imagery       Imagery[]
   geophysics    Geophysics[]
+  boreholes     Borehole[]
+  lithologies   ProjectLithology[]
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@map("projects")
+}
+
+/// 專案岩性設定
+model ProjectLithology {
+  id        String   @id @default(uuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  lithId    Int      // 岩性 ID (用於 voxel 資料)
+  code      String   // 岩性代碼 (e.g., CL, SM)
+  name      String   // 中文名稱 (e.g., 黏土)
+  color     String   // Hex 顏色 (e.g., #8b4513)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, code])
+  @@unique([projectId, lithId])
+  @@map("project_lithologies")
 }
 
 /// 航照圖資料
@@ -159,4 +180,86 @@ model GeologyModel {
   updatedAt    DateTime @updatedAt
 
   @@map("geology_models")
+}
+
+/// 鑽孔資料
+model Borehole {
+  id           String   @id @default(uuid())
+  boreholeNo   String              // 鑽孔編號 (e.g. BH-001)
+  name         String?             // 鑽孔名稱
+  
+  // TWD97 座標 (公尺)
+  x            Float               // X 座標
+  y            Float               // Y 座標
+  elevation    Float               // 孔口高程
+  totalDepth   Float               // 總深度
+  
+  // Metadata
+  drilledDate  DateTime?           // 鑽探日期
+  contractor   String?             // 鑽探單位
+  area         String?             // 所屬區域
+  description  String?             // 備註
+  
+  // 關聯資料
+  layers       BoreholeLayer[]
+  properties   BoreholeProperty[]
+  photos       BoreholePhoto[]
+  
+  // 專案關聯
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([projectId, boreholeNo])
+  @@map("boreholes")
+}
+
+/// 鑽孔地層資料
+model BoreholeLayer {
+  id           String   @id @default(uuid())
+  boreholeId   String
+  borehole     Borehole @relation(fields: [boreholeId], references: [id], onDelete: Cascade)
+  
+  topDepth     Float               // 頂深 (公尺)
+  bottomDepth  Float               // 底深 (公尺)
+  lithologyCode String             // 岩性代碼
+  lithologyName String?            // 岩性名稱
+  description  String?             // 地層描述
+  
+  createdAt    DateTime @default(now())
+
+  @@map("borehole_layers")
+}
+
+/// 鑽孔物性資料
+model BoreholeProperty {
+  id           String   @id @default(uuid())
+  boreholeId   String
+  borehole     Borehole @relation(fields: [boreholeId], references: [id], onDelete: Cascade)
+  
+  depth        Float               // 取樣深度 (公尺)
+  nValue       Int?                // SPT N 值
+  rqd          Float?              // RQD (%)
+  
+  createdAt    DateTime @default(now())
+
+  @@map("borehole_properties")
+}
+
+/// 鑽孔岩芯照片
+model BoreholePhoto {
+  id           String   @id @default(uuid())
+  boreholeId   String
+  borehole     Borehole @relation(fields: [boreholeId], references: [id], onDelete: Cascade)
+  
+  depth        Float               // 對應深度 (公尺)
+  url          String              // 圖片 URL
+  thumbnailUrl String              // 縮圖 URL
+  caption      String?             // 備註
+  
+  createdAt    DateTime @default(now())
+
+  @@map("borehole_photos")
 }

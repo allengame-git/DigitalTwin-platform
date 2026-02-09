@@ -7,7 +7,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useAnnotationStore } from '../stores/annotationStore';
 import { useAuth } from '../contexts/AuthContext';
 import { usePageTracking } from '../hooks/usePageTracking';
@@ -23,6 +23,7 @@ const DEFAULT_PROJECT_ID = 'default';
 
 export const AnnotationsPage: React.FC = () => {
   usePageTracking({ pageName: '審查標註' });
+  const { projectCode } = useParams<{ projectCode: string }>();
 
   const { user } = useAuth();
   const {
@@ -228,8 +229,8 @@ export const AnnotationsPage: React.FC = () => {
           <p className="annotations-subtitle">
             歡迎，{user?.name}
           </p>
-          <Link to="/" className="annotations-back-link">
-            ← 返回儀表板
+          <Link to={projectCode ? `/project/${projectCode}` : '/'} className="annotations-back-link">
+            ← 返回{projectCode ? '專案' : ''}儀表板
           </Link>
         </div>
 

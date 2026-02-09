@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { LayerPanel } from '../overlay/LayerPanel';
 import { ClippingTool } from '../overlay/ClippingTool';
 import { usePerformanceStore } from '../../stores/performanceStore';
@@ -18,6 +18,8 @@ export const GeologySidebar: React.FC = () => {
     const [isCollapsed, setIsCollapsed] = React.useState(false);
     const { fps, memory, triangles } = usePerformanceStore();
     const { resetCamera } = useCameraStore();
+
+    const { projectCode } = useParams<{ projectCode: string }>();
 
     return (
         <div
@@ -76,7 +78,7 @@ export const GeologySidebar: React.FC = () => {
             >
                 <div style={{ marginBottom: '8px' }}>
                     <Link
-                        to="/"
+                        to={projectCode ? `/project/${projectCode}` : '/'}
                         style={{
                             textDecoration: 'none',
                             color: '#4b5563',
@@ -87,7 +89,7 @@ export const GeologySidebar: React.FC = () => {
                             fontWeight: 500
                         }}
                     >
-                        ← 回到儀表板
+                        ← 回到{projectCode ? '專案' : ''}儀表板
                     </Link>
                 </div>
                 <h1 style={{ margin: 0, fontSize: '18px', color: '#111827', fontWeight: 700 }}>

@@ -1,9 +1,10 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const PlaceholderPage: React.FC<{ title: string; icon: string }> = ({ title, icon }) => {
     const { user } = useAuth();
+    const { projectCode } = useParams<{ projectCode: string }>();
 
     return (
         <div style={{
@@ -17,7 +18,7 @@ const PlaceholderPage: React.FC<{ title: string; icon: string }> = ({ title, ico
             <p style={{ color: '#666', marginBottom: '16px' }}>這是 {title} 的預留位置頁面。</p>
             <p style={{ color: '#999', marginBottom: '24px' }}>目前登入為：{user?.name} ({user?.role})</p>
             <Link
-                to="/"
+                to={projectCode ? `/project/${projectCode}` : '/'}
                 style={{
                     display: 'inline-block',
                     padding: '12px 24px',
@@ -27,7 +28,7 @@ const PlaceholderPage: React.FC<{ title: string; icon: string }> = ({ title, ico
                     borderRadius: '8px',
                 }}
             >
-                返回儀表板
+                返回{projectCode ? '專案' : ''}儀表板
             </Link>
         </div>
     );

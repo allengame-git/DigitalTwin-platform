@@ -18,6 +18,8 @@ import annotationsRoutes from './routes/annotations';
 import uploadRoutes from './routes/upload';
 import geologyModelRoutes from './routes/geology-model';
 import projectRoutes from './routes/project';
+import boreholeRoutes from './routes/borehole';
+import lithologyRoutes from './routes/lithology';
 import { requestIdMiddleware, requestLogger, errorLogger } from './middleware/errorLogger';
 import path from 'path';
 
@@ -45,6 +47,8 @@ app.use('/api/annotations', annotationsRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/geology-model', geologyModelRoutes);
 app.use('/api/project', projectRoutes);
+app.use('/api/borehole', boreholeRoutes);
+app.use('/api/lithology', lithologyRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
