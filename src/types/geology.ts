@@ -6,6 +6,8 @@
 /** 鑽孔基本資訊 */
 export interface Borehole {
     id: string;
+    /** 鑽孔編號 (e.g. BH-001) */
+    boreholeNo: string;
     name: string;
     /** TWD97 X 座標 (公尺) */
     x: number;
@@ -19,8 +21,14 @@ export interface Borehole {
     drilledDate?: string;
     /** 所屬區域 */
     area?: string;
+    /** 鑽探單位 */
+    contractor?: string;
+    /** 描述/備註 */
+    description?: string;
     /** 簡易層位資料 (用於 3D 顯示) */
     layers?: Layer[];
+    /** 物性資料 */
+    properties?: PropertyData[];
 }
 
 /** 地層資訊 */

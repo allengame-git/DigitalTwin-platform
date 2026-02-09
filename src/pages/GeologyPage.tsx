@@ -8,10 +8,24 @@ import { GeologyCanvas } from '../components/scene/GeologyCanvas';
 import { GeologyErrorBoundary } from '../components/scene/GeologyErrorBoundary';
 import { BoreholeDetail } from '../components/overlay/BoreholeDetail';
 import { GeologySidebar } from '../components/layout/GeologySidebar';
+import { useParams } from 'react-router-dom';
 import { useBoreholeStore } from '../stores/boreholeStore';
+import { useProjectStore } from '../stores/projectStore';
 
 export const GeologyPage: React.FC = () => {
+    const { projectCode } = useParams<{ projectCode: string }>();
+    const { projects, setActiveProject } = useProjectStore();
     const { selectedBorehole } = useBoreholeStore();
+
+    // 同步專案狀態
+    React.useEffect(() => {
+        if (projectCode) {
+            const project = projects.find(p => p.code === projectCode);
+            if (project) {
+                setActiveProject(project.id);
+            }
+        }
+    }, [projectCode, projects, setActiveProject]);
 
     return (
         <div style={{ width: '100vw', height: '100vh', display: 'flex', overflow: 'hidden' }}>

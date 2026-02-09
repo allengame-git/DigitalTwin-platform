@@ -21,6 +21,7 @@ import {
 import { useProjectStore } from '../stores/projectStore';
 import { setOrigin } from '../utils/coordinates';
 import { BoreholeUploadSection } from '../components/data/BoreholeUploadSection';
+import { FaultPlaneUploadSection } from '../components/data/FaultPlaneUploadSection';
 import LithologySection from '../components/data/LithologySection';
 import { useLithologyStore } from '../stores/lithologyStore';
 
@@ -912,6 +913,31 @@ export const DataManagementPage: React.FC = () => {
                     border: 1px solid #dcfce7;
                     margin-left: 6px;
                 }
+                /* Data Table Styles */
+                .dm-table-wrapper {
+                    border: 1px solid #e5e7eb;
+                    border-radius: 8px;
+                    overflow: hidden;
+                }
+                .dm-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                .dm-table th {
+                    background: #f9fafb;
+                    font-weight: 600;
+                    font-size: 12px;
+                    color: #374151;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    border-bottom: 1px solid #e5e7eb;
+                }
+                .dm-table td {
+                    border-bottom: 1px solid #f3f4f6;
+                }
+                .dm-table tbody tr:last-child td {
+                    border-bottom: none;
+                }
             `}</style>
 
             {/* Same header... */}
@@ -1008,6 +1034,11 @@ export const DataManagementPage: React.FC = () => {
                 {/* 鑽孔資料 */}
                 <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
                     <BoreholeUploadSection />
+                </div>
+
+                {/* 斷層面資料 */}
+                <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                    <FaultPlaneUploadSection />
                 </div>
 
                 {/* 航照圖管理 */}

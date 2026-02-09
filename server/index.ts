@@ -20,6 +20,7 @@ import geologyModelRoutes from './routes/geology-model';
 import projectRoutes from './routes/project';
 import boreholeRoutes from './routes/borehole';
 import lithologyRoutes from './routes/lithology';
+import faultPlaneRoutes from './routes/faultPlane';
 import { requestIdMiddleware, requestLogger, errorLogger } from './middleware/errorLogger';
 import path from 'path';
 
@@ -30,9 +31,18 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(requestIdMiddleware);
 app.use(requestLogger);
+// Configure allowed origins
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    process.env.FRONTEND_URL,
+].filter((origin): origin is string => !!origin);
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
 app.use(cookieParser());
@@ -49,6 +59,7 @@ app.use('/api/geology-model', geologyModelRoutes);
 app.use('/api/project', projectRoutes);
 app.use('/api/borehole', boreholeRoutes);
 app.use('/api/lithology', lithologyRoutes);
+app.use('/api/fault-plane', faultPlaneRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

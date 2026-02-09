@@ -6,44 +6,13 @@
  * Task: T041
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 import { Html } from '@react-three/drei';
 import { useLayerStore } from '../../stores/layerStore';
 import { twd97ToWorld } from '../../utils/coordinates';
-
-// Mock 斷層面資料 (待 API 整合)
-const MOCK_FAULT_PLANES = [
-    {
-        id: 'fault-1',
-        name: '主斷層 A',
-        type: 'normal' as const,
-        coordinates: [
-            { x: 250000, y: 2600000, z: 0 },
-            { x: 250500, y: 2600200, z: -50 },
-            { x: 251000, y: 2600400, z: -100 },
-            { x: 251500, y: 2600600, z: -150 },
-        ],
-        dipAngle: 70,       // 傾角 (度)
-        dipDirection: 90,   // 傾向 (度)
-        depth: 200,         // 向下延伸深度 (公尺)
-        color: '#ff4444',
-    },
-    {
-        id: 'fault-2',
-        name: '次要斷層 B',
-        type: 'reverse' as const,
-        coordinates: [
-            { x: 249500, y: 2600500, z: 0 },
-            { x: 250000, y: 2600300, z: -30 },
-            { x: 250500, y: 2600100, z: -60 },
-        ],
-        dipAngle: 45,
-        dipDirection: 270,
-        depth: 150,
-        color: '#4488ff',
-    },
-];
+import { useFaultPlaneStore, FaultPlane } from '../../stores/faultPlaneStore';
+import { useProjectStore } from '../../stores/projectStore';
 
 interface FaultPlaneData {
     id: string;
@@ -54,10 +23,6 @@ interface FaultPlaneData {
     dipDirection: number;
     depth: number;
     color: string;
-}
-
-interface StructureLinesProps {
-    faultPlanes?: FaultPlaneData[];
 }
 
 /**
@@ -125,14 +90,23 @@ function createFaultPlaneGeometry(
     return geometry;
 }
 
-export function StructureLines({ faultPlanes = MOCK_FAULT_PLANES }: StructureLinesProps) {
+export function StructureLines() {
     const { layers } = useLayerStore();
     const faultsLayer = layers.faults;
+    const { faultPlanes, fetchFaultPlanes } = useFaultPlaneStore();
+    const { activeProjectId } = useProjectStore();
     const [selectedFault, setSelectedFault] = React.useState<FaultPlaneData | null>(null);
+
+    // 載入斷層面資料
+    useEffect(() => {
+        if (activeProjectId) {
+            fetchFaultPlanes(activeProjectId);
+        }
+    }, [activeProjectId, fetchFaultPlanes]);
 
     // 建立斷層面幾何
     const faultGeometries = useMemo(() => {
-        return faultPlanes.map((fault) => ({
+        return faultPlanes.map((fault: FaultPlaneData) => ({
             ...fault,
             geometry: createFaultPlaneGeometry(
                 fault.coordinates,

@@ -12,12 +12,14 @@ import { LayerPanel } from '../overlay/LayerPanel';
 import { ClippingTool } from '../overlay/ClippingTool';
 import { usePerformanceStore } from '../../stores/performanceStore';
 import { useCameraStore } from '../../stores/cameraStore';
+import { useBoreholeStore } from '../../stores/boreholeStore';
 
 export const GeologySidebar: React.FC = () => {
     // 收合狀態
     const [isCollapsed, setIsCollapsed] = React.useState(false);
     const { fps, memory, triangles } = usePerformanceStore();
     const { resetCamera } = useCameraStore();
+    const { boreholes } = useBoreholeStore();
 
     const { projectCode } = useParams<{ projectCode: string }>();
 
@@ -96,7 +98,7 @@ export const GeologySidebar: React.FC = () => {
                     地質資料展示
                 </h1>
                 <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#6b7280' }}>
-                    TWD97 座標系統 | 800+ 鑽孔
+                    TWD97 座標系統 | {boreholes.length} 筆鑽孔
                 </p>
             </div>
 

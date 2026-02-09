@@ -29,6 +29,7 @@ model Project {
   geophysics    Geophysics[]
   boreholes     Borehole[]
   lithologies   ProjectLithology[]
+  faultPlanes   FaultPlane[]
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -262,4 +263,42 @@ model BoreholePhoto {
   createdAt    DateTime @default(now())
 
   @@map("borehole_photos")
+}
+
+/// 斷層面資料
+model FaultPlane {
+  id             String   @id @default(uuid())
+  name           String                         // 斷層名稱
+  type           String                         // normal | reverse | strike-slip
+  dipAngle       Float                          // 傾角 (度)
+  dipDirection   Float                          // 傾向 (度)
+  depth          Float                          // 向下延伸深度 (m)
+  color          String   @default("#ff4444")   // 顯示顏色
+
+  // 關聯座標點
+  coordinates    FaultCoordinate[]
+
+  // 專案關聯 (必填)
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("fault_planes")
+}
+
+/// 斷層座標點
+model FaultCoordinate {
+  id           String   @id @default(uuid())
+  faultPlaneId String
+  faultPlane   FaultPlane @relation(fields: [faultPlaneId], references: [id], onDelete: Cascade)
+
+  // TWD97 座標 (公尺)
+  x            Float
+  y            Float
+  z            Float           // 高程 / 深度
+  sortOrder    Int             // 座標點順序
+
+  @@map("fault_coordinates")
 }

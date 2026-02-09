@@ -24,6 +24,7 @@ router.get('/', async (_req: Request, res: Response) => {
                         geologyModels: true,
                         imagery: true,
                         geophysics: true,
+                        boreholes: true,
                     }
                 }
             }
@@ -50,6 +51,7 @@ router.get('/:id', async (req: Request, res: Response) => {
                         geologyModels: true,
                         imagery: true,
                         geophysics: true,
+                        boreholes: true,
                     }
                 }
             }
@@ -81,6 +83,7 @@ router.get('/code/:code', async (req: Request, res: Response) => {
                         geologyModels: true,
                         imagery: true,
                         geophysics: true,
+                        boreholes: true,
                     }
                 }
             }
@@ -182,6 +185,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
                         geologyModels: true,
                         imagery: true,
                         geophysics: true,
+                        boreholes: true,
                     }
                 }
             }
@@ -223,10 +227,11 @@ router.get('/:id/stats', async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
 
-        const [geologyModels, imagery, geophysics] = await Promise.all([
+        const [geologyModels, imagery, geophysics, boreholes] = await Promise.all([
             prisma.geologyModel.count({ where: { projectId: id } }),
             prisma.imagery.count({ where: { projectId: id } }),
             prisma.geophysics.count({ where: { projectId: id } }),
+            prisma.borehole.count({ where: { projectId: id } }),
         ]);
 
         res.json({
@@ -235,7 +240,8 @@ router.get('/:id/stats', async (req: Request, res: Response) => {
                 geologyModels,
                 imagery,
                 geophysics,
-                total: geologyModels + imagery + geophysics,
+                boreholes,
+                total: geologyModels + imagery + geophysics + boreholes,
             }
         });
     } catch (error) {

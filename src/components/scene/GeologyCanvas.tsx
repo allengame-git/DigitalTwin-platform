@@ -8,6 +8,7 @@ import { Canvas } from '@react-three/fiber';
 import { MapControls, Stats } from '@react-three/drei';
 import { RENDERER_CONFIG, DEFAULT_CAMERA_CONFIG } from '../../config/three';
 import { useBoreholeStore } from '../../stores/boreholeStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { BoreholeInstances } from './BoreholeInstances';
 import { SceneEnvironment } from './SceneEnvironment';
 import { LoadingProgress } from '../overlay/LoadingProgress';
@@ -31,10 +32,13 @@ interface GeologyCanvasProps {
 
 export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) {
     const { fetchBoreholes, status } = useBoreholeStore();
+    const { activeProjectId } = useProjectStore();
 
     useEffect(() => {
-        fetchBoreholes();
-    }, [fetchBoreholes]);
+        if (activeProjectId) {
+            fetchBoreholes(activeProjectId);
+        }
+    }, [fetchBoreholes, activeProjectId]);
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%', ...style }}>

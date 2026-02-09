@@ -21,6 +21,9 @@ router.get('/', async (req: Request, res: Response) => {
             include: {
                 layers: {
                     orderBy: { topDepth: 'asc' }
+                },
+                properties: {
+                    orderBy: { depth: 'asc' }
                 }
             },
             orderBy: { boreholeNo: 'asc' }
@@ -212,23 +215,75 @@ router.put('/:id', async (req: Request, res: Response) => {
             drilledDate,
             contractor,
             area,
-            description
+            description,
+            layers,
+            properties
         } = req.body;
 
-        const borehole = await prisma.borehole.update({
-            where: { id: id as string },
-            data: {
-                boreholeNo,
-                name,
-                x: x !== undefined ? parseFloat(x) : undefined,
-                y: y !== undefined ? parseFloat(y) : undefined,
-                elevation: elevation !== undefined ? parseFloat(elevation) : undefined,
-                totalDepth: totalDepth !== undefined ? parseFloat(totalDepth) : undefined,
-                drilledDate: drilledDate ? new Date(drilledDate) : undefined,
-                contractor,
-                area,
-                description
+        const borehole = await prisma.$transaction(async (tx) => {
+            // 1. Update basic info
+            const updated = await tx.borehole.update({
+                where: { id: id as string },
+                data: {
+                    boreholeNo,
+                    name,
+                    x: x !== undefined ? parseFloat(x) : undefined,
+                    y: y !== undefined ? parseFloat(y) : undefined,
+                    elevation: elevation !== undefined ? parseFloat(elevation) : undefined,
+                    totalDepth: totalDepth !== undefined ? parseFloat(totalDepth) : undefined,
+                    drilledDate: drilledDate ? new Date(drilledDate) : undefined,
+                    contractor,
+                    area,
+                    description
+                },
+                include: {
+                    layers: true,
+                    properties: true
+                }
+            });
+
+            // 2. Update Layers if provided (Replace all)
+            if (layers && Array.isArray(layers)) {
+                await tx.boreholeLayer.deleteMany({ where: { boreholeId: id as string } });
+                if (layers.length > 0) {
+                    await tx.boreholeLayer.createMany({
+                        data: layers.map((l: any) => ({
+                            boreholeId: id as string,
+                            topDepth: parseFloat(l.topDepth),
+                            bottomDepth: parseFloat(l.bottomDepth),
+                            lithologyCode: l.lithologyCode,
+                            lithologyName: l.lithologyName,
+                            description: l.description
+                        }))
+                    });
+                }
             }
+
+            // 3. Update Properties if provided (Replace all)
+            if (properties && Array.isArray(properties)) {
+                await tx.boreholeProperty.deleteMany({ where: { boreholeId: id as string } });
+                if (properties.length > 0) {
+                    await tx.boreholeProperty.createMany({
+                        data: properties.map((p: any) => ({
+                            boreholeId: id as string,
+                            depth: parseFloat(p.depth),
+                            nValue: p.nValue ? parseInt(p.nValue) : null,
+                            rqd: p.rqd ? parseFloat(p.rqd) : null
+                        }))
+                    });
+                }
+            }
+
+
+
+            // Return the final state with all relations
+            return await tx.borehole.findUnique({
+                where: { id: id as string },
+                include: {
+                    layers: { orderBy: { topDepth: 'asc' } },
+                    properties: { orderBy: { depth: 'asc' } }
+                }
+            });
         });
 
         res.json(borehole);

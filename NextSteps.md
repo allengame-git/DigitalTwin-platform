@@ -6,7 +6,7 @@
 
 ## 📍 目前狀態
 
-**最後更新**: 2026-02-06
+**最後更新**: 2026-02-09
 
 ### 已完成功能
 
@@ -21,6 +21,16 @@
 - ✅ 斷層線與位態符號視覺化
 - ✅ 導覽模式 (Guided Tour)
 - ✅ 物理性質圖表更新：顯示 N 值與 RQD
+- ✅ **真實鑽孔資料正式串接**
+  - 取代全域 Mock 資料，改為 project-scoped API 載入
+  - 修正不同專案間資料外洩問題
+  - 更新 Dashboard 與 Sidebar 即時資料統計 (鑽孔數、模型數等)
+- ✅ **地質構造 (斷層面) 完整實作**
+  - Database: `FaultPlane` + `FaultCoordinate` 模型
+  - Backend: 完整 CRUD API 與 CSV 批次匯入
+  - Frontend: `faultPlaneStore` 狀態管理
+  - UI: `FaultPlaneUploadSection` 支援單筆新增、編輯與 CSV 匯入
+  - 3D: `StructureLines.tsx` 整合真實資料與位態渲染
 
 #### 2. 3D 地質模型 (New - 2026-02-06)
 
@@ -92,15 +102,21 @@ Password: postgres
 - [ ] **Frontend**: 更新 `viewerStore.ts` 支援模型 offset
 - [ ] **UI**: 在 `LayerPanel.tsx` 增加 XYZ Offset 微調控制項
 
-#### 2. 真實資料整合
+#### 2. 真實資料整合與完善
 
-- [ ] 串接真實後端 API 取代 Mock 鑽孔資料
-- [ ] 串接真實航照圖 Tile 服務
-- [ ] 驗證真實 CSV 資料的岩性 ID 對應
+- [x] 串接真實後端 API 取代 Mock 鑽孔資料
+- [x] 串接真實航照圖 Tile 服務 (已支援雲端 URL)
+- [ ] 驗證真實 CSV 資料的岩性 ID 對應與顏色顯示一致性
+
+#### 3. 斷層面功能完善 (Phase 6)
+
+- [ ] **3D 視覺增強**: 增加斷層名稱標籤 (Html Label) 與傾向指示箭頭
+- [ ] **批次匯入驗證**: 使用實際大量資料測試 CSV 解析與匯入效能
+- [ ] **UI 優化**: 在地質分頁點擊斷層後，側邊欄自動顯示該斷層的詳細參數 (dip/dip direction)
 
 ### 中優先級
 
-#### 3. UX 優化 (Data Management)
+#### 4. UX 優化 (Data Management)
 
 - [ ] **UI**: 批次上傳功能
 - [ ] **UI**: 上傳進度條 (Progress Bar)

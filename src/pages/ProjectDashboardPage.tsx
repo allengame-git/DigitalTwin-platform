@@ -133,9 +133,11 @@ export const ProjectDashboardPage: React.FC = () => {
                         <div style={{ marginTop: '12px', display: 'flex', gap: '16px', fontSize: '13px', color: '#64748b' }}>
                             <span>{project._count?.geologyModels || 0} 個地質模型</span>
                             <span>|</span>
+                            <span>{project._count?.boreholes || 0} 筆鑽探資料</span>
+                            <span>|</span>
                             <span>{project._count?.imagery || 0} 張航照圖</span>
                             <span>|</span>
-                            <span>{project._count?.geophysics || 0} 筆探查資料</span>
+                            <span>{project._count?.geophysics || 0} 筆探勘剖面</span>
                         </div>
                     )}
                 </div>

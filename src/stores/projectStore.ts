@@ -22,6 +22,7 @@ export interface Project {
         geologyModels: number;
         imagery: number;
         geophysics: number;
+        boreholes: number;
     };
 }
 

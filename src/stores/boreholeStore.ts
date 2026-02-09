@@ -33,7 +33,9 @@ interface BoreholeActions {
     setFilter: (filter: Partial<BoreholeState['filter']>) => void;
     setBoreholes: (boreholes: Borehole[]) => void;
     createBorehole: (data: CreateBoreholeData) => Promise<Borehole | null>;
+    updateBorehole: (id: string, data: Partial<CreateBoreholeData>) => Promise<Borehole | null>;
     deleteBorehole: (id: string) => Promise<boolean>;
+    batchDelete: (ids: string[]) => Promise<{ success: number; failed: number }>;
     batchImport: (projectId: string, boreholes: CreateBoreholeData[]) => Promise<BatchImportResult>;
     batchImportLayers: (projectId: string, layers: LayerCsvRow[]) => Promise<BatchImportResult>;
     batchImportProperties: (projectId: string, properties: PropertyCsvRow[]) => Promise<BatchImportResult>;
@@ -95,13 +97,16 @@ import { LITHOLOGY_MAP } from '../config/lithologyConfig';
 const mapApiToBorehole = (apiData: any): Borehole => {
     return {
         id: apiData.id,
-        name: apiData.name || apiData.boreholeNo,
+        boreholeNo: apiData.boreholeNo,
+        name: apiData.name || '',
         x: apiData.x,
         y: apiData.y,
         elevation: apiData.elevation,
         totalDepth: apiData.totalDepth,
         drilledDate: apiData.drilledDate,
         area: apiData.area,
+        contractor: apiData.contractor,
+        description: apiData.description,
         layers: apiData.layers?.map((layer: any) => {
             const lithology = LITHOLOGY_MAP.find(l => l.code === layer.lithologyCode);
             return {
@@ -115,6 +120,11 @@ const mapApiToBorehole = (apiData: any): Borehole => {
                 description: layer.description,
             };
         }) || [],
+        properties: apiData.properties?.map((prop: any) => ({
+            depth: prop.depth,
+            nValue: prop.nValue,
+            rqd: prop.rqd,
+        })) || [],
     };
 };
 
@@ -241,6 +251,35 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
         }
     },
 
+    updateBorehole: async (id: string, data: Partial<CreateBoreholeData>) => {
+        try {
+            const response = await fetch(`${API_BASE}/api/borehole/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(data),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || '更新鑽孔失敗');
+            }
+
+            const updated = await response.json();
+            const borehole = mapApiToBorehole(updated);
+
+            // Update in local state
+            set(state => ({
+                boreholes: state.boreholes.map(b => b.id === id ? borehole : b)
+            }));
+
+            return borehole;
+        } catch (error) {
+            set({ error: error instanceof Error ? error.message : '更新鑽孔失敗' });
+            return null;
+        }
+    },
+
     deleteBorehole: async (id: string) => {
         try {
             const response = await fetch(`${API_BASE}/api/borehole/${id}`, {
@@ -262,6 +301,35 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
             set({ error: error instanceof Error ? error.message : '刪除鑽孔失敗' });
             return false;
         }
+    },
+
+    batchDelete: async (ids: string[]) => {
+        let success = 0;
+        let failed = 0;
+
+        for (const id of ids) {
+            try {
+                const response = await fetch(`${API_BASE}/api/borehole/${id}`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                });
+
+                if (response.ok) {
+                    success++;
+                } else {
+                    failed++;
+                }
+            } catch {
+                failed++;
+            }
+        }
+
+        // Remove deleted items from local state
+        set(state => ({
+            boreholes: state.boreholes.filter(b => !ids.includes(b.id))
+        }));
+
+        return { success, failed };
     },
 
     batchImport: async (projectId: string, boreholes: CreateBoreholeData[]) => {

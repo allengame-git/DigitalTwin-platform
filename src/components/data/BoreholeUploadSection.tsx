@@ -50,16 +50,21 @@ const initialFormData: BoreholeFormData = {
 };
 
 export const BoreholeUploadSection: React.FC = () => {
-    const { boreholes, status, fetchBoreholes, createBorehole, deleteBorehole, batchImport, batchImportLayers, batchImportProperties } = useBoreholeStore();
+    const { boreholes, status, fetchBoreholes, createBorehole, updateBorehole, deleteBorehole, batchDelete, batchImport, batchImportLayers, batchImportProperties } = useBoreholeStore();
     const { activeProjectId } = useProjectStore();
     const { lithologies } = useLithologyStore();
 
     const [showForm, setShowForm] = useState(false);
+    const [editingBorehole, setEditingBorehole] = useState<string | null>(null);
     const [formData, setFormData] = useState<BoreholeFormData>(initialFormData);
     const [layers, setLayers] = useState<LayerFormData[]>([]);
     const [properties, setProperties] = useState<PropertyFormData[]>([]);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Selection state
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
 
     // Delete confirmation
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -79,6 +84,33 @@ export const BoreholeUploadSection: React.FC = () => {
             fetchBoreholes(activeProjectId);
         }
     }, [activeProjectId, fetchBoreholes]);
+
+    // Selection handlers
+    const toggleSelectAll = () => {
+        if (selectedIds.size === boreholes.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(boreholes.map(b => b.id)));
+        }
+    };
+
+    const toggleSelect = (id: string) => {
+        const newSet = new Set(selectedIds);
+        if (newSet.has(id)) {
+            newSet.delete(id);
+        } else {
+            newSet.add(id);
+        }
+        setSelectedIds(newSet);
+    };
+
+    const handleBatchDelete = async () => {
+        if (selectedIds.size === 0) return;
+        const result = await batchDelete(Array.from(selectedIds));
+        alert(`批量刪除完成：成功 ${result.success} 筆，失敗 ${result.failed} 筆`);
+        setSelectedIds(new Set());
+        setShowBatchDeleteConfirm(false);
+    };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -131,7 +163,7 @@ export const BoreholeUploadSection: React.FC = () => {
 
         setIsSubmitting(true);
         try {
-            const result = await createBorehole({
+            const boreholeData = {
                 projectId: activeProjectId,
                 boreholeNo: formData.boreholeNo.trim(),
                 name: formData.name.trim() || undefined,
@@ -154,14 +186,17 @@ export const BoreholeUploadSection: React.FC = () => {
                     nValue: p.nValue ? parseInt(p.nValue) : undefined,
                     rqd: p.rqd ? parseFloat(p.rqd) : undefined,
                 })) : undefined,
-            });
+            };
+
+            let result;
+            if (editingBorehole) {
+                result = await updateBorehole(editingBorehole, boreholeData);
+            } else {
+                result = await createBorehole(boreholeData);
+            }
 
             if (result) {
-                setShowForm(false);
-                setFormData(initialFormData);
-                setLayers([]);
-                setProperties([]);
-                setFormErrors({});
+                handleCancelForm();
             }
         } finally {
             setIsSubmitting(false);
@@ -170,10 +205,62 @@ export const BoreholeUploadSection: React.FC = () => {
 
     const handleCancelForm = () => {
         setShowForm(false);
+        setEditingBorehole(null);
         setFormData(initialFormData);
         setLayers([]);
         setProperties([]);
         setFormErrors({});
+    };
+
+    const handleEdit = (bh: any) => {
+        setEditingBorehole(bh.id);
+
+        // Format date to YYYY-MM-DD for date input
+        let formattedDate = '';
+        if (bh.drilledDate) {
+            const date = new Date(bh.drilledDate);
+            if (!isNaN(date.getTime())) {
+                formattedDate = date.toISOString().split('T')[0];
+            }
+        }
+
+        setFormData({
+            boreholeNo: bh.boreholeNo || '',
+            name: bh.name || '',
+            x: bh.x.toString(),
+            y: bh.y.toString(),
+            elevation: bh.elevation.toString(),
+            totalDepth: bh.totalDepth.toString(),
+            drilledDate: formattedDate,
+            contractor: bh.contractor || '',
+            area: bh.area || '',
+            description: bh.description || '',
+        });
+
+        // Map and set layers
+        if (bh.layers && Array.isArray(bh.layers)) {
+            setLayers(bh.layers.map((l: any) => ({
+                topDepth: l.topDepth.toString(),
+                bottomDepth: l.bottomDepth.toString(),
+                lithologyCode: l.lithologyCode,
+                description: l.description || '',
+            })));
+        } else {
+            setLayers([]);
+        }
+
+        // Map and set properties
+        if (bh.properties && Array.isArray(bh.properties)) {
+            setProperties(bh.properties.map((p: any) => ({
+                depth: p.depth.toString(),
+                nValue: p.nValue ? p.nValue.toString() : '',
+                rqd: p.rqd ? p.rqd.toString() : '',
+            })));
+        } else {
+            setProperties([]);
+        }
+
+        setShowForm(true);
     };
 
     const handleDeleteClick = (id: string) => {
@@ -285,20 +372,23 @@ export const BoreholeUploadSection: React.FC = () => {
         setShowPropertyCsvImport(false);
     };
 
-    const formatFileSize = (bytes: number) => {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    };
-
     return (
         <section className="dm-section">
             <div className="dm-section-header">
                 <div>
                     <h2 className="dm-section-title">鑽探資料</h2>
-                    <p className="dm-section-desc">管理鑽孔位置、地層及物性資料</p>
+                    <p className="dm-section-desc">管理鑽孔位置、地層及物性資料 (共 {boreholes.length} 筆)</p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
+                    {selectedIds.size > 0 && (
+                        <button
+                            className="dm-btn"
+                            style={{ background: '#dc2626', color: 'white' }}
+                            onClick={() => setShowBatchDeleteConfirm(true)}
+                        >
+                            刪除已選 ({selectedIds.size})
+                        </button>
+                    )}
                     <div style={{ position: 'relative' }}>
                         <button
                             className="dm-btn dm-btn-secondary"
@@ -355,7 +445,7 @@ export const BoreholeUploadSection: React.FC = () => {
                 </div>
             </div>
 
-            {/* 鑽孔列表 */}
+            {/* 鑽孔列表 - 表格形式 */}
             {status === 'loading' ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>載入中...</div>
             ) : boreholes.length === 0 ? (
@@ -365,39 +455,80 @@ export const BoreholeUploadSection: React.FC = () => {
                     <p style={{ fontSize: '13px', color: '#94a3b8' }}>點擊「新增鑽孔」按鈕開始上傳</p>
                 </div>
             ) : (
-                <div className="dm-file-grid">
-                    {boreholes.map(bh => (
-                        <div key={bh.id} className="dm-file-card">
-                            <div className="dm-file-icon" style={{ background: '#f0f9ff' }}>📍</div>
-                            <div className="dm-file-info">
-                                <div className="dm-file-name">{bh.name || bh.id}</div>
-                                <div className="dm-file-meta">
-                                    孔深: {bh.totalDepth.toFixed(1)}m | 高程: {bh.elevation.toFixed(1)}m
-                                </div>
-                                <div className="dm-file-meta" style={{ fontSize: '11px', color: '#94a3b8' }}>
-                                    X: {bh.x.toFixed(0)}, Y: {bh.y.toFixed(0)}
-                                </div>
-                            </div>
-                            <div className="dm-file-actions">
-                                <button
-                                    className="dm-btn-icon"
-                                    onClick={() => handleDeleteClick(bh.id)}
-                                    title="刪除"
+                <div className="dm-table-wrapper" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    <table className="dm-table" style={{ fontSize: '13px' }}>
+                        <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 10 }}>
+                            <tr>
+                                <th style={{ width: '40px', padding: '10px 8px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.size === boreholes.length && boreholes.length > 0}
+                                        onChange={toggleSelectAll}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                </th>
+                                <th style={{ padding: '10px 12px', textAlign: 'left' }}>鑽孔編號</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'right' }}>X (TWD97)</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'right' }}>Y (TWD97)</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'right' }}>高程 (m)</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'right' }}>深度 (m)</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'left' }}>區域</th>
+                                <th style={{ padding: '10px 12px', width: '100px', textAlign: 'center' }}>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {boreholes.map(bh => (
+                                <tr
+                                    key={bh.id}
+                                    style={{
+                                        background: selectedIds.has(bh.id) ? '#eff6ff' : 'transparent',
+                                        transition: 'background 0.15s',
+                                    }}
+                                    onMouseEnter={e => { if (!selectedIds.has(bh.id)) (e.currentTarget as HTMLElement).style.background = '#f9fafb'; }}
+                                    onMouseLeave={e => { if (!selectedIds.has(bh.id)) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                                 >
-                                    🗑️
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+                                    <td style={{ padding: '8px', textAlign: 'center' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.has(bh.id)}
+                                            onChange={() => toggleSelect(bh.id)}
+                                            style={{ cursor: 'pointer' }}
+                                        />
+                                    </td>
+                                    <td style={{ padding: '8px 12px', fontWeight: 500 }}>{bh.boreholeNo}</td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'monospace', fontSize: '12px' }}>{bh.x.toFixed(2)}</td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'monospace', fontSize: '12px' }}>{bh.y.toFixed(2)}</td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right' }}>{bh.elevation.toFixed(1)}</td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right' }}>{bh.totalDepth.toFixed(1)}</td>
+                                    <td style={{ padding: '8px 12px', color: '#64748b' }}>{bh.area || '-'}</td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                        <button
+                                            onClick={() => handleEdit(bh)}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3b82f6', fontSize: '12px', marginRight: '8px' }}
+                                            title="編輯"
+                                        >
+                                            編輯
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteClick(bh.id)}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '12px' }}
+                                            title="刪除"
+                                        >
+                                            刪除
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             )}
 
-            {/* 新增/編輯表單 Modal */}
             {showForm && (
                 <div className="dm-modal-overlay">
                     <div className="dm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
                         <div className="dm-modal-header">
-                            <h3 className="dm-modal-title">新增鑽孔資料</h3>
+                            <h3 className="dm-modal-title">{editingBorehole ? '編輯鑽孔資料' : '新增鑽孔資料'}</h3>
                             <button onClick={handleCancelForm} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#6b7280' }}>✕</button>
                         </div>
                         <div className="dm-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
@@ -614,6 +745,24 @@ BH-002,224600,2429600,118.2,45.0,2024-01-20,A區`}
                         <div className="dm-modal-footer">
                             <button className="dm-btn dm-btn-secondary" onClick={() => setShowDeleteConfirm(false)}>取消</button>
                             <button className="dm-btn dm-btn-primary" style={{ background: '#dc2626' }} onClick={confirmDelete}>刪除</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 批量刪除確認 Modal */}
+            {showBatchDeleteConfirm && (
+                <div className="dm-modal-overlay" onClick={() => setShowBatchDeleteConfirm(false)}>
+                    <div className="dm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+                        <div className="dm-modal-header">
+                            <h3 className="dm-modal-title">確認批量刪除</h3>
+                        </div>
+                        <div className="dm-modal-body">
+                            <p>確定要刪除選取的 <strong>{selectedIds.size}</strong> 筆鑽孔資料嗎？此操作無法復原。</p>
+                        </div>
+                        <div className="dm-modal-footer">
+                            <button className="dm-btn dm-btn-secondary" onClick={() => setShowBatchDeleteConfirm(false)}>取消</button>
+                            <button className="dm-btn dm-btn-primary" style={{ background: '#dc2626' }} onClick={handleBatchDelete}>批量刪除</button>
                         </div>
                     </div>
                 </div>

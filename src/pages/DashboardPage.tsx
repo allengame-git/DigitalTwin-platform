@@ -374,12 +374,14 @@ export const DashboardPage: React.FC = () => {
                   <p className="dashboard-card-desc">
                     {project.description || '無描述'}
                   </p>
-                  <div style={{ marginTop: '12px', display: 'flex', gap: '8px', fontSize: '11px', color: '#64748b' }}>
+                  <div style={{ marginTop: '12px', display: 'flex', gap: '8px', fontSize: '11px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                     <span>{project._count?.geologyModels || 0} 模型</span>
+                    <span>|</span>
+                    <span>{project._count?.boreholes || 0} 鑽探</span>
                     <span>|</span>
                     <span>{project._count?.imagery || 0} 航照</span>
                     <span>|</span>
-                    <span>{project._count?.geophysics || 0} 探查</span>
+                    <span>{project._count?.geophysics || 0} 探勘</span>
                   </div>
 
                   {/* Actions: Edit (Admin/Engineer) & Delete (Admin Only) */}
