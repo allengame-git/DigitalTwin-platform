@@ -23,13 +23,11 @@ interface LayerConfig {
 
 interface LayerState {
     layers: Record<LayerType, LayerConfig>;
-    undergroundTransparency: number;
 }
 
 interface LayerActions {
     toggleLayer: (layerId: LayerType) => void;
     setOpacity: (layerId: LayerType, opacity: number) => void;
-    setUndergroundTransparency: (value: number) => void;
     setLayerVisible: (layerId: LayerType, visible: boolean) => void;
     resetLayers: () => void;
 }
@@ -47,7 +45,6 @@ const defaultLayers: Record<LayerType, LayerConfig> = {
 export const useLayerStore = create<LayerState & LayerActions>((set) => ({
     // 初始狀態
     layers: { ...defaultLayers },
-    undergroundTransparency: 0.3,
 
     // Actions
     toggleLayer: (layerId) => {
@@ -74,9 +71,6 @@ export const useLayerStore = create<LayerState & LayerActions>((set) => ({
         }));
     },
 
-    setUndergroundTransparency: (value) => {
-        set({ undergroundTransparency: Math.max(0, Math.min(1, value)) });
-    },
 
     setLayerVisible: (layerId, visible) => {
         set(state => ({
@@ -91,6 +85,6 @@ export const useLayerStore = create<LayerState & LayerActions>((set) => ({
     },
 
     resetLayers: () => {
-        set({ layers: { ...defaultLayers }, undergroundTransparency: 0.3 });
+        set({ layers: { ...defaultLayers } });
     },
 }));

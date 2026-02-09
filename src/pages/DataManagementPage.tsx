@@ -18,6 +18,9 @@ import {
     GeologyModelFile,
     GeologyModelMetadata
 } from '../stores/uploadStore';
+import { useProjectStore } from '../stores/projectStore';
+import { setOrigin } from '../utils/coordinates';
+
 
 export const DataManagementPage: React.FC = () => {
     const { user } = useAuth();
@@ -40,6 +43,56 @@ export const DataManagementPage: React.FC = () => {
         pollGeologyModelStatus,
         clearError,
     } = useUploadStore();
+
+    const { activeProjectId, projects, updateProject } = useProjectStore();
+    const activeProject = projects.find(p => p.id === activeProjectId);
+
+    // Project Settings State
+    const [originForm, setOriginForm] = useState({ x: '', y: '' });
+    const [isSavingOrigin, setIsSavingOrigin] = useState(false);
+
+    useEffect(() => {
+        if (activeProject) {
+            setOriginForm({
+                x: activeProject.originX.toString(),
+                y: activeProject.originY.toString()
+            });
+        }
+    }, [activeProject]);
+
+    const handleOriginSubmit = async () => {
+        if (!activeProject) return;
+
+        const x = parseFloat(originForm.x);
+        const y = parseFloat(originForm.y);
+
+        if (isNaN(x) || isNaN(y)) {
+            alert('請輸入有效的數字');
+            return;
+        }
+
+        setIsSavingOrigin(true);
+        try {
+            const updated = await updateProject(activeProject.id, {
+                originX: x,
+                originY: y
+            });
+
+            if (updated) {
+                setOrigin(x, y);
+                alert('專案座標設定已更新');
+            } else {
+                alert('更新失敗');
+            }
+        } catch (error) {
+            console.error('Update origin error:', error);
+            alert('更新時發生錯誤');
+        } finally {
+            setIsSavingOrigin(false);
+        }
+    };
+
+
 
 
     const [isDragging, setIsDragging] = useState(false);
@@ -857,6 +910,54 @@ export const DataManagementPage: React.FC = () => {
             </header>
 
             <main className="dm-content">
+                {/* Project Settings Section */}
+                {activeProject && (
+                    <section className="dm-section">
+                        <div className="dm-section-header">
+                            <div className="dm-section-icon">⚙️</div>
+                            <div>
+                                <div className="dm-section-title">專案設定 (TWD97 座標原點)</div>
+                                <div className="dm-section-desc">設定此專案的場景中心座標，所有 3D 模型將以此為基準進行定位。</div>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', maxWidth: '600px' }}>
+                            <div style={{ flex: 1 }}>
+                                <label className="dm-form-label">
+                                    原點 X (東距) <span className="required">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    className="dm-form-input"
+                                    value={originForm.x}
+                                    onChange={e => setOriginForm(prev => ({ ...prev, x: e.target.value }))}
+                                    placeholder="224000"
+                                />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <label className="dm-form-label">
+                                    原點 Y (北距) <span className="required">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    className="dm-form-input"
+                                    value={originForm.y}
+                                    onChange={e => setOriginForm(prev => ({ ...prev, y: e.target.value }))}
+                                    placeholder="2429000"
+                                />
+                            </div>
+                            <button
+                                className="dm-btn dm-btn-primary"
+                                onClick={handleOriginSubmit}
+                                disabled={isSavingOrigin}
+                                style={{ height: '42px', minWidth: '80px' }}
+                            >
+                                {isSavingOrigin ? '儲存中...' : '儲存設定'}
+                            </button>
+                        </div>
+                    </section>
+                )}
+
                 {/* 航照圖管理 */}
                 <section className="dm-section">
                     <div className="dm-section-header">

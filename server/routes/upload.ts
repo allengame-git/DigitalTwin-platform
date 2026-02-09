@@ -100,13 +100,14 @@ router.post('/imagery', upload.single('file'), async (req: Request, res: Respons
         }
 
         // 驗證必填 metadata
-        const { year, name, source, description, minX, maxX, minY, maxY } = req.body;
+        const { projectId, year, name, source, description, minX, maxX, minY, maxY } = req.body;
 
-        if (!year || !name) {
+        if (!projectId || !year || !name) {
             fs.unlinkSync(req.file.path);
             return res.status(400).json({
                 message: '缺少必填欄位',
                 errors: {
+                    projectId: !projectId ? '專案 ID 為必填' : null,
                     year: !year ? '資料年份為必填' : null,
                     name: !name ? '資料名稱為必填' : null,
                 },
@@ -178,6 +179,7 @@ router.post('/imagery', upload.single('file'), async (req: Request, res: Respons
         // 儲存到資料庫
         const imagery = await prisma.imagery.create({
             data: {
+                projectId,
                 filename: finalFilename,
                 originalName: req.file.originalname,
                 year: yearNum,
@@ -209,7 +211,13 @@ router.post('/imagery', upload.single('file'), async (req: Request, res: Respons
 // 取得已上傳列表
 router.get('/imagery', async (req: Request, res: Response) => {
     try {
+        const { projectId } = req.query;
+        if (!projectId) {
+            return res.status(400).json({ message: 'Missing projectId' });
+        }
+
         const images = await prisma.imagery.findMany({
+            where: { projectId: projectId as string },
             orderBy: { createdAt: 'desc' },
         });
 
@@ -313,6 +321,7 @@ router.post('/geophysics', geophysicsUpload.single('file'), async (req: Request,
         }
 
         const {
+            projectId,
             year, name, lineId, method, description,
             x1, y1, z1, x2, y2, z2,
             depthTop, depthBottom
@@ -320,6 +329,7 @@ router.post('/geophysics', geophysicsUpload.single('file'), async (req: Request,
 
         // 驗證必填欄位
         const errors: Record<string, string | null> = {};
+        if (!projectId) errors.projectId = '專案 ID 為必填';
         if (!year) errors.year = '資料年份為必填';
         if (!name) errors.name = '資料名稱為必填';
         if (!method) errors.method = '探查方法為必填';
@@ -366,6 +376,7 @@ router.post('/geophysics', geophysicsUpload.single('file'), async (req: Request,
         // 儲存到資料庫
         const geophysics = await prisma.geophysics.create({
             data: {
+                projectId,
                 filename: finalFilename,
                 originalName: req.file.originalname,
                 year: yearNum,
@@ -397,7 +408,13 @@ router.post('/geophysics', geophysicsUpload.single('file'), async (req: Request,
 // 取得地球物理探查資料列表
 router.get('/geophysics', async (req: Request, res: Response) => {
     try {
+        const { projectId } = req.query;
+        if (!projectId) {
+            return res.status(400).json({ message: 'Missing projectId' });
+        }
+
         const data = await prisma.geophysics.findMany({
+            where: { projectId: projectId as string },
             orderBy: { createdAt: 'desc' },
         });
         res.json({ success: true, data });

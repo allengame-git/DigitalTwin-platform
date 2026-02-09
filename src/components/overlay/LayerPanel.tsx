@@ -11,7 +11,10 @@ import React, { useState } from 'react';
 import { useLayerStore, LayerType } from '../../stores/layerStore';
 import { useViewerStore } from '../../stores/viewerStore';
 import { ImagerySelector } from '../controls/ImagerySelector';
+import { ModelVersionSelector } from '../controls/ModelVersionSelector';
 import { useAuth } from '../../contexts/AuthContext';
+import { useProjectStore } from '../../stores/projectStore';
+import { setOrigin } from '../../utils/coordinates';
 
 interface LayerPanelProps {
     position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -161,10 +164,8 @@ const TabButton: React.FC<{
 const LayersTab: React.FC = () => {
     const {
         layers,
-        undergroundTransparency,
         toggleLayer,
         setOpacity,
-        setUndergroundTransparency,
     } = useLayerStore();
 
     return (
@@ -216,31 +217,6 @@ const LayersTab: React.FC = () => {
                 </div>
             ))}
 
-            {/* Underground Transparency */}
-            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '6px',
-                }}>
-                    <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
-                        🌐 地下透視
-                    </span>
-                    <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                        {Math.round(undergroundTransparency * 100)}%
-                    </span>
-                </div>
-                <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={undergroundTransparency}
-                    onChange={(e) => setUndergroundTransparency(parseFloat(e.target.value))}
-                    style={{ width: '100%', cursor: 'pointer' }}
-                />
-            </div>
         </>
     );
 };
@@ -250,9 +226,106 @@ const LayersTab: React.FC = () => {
 // ===============================
 const SettingsTab: React.FC = () => {
     const [imageryOpen, setImageryOpen] = useState(false);
+    const { activeProjectId, projects, updateProject } = useProjectStore();
+    const activeProject = projects.find(p => p.id === activeProjectId);
+
+    // Origin State
+    const [originForm, setOriginForm] = useState({ x: '', y: '' });
+    const [isEditingOrigin, setIsEditingOrigin] = useState(false);
+
+    React.useEffect(() => {
+        if (activeProject) {
+            setOriginForm({
+                x: activeProject.originX.toString(),
+                y: activeProject.originY.toString()
+            });
+        }
+    }, [activeProject]);
+
+    const handleOriginUpdate = async () => {
+        if (!activeProject) return;
+        const x = parseFloat(originForm.x);
+        const y = parseFloat(originForm.y);
+
+        if (!isNaN(x) && !isNaN(y)) {
+            await updateProject(activeProject.id, { originX: x, originY: y });
+            setOrigin(x, y);
+            setIsEditingOrigin(false);
+        }
+    };
 
     return (
         <>
+            {/* Model Version Selector */}
+            <ModelVersionSelector />
+
+            {/* Project Origin Settings */}
+            <div style={{
+                marginTop: '12px',
+                paddingTop: '12px',
+                borderTop: '1px solid #e5e7eb',
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+                        📍 座標原點 (TWD97)
+                    </span>
+                    <button
+                        onClick={() => {
+                            if (isEditingOrigin) handleOriginUpdate();
+                            else setIsEditingOrigin(true);
+                        }}
+                        style={{
+                            fontSize: '11px',
+                            padding: '2px 6px',
+                            background: isEditingOrigin ? '#3b82f6' : 'transparent',
+                            color: isEditingOrigin ? 'white' : '#3b82f6',
+                            border: '1px solid #3b82f6',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {isEditingOrigin ? '儲存' : '修改'}
+                    </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ display: 'block', fontSize: '10px', color: '#6b7280', marginBottom: '2px' }}>X (東距)</label>
+                        <input
+                            type="number"
+                            value={originForm.x}
+                            disabled={!isEditingOrigin}
+                            onChange={e => setOriginForm(prev => ({ ...prev, x: e.target.value }))}
+                            style={{
+                                width: '100%',
+                                padding: '4px 6px',
+                                fontSize: '12px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                background: isEditingOrigin ? 'white' : '#f9fafb'
+                            }}
+                        />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ display: 'block', fontSize: '10px', color: '#6b7280', marginBottom: '2px' }}>Y (北距)</label>
+                        <input
+                            type="number"
+                            value={originForm.y}
+                            disabled={!isEditingOrigin}
+                            onChange={e => setOriginForm(prev => ({ ...prev, y: e.target.value }))}
+                            style={{
+                                width: '100%',
+                                padding: '4px 6px',
+                                fontSize: '12px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                background: isEditingOrigin ? 'white' : '#f9fafb'
+                            }}
+                        />
+                    </div>
+                </div>
+            </div>
+
             {/* Auto LOD Toggle */}
             <AutoLodToggle />
 

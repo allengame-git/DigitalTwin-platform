@@ -27,11 +27,11 @@ const LITHOLOGY_COLORS: Record<number, [number, number, number]> = {
 
 const DEFAULT_COLOR: [number, number, number] = [0.5, 0.5, 0.5];
 
-// TWD97 座標原點 (用於轉換到場景座標) - 必須與前端 coordinates.ts 一致
-const TWD97_ORIGIN = {
-    x: 224000,    // 中央參考點 X (接近場址區域)
-    y: 2429000,   // 中央參考點 Y
-};
+// TWD97 座標原點結構
+export interface Vector2 {
+    x: number;
+    y: number;
+}
 const SCALE_FACTOR = 1.0; // 1:1 比例
 
 export interface VoxelPoint {
@@ -173,6 +173,7 @@ function marchingCubes(
     dims: [number, number, number],
     origin: [number, number, number],
     cellSize: number,
+    twd97Origin: Vector2,
     isoValue: number = 0.5
 ): { positions: number[]; indices: number[] } {
     const [nx, ny, nz] = dims;
@@ -206,9 +207,9 @@ function marchingCubes(
         // X: 東距偏移
         // Y: 高程 (z in CSV)
         // Z: 北距偏移 (負值因為 Three.js 慣例)
-        const worldX = (px - TWD97_ORIGIN.x) * SCALE_FACTOR;
+        const worldX = (px - twd97Origin.x) * SCALE_FACTOR;
         const worldY = pz * SCALE_FACTOR; // CSV 的 z (高程) 映射到 Three.js Y 軸
-        const worldZ = -(py - TWD97_ORIGIN.y) * SCALE_FACTOR; // 北距映射到 -Z
+        const worldZ = -(py - twd97Origin.y) * SCALE_FACTOR; // 北距映射到 -Z
 
         const idx = positions.length / 3;
         positions.push(worldX, worldY, worldZ);
@@ -315,6 +316,7 @@ export async function generateIsosurface(
     csvPath: string,
     outputDir: string,
     cellSize: number = 20,
+    origin: Vector2,
     onProgress?: (percent: number) => void
 ): Promise<IsosurfaceResult> {
     console.log(`🔄 Starting isosurface generation: ${csvPath}`);
@@ -338,6 +340,7 @@ export async function generateIsosurface(
     // 計算邊界
     const bounds = calculateBounds(points);
     console.log(`📐 Bounds: X[${bounds.minX}, ${bounds.maxX}], Y[${bounds.minY}, ${bounds.maxY}], Z[${bounds.minZ}, ${bounds.maxZ}]`);
+    console.log(`📍 Using Project Origin: (${origin.x}, ${origin.y})`);
 
     // 按岩性分組
     onProgress?.(20);
@@ -356,10 +359,10 @@ export async function generateIsosurface(
         console.log(`  Processing lith_id=${lithId} (${groupPoints.length} points)`);
 
         // 建立密度網格
-        const { grid, dims, origin } = buildDensityGrid(groupPoints, bounds, cellSize);
+        const { grid, dims, origin: groupOrigin } = buildDensityGrid(groupPoints, bounds, cellSize);
 
         // 執行 Marching Cubes
-        const { positions, indices } = marchingCubes(grid, dims, origin, cellSize);
+        const { positions, indices } = marchingCubes(grid, dims, groupOrigin, cellSize, origin);
 
         if (positions.length === 0 || indices.length === 0) {
             console.log(`    Skipped (no surface generated)`);

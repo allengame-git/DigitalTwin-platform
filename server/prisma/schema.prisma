@@ -9,6 +9,31 @@ datasource db {
   provider = "postgresql"
 }
 
+/// 專案
+model Project {
+  id           String   @id @default(uuid())
+  name         String   @unique    // 專案名稱
+  code         String   @unique    // 專案代碼 (URL-friendly)
+  description  String?
+  
+  // TWD97 座標原點 (場景中心)
+  originX      Float    @default(224000)
+  originY      Float    @default(2429000)
+  
+  // 專案狀態
+  isActive     Boolean  @default(true)
+  
+  // 關聯資料
+  geologyModels GeologyModel[]
+  imagery       Imagery[]
+  geophysics    Geophysics[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("projects")
+}
+
 /// 航照圖資料
 model Imagery {
   id           String   @id @default(uuid())
@@ -33,6 +58,10 @@ model Imagery {
   size         Int
   url          String
   thumbnailUrl String
+  
+  // 專案關聯
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -71,6 +100,10 @@ model Geophysics {
   size         Int
   url          String
   thumbnailUrl String
+  
+  // 專案關聯
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -117,6 +150,10 @@ model GeologyModel {
   
   // 版本控制
   isActive     Boolean @default(false)
+  
+  // 專案關聯
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

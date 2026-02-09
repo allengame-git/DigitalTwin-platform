@@ -63,7 +63,13 @@ const upload = multer({
  */
 router.get('/', async (req: Request, res: Response) => {
     try {
+        const { projectId } = req.query;
+        if (!projectId) {
+            return res.status(400).json({ message: 'Missing projectId' });
+        }
+
         const models = await prisma.geologyModel.findMany({
+            where: { projectId: projectId as string },
             orderBy: [
                 { isActive: 'desc' },
                 { createdAt: 'desc' },
@@ -134,12 +140,14 @@ router.post('/', upload.single('file'), async (req: Request, res: Response) => {
         }
 
         const {
+            projectId,
             version, year, name, description, sourceData,
             cellSizeX, cellSizeY, cellSizeZ
         } = req.body;
 
         // 驗證必填欄位
         const errors: Record<string, string> = {};
+        if (!projectId) errors.projectId = '專案 ID 為必填';
         if (!version) errors.version = '版本號為必填';
         if (!year) errors.year = '資料年份為必填';
         if (!name) errors.name = '模型名稱為必填';
@@ -158,6 +166,7 @@ router.post('/', upload.single('file'), async (req: Request, res: Response) => {
         // 建立資料庫記錄 (狀態: pending)
         const model = await prisma.geologyModel.create({
             data: {
+                projectId,
                 filename: req.file.filename,
                 originalName: req.file.originalname,
                 version: version.trim(),
@@ -174,7 +183,7 @@ router.post('/', upload.single('file'), async (req: Request, res: Response) => {
         });
 
         // 非同步啟動轉換 (不阻塞回應)
-        startConversion(model.id, req.file.path);
+        startConversion(model.id, projectId, req.file.path);
 
         res.json({
             success: true,
@@ -208,9 +217,12 @@ router.post('/:id/activate', async (req: Request, res: Response) => {
             return res.status(400).json({ message: '此模型尚未轉換完成' });
         }
 
-        // 先將所有模型設為非使用中
+        // 先將所有該專案的模型設為非使用中
         await prisma.geologyModel.updateMany({
-            where: { isActive: true },
+            where: {
+                projectId: target.projectId,
+                isActive: true
+            },
             data: { isActive: false },
         });
 
@@ -271,11 +283,22 @@ router.delete('/:id', async (req: Request, res: Response) => {
 /**
  * 非同步轉換流程 (Isosurface GLB)
  */
-async function startConversion(modelId: string, csvPath: string, cellSize: number = 20) {
+async function startConversion(modelId: string, projectId: string, csvPath: string, cellSize: number = 20) {
     let lastProgressUpdate = 0;
     const PROGRESS_THROTTLE = 2000;
 
     try {
+        // 取得專案設定的原點
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { originX: true, originY: true },
+        });
+
+        const origin = {
+            x: project?.originX ?? 224000,
+            y: project?.originY ?? 2429000,
+        };
+
         // 更新狀態為 processing
         await prisma.geologyModel.update({
             where: { id: modelId },
@@ -284,7 +307,7 @@ async function startConversion(modelId: string, csvPath: string, cellSize: numbe
 
         // 執行 Isosurface 轉換
         const outputDir = path.join(TILES_DIR, modelId);
-        const result: IsosurfaceResult = await generateIsosurface(csvPath, outputDir, cellSize, async (percent: number) => {
+        const result: IsosurfaceResult = await generateIsosurface(csvPath, outputDir, cellSize, origin, async (percent: number) => {
             const now = Date.now();
             if ((now - lastProgressUpdate > PROGRESS_THROTTLE) || percent === 100) {
                 await prisma.geologyModel.update({

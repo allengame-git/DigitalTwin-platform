@@ -17,6 +17,7 @@ import inviteRoutes from './routes/invite';
 import annotationsRoutes from './routes/annotations';
 import uploadRoutes from './routes/upload';
 import geologyModelRoutes from './routes/geology-model';
+import projectRoutes from './routes/project';
 import { requestIdMiddleware, requestLogger, errorLogger } from './middleware/errorLogger';
 import path from 'path';
 
@@ -43,6 +44,7 @@ app.use('/api/invite', inviteRoutes);
 app.use('/api/annotations', annotationsRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/geology-model', geologyModelRoutes);
+app.use('/api/project', projectRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

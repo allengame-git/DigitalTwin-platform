@@ -6,3 +6,5 @@ dist/
 .gemini/
 .agent/
 brain/
+
+server/uploads/

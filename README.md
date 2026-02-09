@@ -214,8 +214,15 @@ npm run build
   - 地球物理探查資料上傳 (含 TWD97 座標與探查方法)
   - 3D 場景中以垂直平面顯示探查剖面圖
   - **3D 地質模型上傳 (New)**: CSV Voxel 自動轉換為 GLB Isosurface Mesh
+- [x] **Multi-Project Architecture (New)**:
+  - 支援建立、**編輯、刪除**多個獨立專案
+  - 專案 Dashboard 頁面 (`/project/:code`)
+  - Project-scoped 路由設計
+  - 支援自定義 TWD97 座標原點 (每專案)
+  - **Project Safeguards**: 刪除專案確認機制 (Admin Only)
 - [x] **UI/UX**:
   - Sidebar 分頁設計 (圖層頁 + 設定頁)
+  - **設定頁優化**: 整合「3D 地質模型版本」選擇器至控制面板
   - 設定頁權限控制 (admin/engineer 專屬)
 
 ### 🔄 Pending Features
@@ -230,6 +237,16 @@ npm run build
 |--------|---------------------|------------------|
 | POST   | /api/auth/login     | 使用者登入       |
 | POST   | /api/auth/refresh   | Token 更新       |
+
+### Project (專案管理)
+
+| Method | Endpoint            | Description      |
+|--------|---------------------|------------------|
+| GET    | /api/project        | 取得所有專案     |
+| POST   | /api/project        | 建立專案         |
+| GET    | /api/project/:id    | 取得單一專案     |
+| PUT    | /api/project/:id    | 更新專案         |
+| DELETE | /api/project/:id    | 刪除專案         |
 
 ### Imagery (航照圖)
 

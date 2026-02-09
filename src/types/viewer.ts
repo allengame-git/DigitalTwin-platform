@@ -20,10 +20,6 @@ export type LODLevel = 'icon' | 'column' | 'detail';
 
 /** 檢視器設定 */
 export interface ViewerConfig {
-    /** 是否啟用地下透明 */
-    undergroundTransparency: boolean;
-    /** 地下透明度 (0-1) */
-    undergroundOpacity: number;
     /** 當前 LOD 層級 */
     lodLevel: LODLevel;
     /** 是否啟用環境光遮蔽 */

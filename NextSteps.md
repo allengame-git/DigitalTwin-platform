@@ -49,7 +49,19 @@
   - 設定頁 (admin/engineer): 自動 LOD、背景顏色、圖資管理、資料管理連結
 - ✅ 移除多剖面切割功能 (MultiSectionPanel)
 
-#### 5. 基礎架構
+#### 5. 多專案架構 (Multi-Project - 2026-02-07)
+
+- ✅ **資料庫 Schema**: 新增 `Project` model，關聯 GeoModel/Imagery/Geophysics
+- ✅ **API**: 專案 CRUD 介面 (建立、列表、統計、刪除、編輯更新)
+- ✅ **Frontend**:
+  - `ProjectDashboardPage`: 專案專屬入口 (`/project/:code`)
+  - `projectStore`: 全域專案狀態管理
+  - `AppRoutes`: 專案範圍路由 (`/project/:code/*`)
+  - **Dynamic Config**: 支援專案自定義 TWD97 座標原點
+  - **Safeguards**: 專案刪除確認 Modal、Admin 權限刪除防呆
+  - **Cleanup**: 移除全域 `/data` 頁面，強化專案隔離
+
+#### 6. 基礎架構
 
 - ✅ 身分驗證 (JWT Token + Refresh)
 - ✅ Docker PostgreSQL 資料庫設定
@@ -71,50 +83,26 @@ Password: postgres
 
 ### 🚨 高優先級 - 立即需要處理
 
-#### 1. 3D 地質模型驗證 (需重新上傳 CSV)
+#### 1. 地質模型細微調整 (Phase 5)
 
-**問題**: 座標轉換邏輯剛剛修正，現有 GLB 使用舊的座標原點
+**目標**: 提供前端微調模型位置的能力，解決座標轉換誤差。
 
-**解決步驟**:
+- [ ] **Frontend**: 更新 `viewerStore.ts` 支援模型 offset
+- [ ] **UI**: 在 `LayerPanel.tsx` 增加 XYZ Offset 微調控制項
 
-1. 重啟後端服務: `cd server && npm run dev`
-2. 至資料管理頁 (`/data`) 刪除現有地質模型
-3. 重新上傳 CSV 檔案，觸發 GLB 重新生成
-4. 驗證模型在 3D 場景中正確顯示
-
-**相關檔案**:
-
-- `server/services/isosurface-generator.ts` - Marching Cubes + 座標轉換
-- `src/components/scene/GeologyTiles.tsx` - GLB 渲染
-- `src/utils/coordinates.ts` - TWD97_ORIGIN 參考值
-
-#### 2. 座標原點一致性
-
-**問題**: 前後端 TWD97_ORIGIN 需保持一致
-
-```typescript
-// 目前設定 (server/services/isosurface-generator.ts 與 src/utils/coordinates.ts)
-TWD97_ORIGIN = {
-    x: 224000,    // 中央參考點 X
-    y: 2429000,   // 中央參考點 Y
-}
-```
-
-**注意**: 如果更換專案區域，需同時更新兩個檔案
-
-### 中優先級
-
-#### 3. 真實資料整合
+#### 2. 真實資料整合
 
 - [ ] 串接真實後端 API 取代 Mock 鑽孔資料
 - [ ] 串接真實航照圖 Tile 服務
 - [ ] 驗證真實 CSV 資料的岩性 ID 對應
 
-#### 4. 地質模型功能增強
+### 中優先級
 
-- [ ] 地質模型版本管理 UI (已有 DB 欄位，需前端實作)
-- [ ] 多版本切換功能
-- [ ] 模型邊界視覺化 (Bounding Box)
+#### 3. UX 優化 (Data Management)
+
+- [ ] **UI**: 批次上傳功能
+- [ ] **UI**: 上傳進度條 (Progress Bar)
+- [ ] **Feature**: 地質模型版本切換 (Version Control)
 
 #### 5. 使用者體驗優化
 
@@ -141,7 +129,7 @@ TWD97_ORIGIN = {
 ### 後端 - 地質模型
 
 | 檔案 | 說明 |
-|------|------|
+| :--- | :--- |
 | `server/services/isosurface-generator.ts` | Marching Cubes 演算法，CSV → GLB 轉換 |
 | `server/routes/geology-model.ts` | 地質模型 API 路由 |
 | `server/prisma/schema.prisma` | 資料庫 Schema (GeologyModel) |
@@ -149,14 +137,14 @@ TWD97_ORIGIN = {
 ### 後端 - 其他
 
 | 檔案 | 說明 |
-|------|------|
+| :--- | :--- |
 | `server/routes/upload.ts` | 航照圖 & 地球物理探查 API 路由 |
 | `server/.env` | 環境變數（DATABASE_URL） |
 
 ### 前端 Store
 
 | 檔案 | 說明 |
-|------|------|
+| :--- | :--- |
 | `src/stores/uploadStore.ts` | 航照圖 & 地球物理探查 & 地質模型狀態管理 |
 | `src/stores/layerStore.ts` | 圖層控制（含 'geology3d' 類型） |
 | `src/stores/viewerStore.ts` | 3D 檢視器狀態 (LOD, Clipping) |
@@ -164,16 +152,17 @@ TWD97_ORIGIN = {
 ### 前端元件
 
 | 檔案 | 說明 |
-|------|------|
+| :--- | :--- |
 | `src/components/scene/GeologyTiles.tsx` | 3D 地質模型 GLB 渲染 |
 | `src/components/scene/GeophysicsPlane.tsx` | 地球物理探查 3D 剖面渲染 |
 | `src/components/overlay/LayerPanel.tsx` | 圖層控制面板 (分頁設計) |
 | `src/pages/DataManagementPage.tsx` | 資料管理頁面 |
+| `src/pages/ProjectDashboardPage.tsx` | 專案 Dashboard 頁面 |
 
 ### 工具函式
 
 | 檔案 | 說明 |
-|------|------|
+| :--- | :--- |
 | `src/utils/coordinates.ts` | TWD97 ↔ Three.js 座標轉換 |
 
 ---

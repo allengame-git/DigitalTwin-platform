@@ -10,6 +10,8 @@ import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { publicRoutes } from './publicRoutes';
+import { useProjectStore } from '../stores/projectStore';
+import { setOrigin } from '../utils/coordinates';
 
 // --- Lazy loaded components ---
 const LoginPage = React.lazy(() => import('../pages/LoginPage'));
@@ -22,6 +24,7 @@ const GeologyPage = React.lazy(() => import('../pages/GeologyPage'));
 const EngineeringPage = React.lazy(() => import('../pages/PlaceholderPages').then(m => ({ default: m.EngineeringPage })));
 const SimulationPage = React.lazy(() => import('../pages/PlaceholderPages').then(m => ({ default: m.SimulationPage })));
 const AnnotationsPage = React.lazy(() => import('../pages/AnnotationsPage'));
+const ProjectDashboardPage = React.lazy(() => import('../pages/ProjectDashboardPage'));
 
 // Admin pages
 const AdminUsersPage = React.lazy(() => import('../pages/AdminUsersPage'));
@@ -100,7 +103,7 @@ const router = createBrowserRouter([
                 element: <UnauthorizedPage />,
             },
 
-            // Protected routes - All authenticated users (admin bypasses automatically)
+            // Dashboard (專案列表)
             {
                 path: '/',
                 element: (
@@ -110,7 +113,61 @@ const router = createBrowserRouter([
                 ),
             },
 
-            // Protected routes - Admin and Engineers
+            // ============================================
+            // Project-scoped routes (新版)
+            // ============================================
+            {
+                path: '/project/:projectCode',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                        <ProjectDashboardPage />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: '/project/:projectCode/geology',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                        <GeologyPage />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: '/project/:projectCode/engineering',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                        <EngineeringPage />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: '/project/:projectCode/simulation',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                        <SimulationPage />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: '/project/:projectCode/data',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
+                        <DataManagementPage />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: '/project/:projectCode/annotations',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'reviewer', 'engineer']}>
+                        <AnnotationsPage />
+                    </ProtectedRoute>
+                ),
+            },
+
+            // ============================================
+            // Legacy routes (向後相容，無專案範圍)
+            // ============================================
             {
                 path: '/data',
                 element: (
@@ -119,34 +176,6 @@ const router = createBrowserRouter([
                     </ProtectedRoute>
                 ),
             },
-            {
-                path: '/admin/invites',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
-                        <AdminInvitesPage />
-                    </ProtectedRoute>
-                ),
-            },
-
-            // Protected routes - Admin only
-            {
-                path: '/admin/users',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin']}>
-                        <AdminUsersPage />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: '/admin/settings',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin']}>
-                        <AdminSettingsPage />
-                    </ProtectedRoute>
-                ),
-            },
-
-            // Protected routes - All authenticated roles
             {
                 path: '/geology',
                 element: (
@@ -180,6 +209,34 @@ const router = createBrowserRouter([
                 ),
             },
 
+            // ============================================
+            // Admin routes
+            // ============================================
+            {
+                path: '/admin/invites',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
+                        <AdminInvitesPage />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: '/admin/users',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminUsersPage />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: '/admin/settings',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminSettingsPage />
+                    </ProtectedRoute>
+                ),
+            },
+
             // Catch-all 404
             {
                 path: '*',
@@ -193,6 +250,20 @@ const router = createBrowserRouter([
  * App Routes Provider
  */
 export const AppRoutes: React.FC = () => {
+    const { activeProjectId, projects } = useProjectStore();
+
+    // 監聽專案切換，更新全域座標系原點
+    React.useEffect(() => {
+        if (activeProjectId) {
+            const project = projects.find(p => p.id === activeProjectId);
+            if (project) {
+                // 更新座標轉換工具的原點
+                setOrigin(project.originX, project.originY);
+                console.log(`🌍 Project Origin updated to: (${project.originX}, ${project.originY})`);
+            }
+        }
+    }, [activeProjectId, projects]);
+
     return <RouterProvider router={router} />;
 };
 

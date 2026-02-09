@@ -40,8 +40,6 @@ const defaultCamera: CameraState = {
 };
 
 const defaultConfig: ViewerConfig = {
-    undergroundTransparency: true,
-    undergroundOpacity: 0.3,
     lodLevel: 'icon',
     enableAO: false,
     enableShadows: true,

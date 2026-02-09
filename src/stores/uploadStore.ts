@@ -10,6 +10,8 @@ import { create } from 'zustand';
 // 使用相對路徑，Vite dev server 會 proxy /api 到後端
 const API_BASE = '';
 
+import { useProjectStore } from './projectStore';
+
 export interface UploadedFile {
     id: string;
     filename: string;
@@ -196,7 +198,10 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
     // ===============================
     fetchImageryFiles: async () => {
         try {
-            const res = await fetch(`${API_BASE}/api/upload/imagery`);
+            const projectId = useProjectStore.getState().activeProjectId;
+            if (!projectId) return;
+
+            const res = await fetch(`${API_BASE}/api/upload/imagery?projectId=${projectId}`);
             const data = await res.json();
             if (data.success) {
                 set({ imageryFiles: data.data });
@@ -212,6 +217,10 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
         try {
             const formData = new FormData();
             formData.append('file', file);
+            const projectId = useProjectStore.getState().activeProjectId;
+            if (!projectId) throw new Error('未選擇專案');
+            formData.append('projectId', projectId);
+
             formData.append('year', metadata.year.toString());
             formData.append('name', metadata.name);
             if (metadata.source) formData.append('source', metadata.source);
@@ -281,7 +290,10 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
     // ===============================
     fetchGeophysicsFiles: async () => {
         try {
-            const res = await fetch(`${API_BASE}/api/upload/geophysics`);
+            const projectId = useProjectStore.getState().activeProjectId;
+            if (!projectId) return;
+
+            const res = await fetch(`${API_BASE}/api/upload/geophysics?projectId=${projectId}`);
             const data = await res.json();
             if (data.success) {
                 set({ geophysicsFiles: data.data });
@@ -297,6 +309,10 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
         try {
             const formData = new FormData();
             formData.append('file', file);
+            const projectId = useProjectStore.getState().activeProjectId;
+            if (!projectId) throw new Error('未選擇專案');
+            formData.append('projectId', projectId);
+
             formData.append('year', metadata.year.toString());
             formData.append('name', metadata.name);
             formData.append('method', metadata.method);
@@ -372,7 +388,10 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
     // ===============================
     fetchGeologyModels: async () => {
         try {
-            const res = await fetch(`${API_BASE}/api/geology-model`);
+            const projectId = useProjectStore.getState().activeProjectId;
+            if (!projectId) return;
+
+            const res = await fetch(`${API_BASE}/api/geology-model?projectId=${projectId}`);
             const data = await res.json();
             if (data.success) {
                 const models = data.data as GeologyModelFile[];
@@ -393,6 +412,10 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
 
         try {
             const formData = new FormData();
+            const projectId = useProjectStore.getState().activeProjectId;
+            if (!projectId) throw new Error('未選擇專案');
+            formData.append('projectId', projectId);
+
             formData.append('file', file);
             formData.append('version', metadata.version);
             formData.append('year', metadata.year.toString());
