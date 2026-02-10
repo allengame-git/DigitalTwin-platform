@@ -10,15 +10,10 @@ import React, { useMemo } from 'react';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useLayerStore } from '../../stores/layerStore';
+import { useViewerStore } from '../../stores/viewerStore';
+import { useAttitudeStore } from '../../stores/attitudeStore';
 import { twd97ToWorld } from '../../utils/coordinates';
 
-// Mock 位態資料 (待 API 整合)
-const MOCK_ATTITUDES = [
-    { id: 'att-1', x: 250200, y: 2600100, z: 10, strike: 45, dip: 30 },
-    { id: 'att-2', x: 250400, y: 2600300, z: 15, strike: 120, dip: 45 },
-    { id: 'att-3', x: 250600, y: 2600500, z: 5, strike: 270, dip: 75 },
-    { id: 'att-4', x: 249800, y: 2600200, z: 8, strike: 180, dip: 25 },
-];
 
 interface AttitudeData {
     id: string;
@@ -27,6 +22,8 @@ interface AttitudeData {
     z: number;
     strike: number; // 走向 (度)
     dip: number;    // 傾角 (度)
+    dipDirection?: string | null;
+    description?: string | null;
 }
 
 interface StrikeDipSymbolProps {
@@ -71,11 +68,14 @@ function dipToColor(dip: number): THREE.Color {
 }
 
 export function StrikeDipSymbol({
-    attitudes = MOCK_ATTITUDES,
+    attitudes = [],
     discRadius = 25
 }: StrikeDipSymbolProps) {
     const { layers } = useLayerStore();
+    const { config } = useViewerStore();
+    const { selectedAttitudeId, selectAttitude } = useAttitudeStore();
     const attitudesLayer = layers.attitudes;
+    const showLabels = config.showAttitudeLabels;
 
     // 轉換座標並計算旋轉
     const convertedAttitudes = useMemo(() => {
@@ -108,64 +108,98 @@ export function StrikeDipSymbol({
 
     return (
         <group>
-            {convertedAttitudes.map((att) => (
-                <group key={att.id} position={att.position}>
-                    {/* 圓盤主體 (顏色根據 Dip 變化) */}
-                    <mesh rotation={att.rotation} geometry={discGeometry}>
-                        <meshBasicMaterial
-                            color={att.color}
-                            side={THREE.DoubleSide}
-                        />
-                    </mesh>
+            {convertedAttitudes.map((att) => {
+                const isSelected = selectedAttitudeId === att.id;
 
-                    {/* 圓盤邊緣 (深色邊線) */}
-                    <mesh rotation={att.rotation} geometry={edgeGeometry}>
-                        <meshBasicMaterial
-                            color="#1e3a8a"
-                            transparent
-                            opacity={attitudesLayer.opacity}
-                            side={THREE.DoubleSide}
-                        />
-                    </mesh>
-
-                    {/* Dip 方向指示線 (小箭頭朝向傾斜方向) */}
-                    <mesh rotation={att.rotation}>
-                        <boxGeometry args={[0.5, discRadius * 0.8, 0.3]} />
-                        <meshStandardMaterial
-                            color="#dc2626"
-                            transparent={attitudesLayer.opacity < 1}
-                            opacity={attitudesLayer.opacity}
-                        />
-                    </mesh>
-
-                    {/* 標籤 (位於圓盤上方，選開不遮擋圓盤) */}
-                    <Html
-                        position={[discRadius + 0, 50, 0]}
-                        center
-                        style={{
-                            opacity: attitudesLayer.opacity,
-                            pointerEvents: 'none',
+                return (
+                    <group
+                        key={att.id}
+                        position={att.position}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            selectAttitude(att.id);
                         }}
+                        onPointerOver={() => { document.body.style.cursor = 'pointer'; }}
+                        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
                     >
-                        <div
-                            style={{
-                                background: 'rgba(0,0,0,0.75)',
-                                color: 'white',
-                                padding: '3px 8px',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                whiteSpace: 'nowrap',
-                                fontWeight: 500,
-                            }}
-                        >
-                            N{att.strike}°E / {att.dip}°
-                        </div>
-                    </Html>
-                </group>
-            ))}
+                        {/* 圓盤主體 (顏色根據 Dip 變化) */}
+                        <mesh rotation={att.rotation} geometry={discGeometry}>
+                            <meshBasicMaterial
+                                color={isSelected ? '#3b82f6' : att.color}
+                                side={THREE.DoubleSide}
+                            />
+                        </mesh>
+
+                        {/* 圓盤邊緣 (深色邊線) */}
+                        <mesh rotation={att.rotation} geometry={edgeGeometry}>
+                            <meshBasicMaterial
+                                color={isSelected ? '#ffffff' : "#1e3a8a"}
+                                transparent
+                                opacity={attitudesLayer.opacity}
+                                side={THREE.DoubleSide}
+                            />
+                        </mesh>
+
+                        {/* Dip 方向指示箭頭 (小箭頭朝向傾斜方向) */}
+                        <group rotation={att.rotation}>
+                            {/* 箭桿 */}
+                            <mesh position={[0, -discRadius * 0.4, 0.4]}>
+                                <cylinderGeometry args={[0.5, 0.5, discRadius * 0.6]} />
+                                <meshStandardMaterial
+                                    color="#ef4444"
+                                    transparent={attitudesLayer.opacity < 1}
+                                    opacity={attitudesLayer.opacity}
+                                />
+                            </mesh>
+                            {/* 箭頭 */}
+                            <mesh position={[0, -discRadius * 0.75, 0.4]} rotation={[Math.PI, 0, 0]}>
+                                <coneGeometry args={[2, 5, 4]} />
+                                <meshStandardMaterial
+                                    color="#ef4444"
+                                    transparent={attitudesLayer.opacity < 1}
+                                    opacity={attitudesLayer.opacity}
+                                />
+                            </mesh>
+                        </group>
+
+                        {/* 標籤 (位於圓盤上方) */}
+                        {showLabels && (
+                            <Html
+                                position={[0, discRadius + 5, 1]}
+                                center
+                                style={{
+                                    opacity: attitudesLayer.opacity,
+                                    pointerEvents: 'none',
+                                    transition: 'opacity 0.2s',
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        background: 'rgba(15, 23, 42, 0.85)',
+                                        color: 'white',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        whiteSpace: 'nowrap',
+                                        fontWeight: 700,
+                                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                                        letterSpacing: '0.02em',
+                                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
+                                    }}
+                                >
+                                    <span style={{ color: '#94a3b8', marginRight: '4px' }}>N</span>
+                                    {att.strike}°
+                                    <span style={{ color: '#94a3b8', margin: '0 4px' }}>E /</span>
+                                    {att.dip}°
+                                </div>
+                            </Html>
+                        )}
+                    </group>
+                );
+            })}
         </group>
     );
 }
 
 export default StrikeDipSymbol;
-

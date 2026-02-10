@@ -228,7 +228,8 @@ npm run build
   - 地球物理探查資料上傳 (含 TWD97 座標與探查方法)
   - 3D 場景中以垂直平面顯示探查剖面圖
   - **3D 地質模型上傳**: CSV Voxel 自動轉換為 GLB Isosurface Mesh
-  - **斷層面資料管理 (New)**: 支援單筆新增與 CSV 批次匯入斷層資料
+  - **斷層面資料管理**: 支援單筆新增與 CSV 批次匯入斷層資料
+  - **位態資料管理**: 支援單筆新增、編輯、刪除與 CSV 批次匯入 (含重複檢查)
 - [x] **Multi-Project Architecture**:
   - 支援建立、編輯、刪除多個獨立專案
   - 專案 Dashboard 頁面 (`/project/:code`)
@@ -240,6 +241,12 @@ npm run build
   - Sidebar 分頁設計 (圖層頁 + 設定頁)
   - **資訊同步**: Dashboard 與 Sidebar 即時顯示各類資料總數 (鑽探、模型、航照)
   - 設定頁權限控制 (admin/engineer 專屬)
+- [x] **場景環境優化 (2026-02-10)**:
+  - 移除 fog 效果，確保所有距離的清晰視覺
+  - 移除冗餘的綠色基礎地面，避免與 DEM 地形混淆
+  - 重新設計相機重置邏輯 (Scene Traverse 策略 + Store Fallback)
+  - 修復 `GeologyCanvas` 未呼叫 `fetchGeologyModels()` 的 Bug
+  - 位態資料表格固定高度 (400px) + Sticky Header
 
 ### 🔄 Pending Features
 
@@ -264,6 +271,35 @@ npm run build
 | PUT    | /api/project/:id    | 更新專案         |
 | DELETE | /api/project/:id    | 刪除專案         |
 
+### Borehole API (鑽孔)
+
+| Method | Endpoint                    | Description            |
+|--------|-----------------------------|------------------------|
+| GET    | /api/boreholes              | 取得專案所有鑽孔       |
+| POST   | /api/boreholes              | 新增鑽孔              |
+| DELETE | /api/boreholes/:id          | 刪除鑽孔              |
+| POST   | /api/boreholes/batch-import | CSV 批次匯入鑽孔資料   |
+
+### Attitude API (位態)
+
+| Method | Endpoint                    | Description            |
+|--------|-----------------------------|------------------------|
+| GET    | /api/attitude               | 取得專案所有位態       |
+| POST   | /api/attitude               | 新增位態              |
+| PUT    | /api/attitude/:id           | 更新位態              |
+| DELETE | /api/attitude/:id           | 刪除位態              |
+| POST   | /api/attitude/batch-import  | CSV 批次匯入位態資料   |
+
+### FaultPlane API (斷層面)
+
+| Method | Endpoint                     | Description            |
+|--------|------------------------------|------------------------|
+| GET    | /api/fault-plane             | 取得專案的所有斷層面   |
+| POST   | /api/fault-plane             | 新增斷層面             |
+| PUT    | /api/fault-plane/:id         | 更新斷層面             |
+| DELETE | /api/fault-plane/:id         | 刪除斷層面             |
+| POST   | /api/fault-plane/batch-import| CSV 批次匯入斷層資料   |
+
 ### Imagery API (航照圖)
 
 | Method | Endpoint               | Description         |
@@ -281,12 +317,17 @@ npm run build
 | POST   | /api/upload/geophysics    | 上傳探查資料           |
 | DELETE | /api/upload/geophysics/:id| 刪除探查資料           |
 
-### FaultPlane API (斷層面)
+### GeologyModel API (3D 地質模型)
 
-| Method | Endpoint                    | Description            |
-|--------|-----------------------------|------------------------|
-| GET    | /api/fault-plane            | 取得專案的所有斷層面   |
-| POST   | /api/fault-plane            | 新增斷層面             |
-| PUT    | /api/fault-plane/:id        | 更新斷層面             |
-| DELETE | /api/fault-plane/:id        | 刪除斷層面             |
-| POST   | /api/fault-plane/batch-import| CSV 批次匯入斷層資料   |
+| Method | Endpoint                          | Description           |
+|--------|-----------------------------------|-----------------------|
+| GET    | /api/geology-model                | 取得所有地質模型      |
+| POST   | /api/geology-model/upload         | 上傳 CSV 並產生 GLB   |
+| DELETE | /api/geology-model/:id            | 刪除地質模型          |
+
+### Lithology API (岩性定義)
+
+| Method | Endpoint                | Description            |
+|--------|-------------------------|------------------------|
+| GET    | /api/lithology          | 取得專案岩性定義       |
+| POST   | /api/lithology          | 新增/更新岩性定義      |

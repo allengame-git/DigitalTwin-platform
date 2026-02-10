@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
+import { authenticate } from '../middleware/auth';
 
 const router = Router();
 
@@ -71,7 +72,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  * POST /api/fault-plane
  * 新增單一斷層面
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId, name, type, dipAngle, dipDirection, depth, color, coordinates } = req.body;
 
@@ -125,7 +126,7 @@ router.post('/', async (req: Request, res: Response) => {
  * PUT /api/fault-plane/:id
  * 更新斷層面
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
         const { name, type, dipAngle, dipDirection, depth, color, coordinates } = req.body;
@@ -187,7 +188,7 @@ router.put('/:id', async (req: Request, res: Response) => {
  * DELETE /api/fault-plane/:id
  * 刪除斷層面
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
 
@@ -209,7 +210,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
  * POST /api/fault-plane/batch-import
  * 批次匯入斷層面 (CSV)
  */
-router.post('/batch-import', async (req: Request, res: Response) => {
+router.post('/batch-import', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId, faultPlanes } = req.body;
 

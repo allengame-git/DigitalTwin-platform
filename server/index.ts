@@ -21,6 +21,7 @@ import projectRoutes from './routes/project';
 import boreholeRoutes from './routes/borehole';
 import lithologyRoutes from './routes/lithology';
 import faultPlaneRoutes from './routes/faultPlane';
+import attitudeRoutes from './routes/attitude';
 import { requestIdMiddleware, requestLogger, errorLogger } from './middleware/errorLogger';
 import path from 'path';
 
@@ -60,6 +61,7 @@ app.use('/api/project', projectRoutes);
 app.use('/api/borehole', boreholeRoutes);
 app.use('/api/lithology', lithologyRoutes);
 app.use('/api/fault-plane', faultPlaneRoutes);
+app.use('/api/attitude', attitudeRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

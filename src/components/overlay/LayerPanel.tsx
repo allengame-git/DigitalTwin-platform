@@ -203,16 +203,29 @@ const LayersTab: React.FC = () => {
                     </label>
 
                     {layer.visible && (
-                        <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.1"
-                            value={layer.opacity}
-                            onChange={(e) => setOpacity(layer.id, parseFloat(e.target.value))}
-                            style={{ width: '60px', cursor: 'pointer' }}
-                            title={`透明度: ${Math.round(layer.opacity * 100)}%`}
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {layer.id === 'attitudes' && (
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', marginRight: '4px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={useViewerStore.getState().config.showAttitudeLabels}
+                                        onChange={(e) => useViewerStore.getState().setConfig({ showAttitudeLabels: e.target.checked })}
+                                        style={{ width: '12px', height: '12px', cursor: 'pointer' }}
+                                    />
+                                    <span style={{ fontSize: '11px', color: '#6b7280' }}>標籤</span>
+                                </label>
+                            )}
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.1"
+                                value={layer.opacity}
+                                onChange={(e) => setOpacity(layer.id, parseFloat(e.target.value))}
+                                style={{ width: '60px', cursor: 'pointer' }}
+                                title={`透明度: ${Math.round(layer.opacity * 100)}%`}
+                            />
+                        </div>
                     )}
                 </div>
             ))}
@@ -325,6 +338,9 @@ const SettingsTab: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Model Offset Settings */}
+            <ModelOffsetControls />
 
             {/* Auto LOD Toggle */}
             <AutoLodToggle />
@@ -456,6 +472,77 @@ const AutoLodToggle: React.FC = () => {
                     style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
             </label>
+        </div>
+    );
+};
+
+// Sub-component for Model Offset
+const ModelOffsetControls: React.FC = () => {
+    const { config, setConfig } = useViewerStore();
+    const offset = config.modelOffset || [0, 0, 0];
+
+    const handleChange = (index: number, value: string) => {
+        const newVal = parseFloat(value) || 0;
+        const newOffset = [...offset] as [number, number, number];
+        newOffset[index] = newVal;
+        setConfig({ modelOffset: newOffset });
+    };
+
+    return (
+        <div style={{
+            marginTop: '12px',
+            paddingTop: '12px',
+            borderTop: '1px solid #e5e7eb',
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+                    📐 模型位移微調 (XYZ)
+                </span>
+                <button
+                    onClick={() => setConfig({ modelOffset: [0, 0, 0] })}
+                    style={{
+                        fontSize: '11px',
+                        padding: '2px 6px',
+                        background: 'transparent',
+                        color: '#6b7280',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    重設
+                </button>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+                {[
+                    { label: 'X (東)', color: '#ef4444' },
+                    { label: 'Y (北)', color: '#22c55e' },
+                    { label: 'Z (高)', color: '#3b82f6' }
+                ].map((axis, i) => (
+                    <div key={axis.label} style={{ flex: 1 }}>
+                        <label style={{ display: 'block', fontSize: '9px', color: axis.color, marginBottom: '2px', fontWeight: 600 }}>
+                            {axis.label}
+                        </label>
+                        <input
+                            type="number"
+                            value={offset[i]}
+                            step="1"
+                            onChange={e => handleChange(i, e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '4px 6px',
+                                fontSize: '12px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                background: 'white'
+                            }}
+                        />
+                    </div>
+                ))}
+            </div>
+            <p style={{ fontSize: '10px', color: '#9ca3af', marginTop: '6px' }}>
+                用於校正模型與鑽孔之間的小幅度偏差。
+            </p>
         </div>
     );
 };

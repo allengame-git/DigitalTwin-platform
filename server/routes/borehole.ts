@@ -4,9 +4,44 @@
  */
 
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
+import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs';
+
 import prisma from '../lib/prisma';
+import { authenticate } from '../middleware/auth';
 
 const router = Router();
+
+// === 照片上傳設定 ===
+const PHOTO_UPLOAD_DIR = path.join(__dirname, '../uploads/borehole-photos');
+if (!fs.existsSync(PHOTO_UPLOAD_DIR)) {
+    fs.mkdirSync(PHOTO_UPLOAD_DIR, { recursive: true });
+}
+
+const photoStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, PHOTO_UPLOAD_DIR),
+    filename: (_req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `photo-${uniqueSuffix}${ext}`);
+    },
+});
+
+const photoUpload = multer({
+    storage: photoStorage,
+    fileFilter: (_req, file, cb) => {
+        const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (allowed.includes(ext)) {
+            cb(null, true);
+        } else {
+            cb(new Error('不支援的圖片格式。只接受 JPG, PNG, WebP'));
+        }
+    },
+    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+});
 
 /**
  * GET /api/borehole
@@ -68,7 +103,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  * POST /api/borehole
  * 新增鑽孔 (含 layers, properties)
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authenticate, async (req: Request, res: Response) => {
     try {
         const {
             projectId,
@@ -141,7 +176,7 @@ router.post('/', async (req: Request, res: Response) => {
  * POST /api/borehole/batch
  * 批次匯入鑽孔 (JSON array)
  */
-router.post('/batch', async (req: Request, res: Response) => {
+router.post('/batch', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId, boreholes } = req.body;
 
@@ -202,7 +237,7 @@ router.post('/batch', async (req: Request, res: Response) => {
  * PUT /api/borehole/:id
  * 更新鑽孔資料
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const {
@@ -297,7 +332,7 @@ router.put('/:id', async (req: Request, res: Response) => {
  * DELETE /api/borehole/:id
  * 刪除鑽孔
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 
@@ -317,7 +352,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
  * 批次匯入地層資料
  * CSV 格式: boreholeNo, topDepth, bottomDepth, lithologyCode, description
  */
-router.post('/batch-layers', async (req: Request, res: Response) => {
+router.post('/batch-layers', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId, layers } = req.body;
 
@@ -384,7 +419,7 @@ router.post('/batch-layers', async (req: Request, res: Response) => {
  * 批次匯入物性資料 (N值/RQD)
  * CSV 格式: boreholeNo, depth, nValue, rqd
  */
-router.post('/batch-properties', async (req: Request, res: Response) => {
+router.post('/batch-properties', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId, properties } = req.body;
 
@@ -441,6 +476,94 @@ router.post('/batch-properties', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Error batch importing properties:', error);
         res.status(500).json({ error: '批次匯入物性資料失敗' });
+    }
+});
+
+// =============================================
+// 照片上傳 / 刪除 API
+// =============================================
+
+/**
+ * POST /api/borehole/:id/photos
+ * 上傳岩心照片 (需登入)
+ */
+router.post('/:id/photos', authenticate, photoUpload.single('file'), async (req: Request, res: Response) => {
+    try {
+        const boreholeId = req.params.id as string;
+        const file = req.file;
+
+        if (!file) {
+            return res.status(400).json({ error: '請選擇圖片檔案' });
+        }
+
+        const depth = parseFloat(req.body.depth);
+        if (isNaN(depth)) {
+            // Clean up uploaded file
+            fs.unlinkSync(file.path);
+            return res.status(400).json({ error: '請填入有效的深度值' });
+        }
+
+        // Verify borehole exists
+        const borehole = await prisma.borehole.findUnique({ where: { id: boreholeId } });
+        if (!borehole) {
+            fs.unlinkSync(file.path);
+            return res.status(404).json({ error: '找不到指定鑽孔' });
+        }
+
+        // Generate thumbnail
+        const thumbFilename = `thumb-${file.filename}`;
+        const thumbPath = path.join(PHOTO_UPLOAD_DIR, thumbFilename);
+        await sharp(file.path)
+            .resize(200, 200, { fit: 'cover' })
+            .jpeg({ quality: 80 })
+            .toFile(thumbPath);
+
+        const caption = req.body.caption?.trim() || null;
+
+        const photo = await prisma.boreholePhoto.create({
+            data: {
+                boreholeId,
+                depth,
+                url: `/uploads/borehole-photos/${file.filename}`,
+                thumbnailUrl: `/uploads/borehole-photos/${thumbFilename}`,
+                caption,
+            },
+        });
+
+        res.status(201).json(photo);
+    } catch (error) {
+        console.error('Error uploading borehole photo:', error);
+        res.status(500).json({ error: '上傳照片失敗' });
+    }
+});
+
+/**
+ * DELETE /api/borehole/:id/photos/:photoId
+ * 刪除岩心照片 (需登入)
+ */
+router.delete('/:id/photos/:photoId', authenticate, async (req: Request, res: Response) => {
+    try {
+        const photoId = req.params.photoId as string;
+
+        const photo = await prisma.boreholePhoto.findUnique({ where: { id: photoId } });
+        if (!photo) {
+            return res.status(404).json({ error: '找不到照片' });
+        }
+
+        // Delete physical files
+        const filePath = path.join(__dirname, '..', photo.url);
+        const thumbPath = path.join(__dirname, '..', photo.thumbnailUrl);
+
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
+
+        // Delete DB record
+        await prisma.boreholePhoto.delete({ where: { id: photoId } });
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting borehole photo:', error);
+        res.status(500).json({ error: '刪除照片失敗' });
     }
 });
 

@@ -12,7 +12,9 @@ import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 import * as GeoTIFF from 'geotiff';
+
 import prisma from '../lib/prisma';
+import { authenticate } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -93,7 +95,7 @@ async function parseGeoTiffBounds(filePath: string) {
 }
 
 // 上傳航照圖
-router.post('/imagery', upload.single('file'), async (req: Request, res: Response) => {
+router.post('/imagery', authenticate, upload.single('file'), async (req: Request, res: Response) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: '未收到檔案' });
@@ -247,7 +249,7 @@ router.get('/imagery/:id', async (req: Request, res: Response) => {
 });
 
 // 刪除檔案
-router.delete('/imagery/:id', async (req: Request, res: Response) => {
+router.delete('/imagery/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
 
@@ -313,8 +315,8 @@ const geophysicsUpload = multer({
     },
 });
 
-// 上傳地球物理探查資料
-router.post('/geophysics', geophysicsUpload.single('file'), async (req: Request, res: Response) => {
+// 上傳地球物理探查資料 (需登入)
+router.post('/geophysics', authenticate, geophysicsUpload.single('file'), async (req: Request, res: Response) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: '未收到檔案' });
@@ -441,7 +443,7 @@ router.get('/geophysics/:id', async (req: Request, res: Response) => {
 });
 
 // 刪除地球物理探查資料
-router.delete('/geophysics/:id', async (req: Request, res: Response) => {
+router.delete('/geophysics/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const geophysics = await prisma.geophysics.findUnique({
             where: { id: req.params.id as string },

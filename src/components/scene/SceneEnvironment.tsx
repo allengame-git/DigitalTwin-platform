@@ -66,25 +66,6 @@ export function SceneEnvironment({
                     infiniteGrid={true}
                 />
             )}
-
-            {/* 基礎地面 (僅用於視覺，禁用 raycast 以免攔截點擊) */}
-            <mesh
-                rotation={[-Math.PI / 2, 0, 0]}
-                position={[0, -1, 0]}
-                receiveShadow
-                raycast={() => null}
-            >
-                <planeGeometry args={[groundSize, groundSize]} />
-                <meshStandardMaterial
-                    color="#3a5a3a"
-                    transparent
-                    opacity={0.3}
-                    side={THREE.DoubleSide}
-                />
-            </mesh>
-
-            {/* 霧氣效果 - 跟隨背景色 */}
-            <fog attach="fog" args={[config.backgroundColor, 1000, 8000]} />
         </>
     );
 }

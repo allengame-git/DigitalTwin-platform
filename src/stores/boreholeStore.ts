@@ -4,7 +4,8 @@
  */
 
 import { create } from 'zustand';
-import type { Borehole, BoreholeDetail } from '../types/geology';
+import { useAuthStore } from './authStore';
+import type { Borehole, BoreholeDetail, Photo } from '../types/geology';
 import type { RequestStatus } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -39,6 +40,9 @@ interface BoreholeActions {
     batchImport: (projectId: string, boreholes: CreateBoreholeData[]) => Promise<BatchImportResult>;
     batchImportLayers: (projectId: string, layers: LayerCsvRow[]) => Promise<BatchImportResult>;
     batchImportProperties: (projectId: string, properties: PropertyCsvRow[]) => Promise<BatchImportResult>;
+    uploadPhoto: (boreholeId: string, file: File, depth: number, caption?: string) => Promise<boolean>;
+    deletePhoto: (boreholeId: string, photoId: string) => Promise<boolean>;
+    fetchBoreholePhotos: (boreholeId: string) => Promise<Photo[]>;
 }
 
 // Types for API
@@ -224,9 +228,13 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
 
     createBorehole: async (data: CreateBoreholeData) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/borehole`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 credentials: 'include',
                 body: JSON.stringify(data),
             });
@@ -253,9 +261,13 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
 
     updateBorehole: async (id: string, data: Partial<CreateBoreholeData>) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/borehole/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 credentials: 'include',
                 body: JSON.stringify(data),
             });
@@ -282,8 +294,12 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
 
     deleteBorehole: async (id: string) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/borehole/${id}`, {
                 method: 'DELETE',
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 credentials: 'include',
             });
 
@@ -334,9 +350,13 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
 
     batchImport: async (projectId: string, boreholes: CreateBoreholeData[]) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/borehole/batch`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 credentials: 'include',
                 body: JSON.stringify({ projectId, boreholes }),
             });
@@ -359,9 +379,13 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
 
     batchImportLayers: async (projectId: string, layers: LayerCsvRow[]) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/borehole/batch-layers`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 credentials: 'include',
                 body: JSON.stringify({ projectId, layers }),
             });
@@ -381,9 +405,13 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
 
     batchImportProperties: async (projectId: string, properties: PropertyCsvRow[]) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/borehole/batch-properties`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 credentials: 'include',
                 body: JSON.stringify({ projectId, properties }),
             });
@@ -398,6 +426,92 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
         } catch (error) {
             set({ error: error instanceof Error ? error.message : '批次匯入物性資料失敗' });
             return { success: 0, failed: properties.length, errors: [] };
+        }
+    },
+
+    uploadPhoto: async (boreholeId: string, file: File, depth: number, caption?: string) => {
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('depth', depth.toString());
+            if (caption) formData.append('caption', caption);
+
+            const token = useAuthStore.getState().accessToken;
+            const response = await fetch(`${API_BASE}/api/borehole/${boreholeId}/photos`, {
+                method: 'POST',
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
+                credentials: 'include',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || '上傳照片失敗');
+            }
+
+            const newPhoto = await response.json();
+
+            // Update selectedBorehole photos if it's the same borehole
+            const current = get().selectedBorehole;
+            if (current && current.id === boreholeId) {
+                set({
+                    selectedBorehole: {
+                        ...current,
+                        photos: [...current.photos, newPhoto].sort((a, b) => a.depth - b.depth),
+                    },
+                });
+            }
+
+            return true;
+        } catch (error) {
+            set({ error: error instanceof Error ? error.message : '上傳照片失敗' });
+            return false;
+        }
+    },
+
+    deletePhoto: async (boreholeId: string, photoId: string) => {
+        try {
+            const response = await fetch(`${API_BASE}/api/borehole/${boreholeId}/photos/${photoId}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            });
+
+            if (!response.ok) {
+                throw new Error('刪除照片失敗');
+            }
+
+            // Update selectedBorehole photos
+            const current = get().selectedBorehole;
+            if (current && current.id === boreholeId) {
+                set({
+                    selectedBorehole: {
+                        ...current,
+                        photos: current.photos.filter(p => p.id !== photoId),
+                    },
+                });
+            }
+
+            return true;
+        } catch (error) {
+            set({ error: error instanceof Error ? error.message : '刪除照片失敗' });
+            return false;
+        }
+    },
+
+    fetchBoreholePhotos: async (boreholeId: string) => {
+        try {
+            const response = await fetch(`${API_BASE}/api/borehole/${boreholeId}`, {
+                credentials: 'include',
+            });
+
+            if (!response.ok) throw new Error('載入照片失敗');
+
+            const data = await response.json();
+            return data.photos || [];
+        } catch {
+            return [];
         }
     },
 }));

@@ -30,6 +30,7 @@ model Project {
   boreholes     Borehole[]
   lithologies   ProjectLithology[]
   faultPlanes   FaultPlane[]
+  attitudes     Attitude[]
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -301,4 +302,23 @@ model FaultCoordinate {
   sortOrder    Int             // 座標點順序
 
   @@map("fault_coordinates")
+}
+
+/// 位態資料 (Strike/Dip)
+model Attitude {
+  id             String   @id @default(uuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  x              Float               // TWD97 X
+  y              Float               // TWD97 Y
+  z              Float               // 高程 (m)
+  strike         Float               // 走向 (0-360)
+  dip            Float               // 傾角 (0-90)
+  dipDirection   String?             // 傾向 (N/NE/E/SE/S/SW/W/NW)
+  description    String?             // 備註
+
+  createdAt      DateTime @default(now())
+
+  @@map("attitudes")
 }

@@ -8,7 +8,6 @@
 
 import React, { useMemo, useEffect } from 'react';
 import * as THREE from 'three';
-import { Html } from '@react-three/drei';
 import { useLayerStore } from '../../stores/layerStore';
 import { twd97ToWorld } from '../../utils/coordinates';
 import { useFaultPlaneStore, FaultPlane } from '../../stores/faultPlaneStore';
@@ -93,9 +92,8 @@ function createFaultPlaneGeometry(
 export function StructureLines() {
     const { layers } = useLayerStore();
     const faultsLayer = layers.faults;
-    const { faultPlanes, fetchFaultPlanes } = useFaultPlaneStore();
+    const { faultPlanes, selectedFaultId, selectFault, fetchFaultPlanes } = useFaultPlaneStore();
     const { activeProjectId } = useProjectStore();
-    const [selectedFault, setSelectedFault] = React.useState<FaultPlaneData | null>(null);
 
     // 載入斷層面資料
     useEffect(() => {
@@ -118,7 +116,7 @@ export function StructureLines() {
     }, [faultPlanes]);
 
     const handleFaultClick = (fault: FaultPlaneData) => {
-        setSelectedFault(selectedFault?.id === fault.id ? null : fault);
+        selectFault(selectedFaultId === fault.id ? null : fault.id);
     };
 
     if (!faultsLayer.visible) return null;
@@ -143,7 +141,7 @@ export function StructureLines() {
                     }}
                 >
                     <meshBasicMaterial
-                        color={selectedFault?.id === fault.id ? '#ffff00' : fault.color}
+                        color={selectedFaultId === fault.id ? '#ffff00' : fault.color}
                         transparent
                         opacity={faultsLayer.opacity * 0.8}
                         side={THREE.DoubleSide}
@@ -154,124 +152,8 @@ export function StructureLines() {
                     />
                 </mesh>
             ))}
-
-            {/* 詳細資訊面板 */}
-            {selectedFault && (
-                <FaultInfoPanel
-                    fault={selectedFault}
-                    onClose={() => setSelectedFault(null)}
-                />
-            )}
         </group>
     );
 }
-
-// 斷層資訊面板元件
-function FaultInfoPanel({
-    fault,
-    onClose
-}: {
-    fault: FaultPlaneData;
-    onClose: () => void;
-}) {
-    // 計算面板位置 (斷層中心點上方)
-    const centerCoord = fault.coordinates[Math.floor(fault.coordinates.length / 2)];
-    const worldPos = twd97ToWorld(centerCoord);
-
-    const typeLabels: Record<string, string> = {
-        'normal': '正斷層',
-        'reverse': '逆斷層',
-        'strike-slip': '走滑斷層',
-    };
-
-    return (
-        <group position={[worldPos.x, worldPos.y + 100, worldPos.z]}>
-            <mesh>
-                <boxGeometry args={[1, 1, 1]} />
-                <meshBasicMaterial visible={false} />
-            </mesh>
-            <Html center style={{ pointerEvents: 'auto' }}>
-                <div style={{
-                    background: 'rgba(255, 255, 255, 0.98)',
-                    color: '#1e293b',
-                    padding: '12px 16px',
-                    borderRadius: '8px',
-                    minWidth: '220px',
-                    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
-                    fontSize: '14px',
-                    fontFamily: '"Inter", system-ui, sans-serif',
-                    backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    animation: 'fault-popup-in 0.2s ease-out',
-                }}>
-                    <style>{`
-                        @keyframes fault-popup-in {
-                            from { opacity: 0; transform: translateY(10px); }
-                            to { opacity: 1; transform: translateY(0); }
-                        }
-                    `}</style>
-                    <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '8px',
-                        borderBottom: `2px solid ${fault.color}`,
-                        paddingBottom: '8px',
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: fault.color }} />
-                            <strong style={{ fontSize: '15px', fontWeight: 700 }}>
-                                {fault.name}
-                            </strong>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            style={{
-                                background: 'rgba(0,0,0,0.05)',
-                                border: 'none',
-                                color: '#64748b',
-                                cursor: 'pointer',
-                                fontSize: '18px',
-                                width: '24px',
-                                height: '24px',
-                                borderRadius: '50%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.2s',
-                            }}
-                            onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.1)')}
-                            onMouseOut={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.05)')}
-                        >
-                            ×
-                        </button>
-                    </div>
-                    <div style={{ color: '#444', lineHeight: '1.6' }}>
-                        <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: '#94a3b8', fontWeight: 500 }}>類型</span>
-                            <span style={{ fontWeight: 600 }}>{typeLabels[fault.type] || fault.type}</span>
-                        </div>
-                        <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: '#94a3b8', fontWeight: 500 }}>傾角</span>
-                            <span style={{ fontWeight: 600, color: '#0f172a' }}>{fault.dipAngle}°</span>
-                        </div>
-                        <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: '#94a3b8', fontWeight: 500 }}>傾向</span>
-                            <span style={{ fontWeight: 600, color: '#0f172a' }}>{fault.dipDirection}°</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: '#94a3b8', fontWeight: 500 }}>延伸深度</span>
-                            <span style={{ fontWeight: 600, color: '#3b82f6' }}>{fault.depth} m</span>
-                        </div>
-                    </div>
-                </div>
-            </Html>
-        </group>
-    );
-}
-
-
 
 export default StructureLines;
-
-

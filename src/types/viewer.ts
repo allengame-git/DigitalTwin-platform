@@ -30,6 +30,10 @@ export interface ViewerConfig {
     backgroundColor: string;
     /** 是否自動調整 LOD */
     autoLOD: boolean;
+    /** 模型位移調整 [x, y, z] */
+    modelOffset: [number, number, number];
+    /** 是否顯示位態標籤 */
+    showAttitudeLabels: boolean;
 }
 
 /** 切片面設定 */

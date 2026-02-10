@@ -6,6 +6,7 @@
  */
 
 import { create } from 'zustand';
+import { useAuthStore } from './authStore';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -51,6 +52,7 @@ export interface FaultPlaneImportRow {
 
 interface FaultPlaneState {
     faultPlanes: FaultPlane[];
+    selectedFaultId: string | null;
     status: 'idle' | 'loading' | 'success' | 'error';
     error: string | null;
 }
@@ -61,6 +63,7 @@ interface FaultPlaneActions {
     updateFaultPlane: (id: string, data: Partial<CreateFaultPlaneData>) => Promise<FaultPlane | null>;
     deleteFaultPlane: (id: string) => Promise<boolean>;
     batchImport: (projectId: string, data: FaultPlaneImportRow[]) => Promise<{ success: number; failed: number }>;
+    selectFault: (id: string | null) => void;
     clearFaultPlanes: () => void;
 }
 
@@ -69,6 +72,7 @@ type FaultPlaneStore = FaultPlaneState & FaultPlaneActions;
 export const useFaultPlaneStore = create<FaultPlaneStore>((set, get) => ({
     // State
     faultPlanes: [],
+    selectedFaultId: null,
     status: 'idle',
     error: null,
 
@@ -111,9 +115,13 @@ export const useFaultPlaneStore = create<FaultPlaneStore>((set, get) => ({
 
     createFaultPlane: async (projectId: string, data: CreateFaultPlaneData) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/fault-plane`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 credentials: 'include',
                 body: JSON.stringify({ projectId, ...data }),
             });
@@ -149,9 +157,13 @@ export const useFaultPlaneStore = create<FaultPlaneStore>((set, get) => ({
 
     updateFaultPlane: async (id: string, data: Partial<CreateFaultPlaneData>) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/fault-plane/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 credentials: 'include',
                 body: JSON.stringify(data),
             });
@@ -189,8 +201,12 @@ export const useFaultPlaneStore = create<FaultPlaneStore>((set, get) => ({
 
     deleteFaultPlane: async (id: string) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/fault-plane/${id}`, {
                 method: 'DELETE',
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 credentials: 'include',
             });
             const result = await response.json();
@@ -210,9 +226,13 @@ export const useFaultPlaneStore = create<FaultPlaneStore>((set, get) => ({
 
     batchImport: async (projectId: string, data: FaultPlaneImportRow[]) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/fault-plane/batch-import`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 credentials: 'include',
                 body: JSON.stringify({ projectId, faultPlanes: data }),
             });
@@ -230,8 +250,12 @@ export const useFaultPlaneStore = create<FaultPlaneStore>((set, get) => ({
         }
     },
 
+    selectFault: (id: string | null) => {
+        set({ selectedFaultId: id });
+    },
+
     clearFaultPlanes: () => {
-        set({ faultPlanes: [], status: 'idle', error: null });
+        set({ faultPlanes: [], selectedFaultId: null, status: 'idle', error: null });
     },
 }));
 

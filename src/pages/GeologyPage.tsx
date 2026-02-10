@@ -6,16 +6,14 @@
 import React from 'react';
 import { GeologyCanvas } from '../components/scene/GeologyCanvas';
 import { GeologyErrorBoundary } from '../components/scene/GeologyErrorBoundary';
-import { BoreholeDetail } from '../components/overlay/BoreholeDetail';
+import { InspectorPanel } from '../components/overlay/InspectorPanel';
 import { GeologySidebar } from '../components/layout/GeologySidebar';
 import { useParams } from 'react-router-dom';
-import { useBoreholeStore } from '../stores/boreholeStore';
 import { useProjectStore } from '../stores/projectStore';
 
 export const GeologyPage: React.FC = () => {
     const { projectCode } = useParams<{ projectCode: string }>();
     const { projects, setActiveProject } = useProjectStore();
-    const { selectedBorehole } = useBoreholeStore();
 
     // 同步專案狀態
     React.useEffect(() => {
@@ -41,18 +39,11 @@ export const GeologyPage: React.FC = () => {
                     </GeologyErrorBoundary>
                 </div>
 
-                {/* 詳細資料面板 (Overlay) - 仍保留在右側懸浮 */}
-                <div style={{ position: 'absolute', top: 0, right: 0, height: '100%', pointerEvents: 'none', zIndex: 10 }}>
-                    {selectedBorehole && (
-                        <div style={{ pointerEvents: 'auto', height: '100%', background: 'white' }}>
-                            <BoreholeDetail />
-                        </div>
-                    )}
-                </div>
+                {/* 統一資料檢視面板 (右下角) */}
+                <InspectorPanel />
             </div>
         </div>
     );
 };
 
 export default GeologyPage;
-

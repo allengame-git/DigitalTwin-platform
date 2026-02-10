@@ -9,6 +9,7 @@ import { MapControls, Stats } from '@react-three/drei';
 import { RENDERER_CONFIG, DEFAULT_CAMERA_CONFIG } from '../../config/three';
 import { useBoreholeStore } from '../../stores/boreholeStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useUploadStore } from '../../stores/uploadStore';
 import { BoreholeInstances } from './BoreholeInstances';
 import { SceneEnvironment } from './SceneEnvironment';
 import { LoadingProgress } from '../overlay/LoadingProgress';
@@ -22,6 +23,7 @@ import { TerrainMesh } from './TerrainMesh';
 import { PerformanceMonitor } from './PerformanceMonitor';
 import { GeophysicsPlane } from './GeophysicsPlane';
 import { CameraController } from './CameraController';
+import { useAttitudeStore } from '../../stores/attitudeStore';
 
 interface GeologyCanvasProps {
     /** 是否顯示 FPS 統計 */
@@ -33,12 +35,16 @@ interface GeologyCanvasProps {
 export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) {
     const { fetchBoreholes, status } = useBoreholeStore();
     const { activeProjectId } = useProjectStore();
+    const { attitudes, fetchAttitudes } = useAttitudeStore();
+    const { fetchGeologyModels } = useUploadStore();
 
     useEffect(() => {
         if (activeProjectId) {
             fetchBoreholes(activeProjectId);
+            fetchAttitudes(activeProjectId);
+            fetchGeologyModels();
         }
-    }, [fetchBoreholes, activeProjectId]);
+    }, [fetchBoreholes, fetchAttitudes, fetchGeologyModels, activeProjectId]);
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%', ...style }}>
@@ -74,7 +80,7 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
 
                     {/* Phase 8: 地質構造 */}
                     <StructureLines />
-                    <StrikeDipSymbol />
+                    <StrikeDipSymbol attitudes={attitudes} />
 
                     {/* Phase 7: Clipping Plane */}
                     <ClippingPlane />

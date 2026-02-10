@@ -49,8 +49,10 @@ const initialFormData: BoreholeFormData = {
     description: '',
 };
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 export const BoreholeUploadSection: React.FC = () => {
-    const { boreholes, status, fetchBoreholes, createBorehole, updateBorehole, deleteBorehole, batchDelete, batchImport, batchImportLayers, batchImportProperties } = useBoreholeStore();
+    const { boreholes, status, fetchBoreholes, createBorehole, updateBorehole, deleteBorehole, batchDelete, batchImport, batchImportLayers, batchImportProperties, uploadPhoto, deletePhoto, fetchBoreholePhotos } = useBoreholeStore();
     const { activeProjectId } = useProjectStore();
     const { lithologies } = useLithologyStore();
 
@@ -78,6 +80,15 @@ export const BoreholeUploadSection: React.FC = () => {
     const csvInputRef = useRef<HTMLInputElement>(null);
     const layerCsvInputRef = useRef<HTMLInputElement>(null);
     const propertyCsvInputRef = useRef<HTMLInputElement>(null);
+
+    // Photo states
+    const [boreholePhotos, setBoreholePhotos] = useState<any[]>([]);
+    const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
+    const [photoDepth, setPhotoDepth] = useState('');
+    const [photoCaption, setPhotoCaption] = useState('');
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+    const [showDeletePhotoConfirm, setShowDeletePhotoConfirm] = useState<string | null>(null);
+    const photoInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (activeProjectId) {
@@ -261,6 +272,49 @@ export const BoreholeUploadSection: React.FC = () => {
         }
 
         setShowForm(true);
+
+        // Load photos for this borehole
+        loadPhotos(bh.id);
+    };
+
+    const loadPhotos = async (boreholeId: string) => {
+        setIsLoadingPhotos(true);
+        const photos = await fetchBoreholePhotos(boreholeId);
+        setBoreholePhotos(photos);
+        setIsLoadingPhotos(false);
+    };
+
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !editingBorehole) return;
+
+        const depth = parseFloat(photoDepth);
+        if (isNaN(depth)) {
+            alert('請填入有效的深度值');
+            return;
+        }
+
+        setIsUploadingPhoto(true);
+        const success = await uploadPhoto(editingBorehole, file, depth, photoCaption || undefined);
+        setIsUploadingPhoto(false);
+
+        if (success) {
+            setPhotoDepth('');
+            setPhotoCaption('');
+            if (photoInputRef.current) photoInputRef.current.value = '';
+            loadPhotos(editingBorehole);
+        } else {
+            alert('上傳照片失敗');
+        }
+    };
+
+    const handleDeletePhoto = async (photoId: string) => {
+        if (!editingBorehole) return;
+        const success = await deletePhoto(editingBorehole, photoId);
+        if (success) {
+            setBoreholePhotos(prev => prev.filter(p => p.id !== photoId));
+        }
+        setShowDeletePhotoConfirm(null);
     };
 
     const handleDeleteClick = (id: string) => {
@@ -280,7 +334,11 @@ export const BoreholeUploadSection: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file || !activeProjectId) return;
 
-        const text = await file.text();
+        let text = await file.text();
+        // Remove UTF-8 BOM if present
+        if (text.startsWith('\uFEFF')) {
+            text = text.substring(1);
+        }
         const lines = text.trim().split('\n');
         if (lines.length < 2) {
             alert('CSV 檔案格式錯誤');
@@ -312,7 +370,11 @@ export const BoreholeUploadSection: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file || !activeProjectId) return;
 
-        const text = await file.text();
+        let text = await file.text();
+        // Remove UTF-8 BOM if present
+        if (text.startsWith('\uFEFF')) {
+            text = text.substring(1);
+        }
         const lines = text.trim().split('\n');
         if (lines.length < 2) {
             alert('CSV 檔案格式錯誤');
@@ -344,7 +406,11 @@ export const BoreholeUploadSection: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file || !activeProjectId) return;
 
-        const text = await file.text();
+        let text = await file.text();
+        // Remove UTF-8 BOM if present
+        if (text.startsWith('\uFEFF')) {
+            text = text.substring(1);
+        }
         const lines = text.trim().split('\n');
         if (lines.length < 2) {
             alert('CSV 檔案格式錯誤');
@@ -683,6 +749,90 @@ export const BoreholeUploadSection: React.FC = () => {
                                     </table>
                                 )}
                             </div>
+
+                            {/* 岩心照片 - 僅在編輯模式顯示 */}
+                            {editingBorehole && (
+                                <div style={{ marginTop: '16px', padding: '12px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                        <label className="dm-form-label" style={{ margin: 0 }}>岩心照片</label>
+                                    </div>
+
+                                    {/* 上傳表單 */}
+                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                                        <input
+                                            type="text"
+                                            className="dm-form-input"
+                                            style={{ flex: '0 0 80px', padding: '4px 8px', fontSize: '13px' }}
+                                            placeholder="深度 (m) *"
+                                            value={photoDepth}
+                                            onChange={e => setPhotoDepth(e.target.value)}
+                                        />
+                                        <input
+                                            type="text"
+                                            className="dm-form-input"
+                                            style={{ flex: 1, padding: '4px 8px', fontSize: '13px', minWidth: '100px' }}
+                                            placeholder="備註 (選填)"
+                                            value={photoCaption}
+                                            onChange={e => setPhotoCaption(e.target.value)}
+                                        />
+                                        <input
+                                            ref={photoInputRef}
+                                            type="file"
+                                            accept="image/jpeg,image/png,image/webp"
+                                            onChange={handlePhotoUpload}
+                                            style={{ display: 'none' }}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="dm-btn dm-btn-primary"
+                                            style={{ fontSize: '12px', padding: '4px 12px', whiteSpace: 'nowrap' }}
+                                            onClick={() => {
+                                                if (!photoDepth.trim() || isNaN(parseFloat(photoDepth))) {
+                                                    alert('請先填入深度');
+                                                    return;
+                                                }
+                                                photoInputRef.current?.click();
+                                            }}
+                                            disabled={isUploadingPhoto}
+                                        >
+                                            {isUploadingPhoto ? '上傳中...' : '+ 上傳照片'}
+                                        </button>
+                                    </div>
+
+                                    {/* 照片列表 */}
+                                    {isLoadingPhotos ? (
+                                        <div style={{ textAlign: 'center', padding: '16px', color: '#94a3b8', fontSize: '13px' }}>載入照片中...</div>
+                                    ) : boreholePhotos.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: '16px', color: '#94a3b8', fontSize: '13px' }}>尚無岩心照片</div>
+                                    ) : (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                                            {boreholePhotos.map((photo: any) => (
+                                                <div key={photo.id} style={{ position: 'relative', aspectRatio: '1', borderRadius: '6px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                                                    <img
+                                                        src={`${API_BASE}${photo.thumbnailUrl || photo.url}`}
+                                                        alt={photo.caption || `${photo.depth}m`}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                        onError={e => {
+                                                            (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23eee" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%23999" font-size="12">error</text></svg>';
+                                                        }}
+                                                    />
+                                                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.6)', color: 'white', padding: '3px', fontSize: '10px', textAlign: 'center' }}>
+                                                        {photo.depth.toFixed(1)}m
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowDeletePhotoConfirm(photo.id)}
+                                                        style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(220,38,38,0.8)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                                                        title="刪除照片"
+                                                    >
+                                                        x
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         <div className="dm-modal-footer">
                             <button className="dm-btn dm-btn-secondary" onClick={handleCancelForm}>取消</button>
@@ -843,6 +993,24 @@ BH-002,2.0,8,`}
                             >
                                 選擇 CSV 檔案
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 照片刪除確認 Modal */}
+            {showDeletePhotoConfirm && (
+                <div className="dm-modal-overlay" onClick={() => setShowDeletePhotoConfirm(null)}>
+                    <div className="dm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+                        <div className="dm-modal-header">
+                            <h3 className="dm-modal-title">確認刪除照片</h3>
+                        </div>
+                        <div className="dm-modal-body">
+                            <p>確定要刪除此照片嗎？此操作無法復原。</p>
+                        </div>
+                        <div className="dm-modal-footer">
+                            <button className="dm-btn dm-btn-secondary" onClick={() => setShowDeletePhotoConfirm(null)}>取消</button>
+                            <button className="dm-btn dm-btn-primary" style={{ background: '#dc2626' }} onClick={() => handleDeletePhoto(showDeletePhotoConfirm)}>刪除</button>
                         </div>
                     </div>
                 </div>

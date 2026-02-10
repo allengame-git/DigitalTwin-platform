@@ -22,6 +22,7 @@ import { useProjectStore } from '../stores/projectStore';
 import { setOrigin } from '../utils/coordinates';
 import { BoreholeUploadSection } from '../components/data/BoreholeUploadSection';
 import { FaultPlaneUploadSection } from '../components/data/FaultPlaneUploadSection';
+import { AttitudeUploadSection } from '../components/data/AttitudeUploadSection';
 import LithologySection from '../components/data/LithologySection';
 import { useLithologyStore } from '../stores/lithologyStore';
 
@@ -1039,6 +1040,11 @@ export const DataManagementPage: React.FC = () => {
                 {/* 斷層面資料 */}
                 <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
                     <FaultPlaneUploadSection />
+                </div>
+
+                {/* 位態資料 */}
+                <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                    <AttitudeUploadSection />
                 </div>
 
                 {/* 航照圖管理 */}

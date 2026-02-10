@@ -11,6 +11,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import prisma from '../lib/prisma';
+import { authenticate } from '../middleware/auth';
 import { generateIsosurface, IsosurfaceResult } from '../services/isosurface-generator';
 
 const router = express.Router();
@@ -133,7 +134,7 @@ router.get('/:id/status', async (req: Request, res: Response) => {
  * POST /api/geology-model
  * 上傳 voxel CSV，自動轉換為 3D Tiles
  */
-router.post('/', upload.single('file'), async (req: Request, res: Response) => {
+router.post('/', authenticate, upload.single('file'), async (req: Request, res: Response) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: '未收到檔案' });
@@ -200,7 +201,7 @@ router.post('/', upload.single('file'), async (req: Request, res: Response) => {
  * POST /api/geology-model/:id/activate
  * 設為當前使用版本
  */
-router.post('/:id/activate', async (req: Request, res: Response) => {
+router.post('/:id/activate', authenticate, async (req: Request, res: Response) => {
     try {
         const targetId = req.params.id;
 
@@ -243,7 +244,7 @@ router.post('/:id/activate', async (req: Request, res: Response) => {
  * DELETE /api/geology-model/:id
  * 刪除模型
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const model = await prisma.geologyModel.findUnique({
             where: { id: req.params.id as string },

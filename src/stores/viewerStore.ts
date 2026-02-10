@@ -45,6 +45,8 @@ const defaultConfig: ViewerConfig = {
     enableShadows: true,
     backgroundColor: '#f0f0f0',
     autoLOD: true,
+    modelOffset: [0, 0, 0],
+    showAttitudeLabels: false,
 };
 
 const defaultClippingPlane: ClippingPlaneConfig = {

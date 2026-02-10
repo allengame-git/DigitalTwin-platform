@@ -180,7 +180,12 @@ export const FaultPlaneUploadSection: React.FC = () => {
 
         const reader = new FileReader();
         reader.onload = (event) => {
-            setCsvData(event.target?.result as string);
+            let text = event.target?.result as string;
+            // Remove UTF-8 BOM if present
+            if (text.startsWith('\uFEFF')) {
+                text = text.substring(1);
+            }
+            setCsvData(text);
         };
         reader.readAsText(file);
     };

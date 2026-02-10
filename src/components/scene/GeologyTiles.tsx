@@ -38,6 +38,7 @@ function GeologyMesh({
     const clippingConfig = useViewerStore(state => state.clippingPlane);
 
     const geology3dLayer = layers.geology3d;
+    const modelOffset = useViewerStore(state => state.config.modelOffset);
 
     // 計算 Clipping Planes (單一切片模式)
     const clippingPlanes = useMemo(() => {
@@ -95,7 +96,7 @@ function GeologyMesh({
     if (!geology3dLayer.visible) return null;
 
     return (
-        <group ref={groupRef}>
+        <group ref={groupRef} position={modelOffset}>
             <primitive object={scene} />
         </group>
     );

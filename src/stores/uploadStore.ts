@@ -11,6 +11,7 @@ import { create } from 'zustand';
 const API_BASE = '';
 
 import { useProjectStore } from './projectStore';
+import { useAuthStore } from './authStore';
 
 export interface UploadedFile {
     id: string;
@@ -231,8 +232,12 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
             if (metadata.minY) formData.append('minY', metadata.minY);
             if (metadata.maxY) formData.append('maxY', metadata.maxY);
 
+            const token = useAuthStore.getState().accessToken;
             const res = await fetch(`${API_BASE}/api/upload/imagery`, {
                 method: 'POST',
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 body: formData,
             });
 
@@ -258,8 +263,12 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
 
     deleteImagery: async (id: string) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const res = await fetch(`${API_BASE}/api/upload/imagery/${id}`, {
                 method: 'DELETE',
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
             });
             const data = await res.json();
 
@@ -329,8 +338,12 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
             if (metadata.depthTop) formData.append('depthTop', metadata.depthTop);
             if (metadata.depthBottom) formData.append('depthBottom', metadata.depthBottom);
 
+            const token = useAuthStore.getState().accessToken;
             const res = await fetch(`${API_BASE}/api/upload/geophysics`, {
                 method: 'POST',
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 body: formData,
             });
 
@@ -356,8 +369,12 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
 
     deleteGeophysics: async (id: string) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const res = await fetch(`${API_BASE}/api/upload/geophysics/${id}`, {
                 method: 'DELETE',
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
             });
             const data = await res.json();
 
@@ -426,8 +443,12 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
             if (metadata.cellSizeY) formData.append('cellSizeY', metadata.cellSizeY);
             if (metadata.cellSizeZ) formData.append('cellSizeZ', metadata.cellSizeZ);
 
+            const token = useAuthStore.getState().accessToken;
             const res = await fetch(`${API_BASE}/api/geology-model`, {
                 method: 'POST',
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 body: formData,
             });
 
@@ -452,8 +473,12 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
 
     deleteGeologyModel: async (id: string) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const res = await fetch(`${API_BASE}/api/geology-model/${id}`, {
                 method: 'DELETE',
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
             });
             const data = await res.json();
 
@@ -472,8 +497,12 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
 
     activateGeologyModel: async (id: string) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const res = await fetch(`${API_BASE}/api/geology-model/${id}/activate`, {
                 method: 'POST',
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
             });
             const data = await res.json();
 
