@@ -295,10 +295,10 @@ export const FaultPlaneUploadSection: React.FC = () => {
             ) : faultPlanes.length === 0 ? (
                 <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>尚無斷層資料</div>
             ) : (
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                        <thead>
-                            <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                <div style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '14px' }}>
+                        <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f8fafc' }}>
+                            <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                                 <th style={{ padding: '10px', textAlign: 'left' }}>名稱</th>
                                 <th style={{ padding: '10px', textAlign: 'left' }}>類型</th>
                                 <th style={{ padding: '10px', textAlign: 'right' }}>傾角</th>

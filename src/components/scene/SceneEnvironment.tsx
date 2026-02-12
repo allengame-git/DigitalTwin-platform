@@ -25,6 +25,11 @@ export function SceneEnvironment({
         <>
             <color attach="background" args={[config.backgroundColor]} />
 
+            {/* 霧氣效果 */}
+            {config.showFog && (
+                <fog attach="fog" args={[config.backgroundColor, 100, 5000]} />
+            )}
+
             {/* 環境光 */}
             <ambientLight intensity={0.4} />
 

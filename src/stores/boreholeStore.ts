@@ -322,16 +322,22 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
     batchDelete: async (ids: string[]) => {
         let success = 0;
         let failed = 0;
+        const successfullyDeletedIds: string[] = [];
+        const token = useAuthStore.getState().accessToken;
 
         for (const id of ids) {
             try {
                 const response = await fetch(`${API_BASE}/api/borehole/${id}`, {
                     method: 'DELETE',
+                    headers: {
+                        ...(token && { 'Authorization': `Bearer ${token}` }),
+                    },
                     credentials: 'include',
                 });
 
                 if (response.ok) {
                     success++;
+                    successfullyDeletedIds.push(id);
                 } else {
                     failed++;
                 }
@@ -340,10 +346,12 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
             }
         }
 
-        // Remove deleted items from local state
-        set(state => ({
-            boreholes: state.boreholes.filter(b => !ids.includes(b.id))
-        }));
+        // 僅從本地狀態移除真正刪除成功的項目
+        if (successfullyDeletedIds.length > 0) {
+            set(state => ({
+                boreholes: state.boreholes.filter(b => !successfullyDeletedIds.includes(b.id))
+            }));
+        }
 
         return { success, failed };
     },
@@ -473,8 +481,12 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
 
     deletePhoto: async (boreholeId: string, photoId: string) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/borehole/${boreholeId}/photos/${photoId}`, {
                 method: 'DELETE',
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
                 credentials: 'include',
             });
 

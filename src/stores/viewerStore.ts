@@ -47,6 +47,7 @@ const defaultConfig: ViewerConfig = {
     autoLOD: true,
     modelOffset: [0, 0, 0],
     showAttitudeLabels: false,
+    showFog: false,
 };
 
 const defaultClippingPlane: ClippingPlaneConfig = {

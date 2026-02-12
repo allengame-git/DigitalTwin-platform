@@ -13,6 +13,7 @@ import { ClippingTool } from '../overlay/ClippingTool';
 import { usePerformanceStore } from '../../stores/performanceStore';
 import { useCameraStore } from '../../stores/cameraStore';
 import { useBoreholeStore } from '../../stores/boreholeStore';
+import { useUploadStore } from '../../stores/uploadStore';
 
 export const GeologySidebar: React.FC = () => {
     // 收合狀態
@@ -22,6 +23,9 @@ export const GeologySidebar: React.FC = () => {
     const { boreholes } = useBoreholeStore();
 
     const { projectCode } = useParams<{ projectCode: string }>();
+
+    const { activeGeologyModelId, geologyModels } = useUploadStore();
+    const activeModel = geologyModels.find(m => m.id === activeGeologyModelId);
 
     return (
         <div
@@ -97,9 +101,30 @@ export const GeologySidebar: React.FC = () => {
                 <h1 style={{ margin: 0, fontSize: '18px', color: '#111827', fontWeight: 700 }}>
                     地質資料展示
                 </h1>
-                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#6b7280' }}>
-                    TWD97 座標系統 | {boreholes.length} 筆鑽孔
-                </p>
+                <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>
+                        TWD97 座標系統 | {boreholes.length} 筆鑽孔
+                    </p>
+                    {activeModel && (
+                        <div style={{
+                            fontSize: '11px',
+                            color: '#3b82f6',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                        }}>
+                            <span style={{
+                                display: 'inline-block',
+                                width: '6px',
+                                height: '6px',
+                                background: '#3b82f6',
+                                borderRadius: '50%'
+                            }}></span>
+                            目前展示：{activeModel.name}
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* 收合時的圖標 */}

@@ -34,6 +34,8 @@ export interface ViewerConfig {
     modelOffset: [number, number, number];
     /** 是否顯示位態標籤 */
     showAttitudeLabels: boolean;
+    /** 是否啟用霧氣效果 */
+    showFog: boolean;
 }
 
 /** 切片面設定 */

@@ -13,6 +13,47 @@ const API_BASE = '';
 import { useProjectStore } from './projectStore';
 import { useAuthStore } from './authStore';
 
+/**
+ * XHR-based upload with real progress tracking.
+ * Returns parsed JSON response.
+ */
+function uploadWithProgress(
+    url: string,
+    formData: FormData,
+    token: string | null,
+    onProgress: (percent: number) => void,
+): Promise<any> {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                onProgress(Math.round((e.loaded / e.total) * 100));
+            }
+        });
+
+        xhr.addEventListener('load', () => {
+            try {
+                const data = JSON.parse(xhr.responseText);
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(data);
+                } else {
+                    reject(new Error(data.message || `HTTP ${xhr.status}`));
+                }
+            } catch {
+                reject(new Error('回應格式錯誤'));
+            }
+        });
+
+        xhr.addEventListener('error', () => reject(new Error('網路錯誤')));
+        xhr.addEventListener('abort', () => reject(new Error('上傳已取消')));
+
+        xhr.send(formData);
+    });
+}
+
 export interface UploadedFile {
     id: string;
     filename: string;
@@ -136,9 +177,6 @@ export interface GeologyModelMetadata {
     name: string;
     description?: string;
     sourceData?: string;
-    cellSizeX?: string;
-    cellSizeY?: string;
-    cellSizeZ?: string;
 }
 
 export interface UploadState {
@@ -233,15 +271,12 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
             if (metadata.maxY) formData.append('maxY', metadata.maxY);
 
             const token = useAuthStore.getState().accessToken;
-            const res = await fetch(`${API_BASE}/api/upload/imagery`, {
-                method: 'POST',
-                headers: {
-                    ...(token && { 'Authorization': `Bearer ${token}` }),
-                },
-                body: formData,
-            });
-
-            const data = await res.json();
+            const data = await uploadWithProgress(
+                `${API_BASE}/api/upload/imagery`,
+                formData,
+                token,
+                (percent) => set({ uploadProgress: percent }),
+            );
 
             if (data.success) {
                 set(state => ({
@@ -339,15 +374,12 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
             if (metadata.depthBottom) formData.append('depthBottom', metadata.depthBottom);
 
             const token = useAuthStore.getState().accessToken;
-            const res = await fetch(`${API_BASE}/api/upload/geophysics`, {
-                method: 'POST',
-                headers: {
-                    ...(token && { 'Authorization': `Bearer ${token}` }),
-                },
-                body: formData,
-            });
-
-            const data = await res.json();
+            const data = await uploadWithProgress(
+                `${API_BASE}/api/upload/geophysics`,
+                formData,
+                token,
+                (percent) => set({ uploadProgress: percent }),
+            );
 
             if (data.success) {
                 set(state => ({
@@ -413,10 +445,12 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
             if (data.success) {
                 const models = data.data as GeologyModelFile[];
                 set({ geologyModels: models });
-                // 自動選中 isActive 的模型
+                // 自動選中 isActive 的模型，若無則選第一個
                 const activeModel = models.find(m => m.isActive);
                 if (activeModel) {
                     set({ activeGeologyModelId: activeModel.id });
+                } else if (models.length > 0) {
+                    set({ activeGeologyModelId: models[0].id });
                 }
             }
         } catch (error) {
@@ -439,20 +473,14 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
             formData.append('name', metadata.name);
             if (metadata.description) formData.append('description', metadata.description);
             if (metadata.sourceData) formData.append('sourceData', metadata.sourceData);
-            if (metadata.cellSizeX) formData.append('cellSizeX', metadata.cellSizeX);
-            if (metadata.cellSizeY) formData.append('cellSizeY', metadata.cellSizeY);
-            if (metadata.cellSizeZ) formData.append('cellSizeZ', metadata.cellSizeZ);
 
             const token = useAuthStore.getState().accessToken;
-            const res = await fetch(`${API_BASE}/api/geology-model`, {
-                method: 'POST',
-                headers: {
-                    ...(token && { 'Authorization': `Bearer ${token}` }),
-                },
-                body: formData,
-            });
-
-            const data = await res.json();
+            const data = await uploadWithProgress(
+                `${API_BASE}/api/geology-model`,
+                formData,
+                token,
+                (percent) => set({ uploadProgress: percent }),
+            );
 
             if (data.success) {
                 set(state => ({

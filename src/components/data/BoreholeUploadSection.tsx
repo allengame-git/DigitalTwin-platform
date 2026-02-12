@@ -313,6 +313,8 @@ export const BoreholeUploadSection: React.FC = () => {
         const success = await deletePhoto(editingBorehole, photoId);
         if (success) {
             setBoreholePhotos(prev => prev.filter(p => p.id !== photoId));
+        } else {
+            alert('刪除照片失敗，請檢查權限或稍後再試');
         }
         setShowDeletePhotoConfirm(null);
     };
@@ -335,30 +337,42 @@ export const BoreholeUploadSection: React.FC = () => {
         if (!file || !activeProjectId) return;
 
         let text = await file.text();
-        // Remove UTF-8 BOM if present
-        if (text.startsWith('\uFEFF')) {
-            text = text.substring(1);
-        }
-        const lines = text.trim().split('\n');
+
+        // 1. 強健的 BOM 移除 (移除 UTF-8, UTF-16 等 BOM)
+        text = text.replace(/^\uFEFF/, '').replace(/^\uFFFE/, '');
+
+        // 2. 處理換行符號 (相容 Windows \r\n, Mac \r, Linux \n) 並移除空行
+        const lines = text.split(/\r?\n|\r/).map(l => l.trim()).filter(line => line.length > 0);
+
         if (lines.length < 2) {
-            alert('CSV 檔案格式錯誤');
+            alert('CSV 檔案格式錯誤或無資料');
             return;
         }
 
-        const headers = lines[0].split(',').map(h => h.trim());
+        // 3. 解析標頭與資料
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
         const boreholeData = [];
 
         for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim());
+            const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
             const row: any = {};
             headers.forEach((h, idx) => {
-                row[h] = values[idx];
+                if (h) row[h] = values[idx];
             });
-            boreholeData.push(row);
+
+            // 基本驗證：鑽孔編號與座標為必填
+            if (row.boreholeNo && row.x && row.y) {
+                boreholeData.push(row);
+            }
+        }
+
+        if (boreholeData.length === 0) {
+            alert('無法解析任何有效的鑽孔基本資料，請檢查 CSV 標頭。');
+            return;
         }
 
         const result = await batchImport(activeProjectId, boreholeData);
-        alert(`匯入完成：成功 ${result.success} 筆，失敗 ${result.failed} 筆`);
+        alert(`匯入完成：成功 ${result.success} 筆，失敗 ${result.failed} 筆${result.failed > 0 ? '\n請檢查編號是否重複或格式錯誤。' : ''}`);
 
         if (csvInputRef.current) {
             csvInputRef.current.value = '';
@@ -371,26 +385,33 @@ export const BoreholeUploadSection: React.FC = () => {
         if (!file || !activeProjectId) return;
 
         let text = await file.text();
-        // Remove UTF-8 BOM if present
-        if (text.startsWith('\uFEFF')) {
-            text = text.substring(1);
-        }
-        const lines = text.trim().split('\n');
+        text = text.replace(/^\uFEFF/, '').replace(/^\uFFFE/, '');
+        const lines = text.split(/\r?\n|\r/).map(l => l.trim()).filter(line => line.length > 0);
+
         if (lines.length < 2) {
             alert('CSV 檔案格式錯誤');
             return;
         }
 
-        const headers = lines[0].split(',').map(h => h.trim());
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
         const layerData = [];
 
         for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim());
+            const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
             const row: any = {};
             headers.forEach((h, idx) => {
-                row[h] = values[idx];
+                if (h) row[h] = values[idx];
             });
-            layerData.push(row);
+
+            // 驗證：需有鑽孔編號與地層深度
+            if (row.boreholeNo && row.topDepth !== undefined && row.bottomDepth !== undefined) {
+                layerData.push(row);
+            }
+        }
+
+        if (layerData.length === 0) {
+            alert('無法解析任何有效的地層資料。');
+            return;
         }
 
         const result = await batchImportLayers(activeProjectId, layerData);
@@ -407,26 +428,33 @@ export const BoreholeUploadSection: React.FC = () => {
         if (!file || !activeProjectId) return;
 
         let text = await file.text();
-        // Remove UTF-8 BOM if present
-        if (text.startsWith('\uFEFF')) {
-            text = text.substring(1);
-        }
-        const lines = text.trim().split('\n');
+        text = text.replace(/^\uFEFF/, '').replace(/^\uFFFE/, '');
+        const lines = text.split(/\r?\n|\r/).map(l => l.trim()).filter(line => line.length > 0);
+
         if (lines.length < 2) {
             alert('CSV 檔案格式錯誤');
             return;
         }
 
-        const headers = lines[0].split(',').map(h => h.trim());
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
         const propertyData = [];
 
         for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim());
+            const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
             const row: any = {};
             headers.forEach((h, idx) => {
-                row[h] = values[idx];
+                if (h) row[h] = values[idx];
             });
-            propertyData.push(row);
+
+            // 驗證：需有鑽孔編號與深度
+            if (row.boreholeNo && row.depth !== undefined) {
+                propertyData.push(row);
+            }
+        }
+
+        if (propertyData.length === 0) {
+            alert('無法解析任何有效的物性資料。');
+            return;
         }
 
         const result = await batchImportProperties(activeProjectId, propertyData);

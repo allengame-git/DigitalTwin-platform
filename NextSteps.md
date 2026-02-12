@@ -32,6 +32,17 @@
   - UI: `FaultPlaneUploadSection` 支援單筆新增、編輯與 CSV 匯入
   - 3D: `StructureLines.tsx` 整合真實資料與位態渲染
 
+#### 2. 地形與著色 (Terrain & Visualization) - 2026-02-12
+
+- ✅ **Terrain Legend (地形圖例)**
+  - Color Ramp 支援 (Rainbow, Spectral, Viridis...)
+  - 高度反轉 (Reverse) 與 Z-axis 範圍手動/自動設定
+  - **即時渲染**: Custom Shader (`onBeforeCompile`)
+- ✅ **Persistence (設定持久化)**
+  - 瀏覽器自動記憶圖層狀態與圖例設定
+- ✅ **Default View Optimization**
+  - 首次進入僅顯示鑽孔與地形，優化使用者體驗
+
 #### 2. 3D 地質模型 (2026-02-06)
 
 - ✅ **Isosurface Mesh Generation**
@@ -117,10 +128,10 @@ Password: postgres
 
 **背景**: 已修復 `GeologyCanvas` 未呼叫 `fetchGeologyModels()` 的問題，但需要驗證完整的模型載入流程。
 
-- [ ] **驗證**: 進入地質頁面後，Console 應顯示 `geologyModelsCount: 1` 而非 0
-- [ ] **驗證**: Camera Reset 的 log 應顯示 `hasContent: true` 且 `strategy: 'scene-traverse'`
-- [ ] **測試**: 確認 NPP3 模型的 GLB mesh 正確顯示在場景中
-- [ ] **測試**: 確認 `activeGeologyModelId` 正確設定
+- [x] **驗證**: 進入地質頁面後，Console 應顯示 `geologyModelsCount: 1` 而非 0
+- [x] **驗證**: Camera Reset 的 log 應顯示 `hasContent: true` 且 `strategy: 'scene-traverse'`
+- [x] **測試**: 確認 NPP3 模型的 GLB mesh 正確顯示在場景中
+- [x] **測試**: 確認 `activeGeologyModelId` 正確設定
 
 **相關檔案**:
 
@@ -132,16 +143,16 @@ Password: postgres
 
 **問題**: `fetchGeologyModels()` 載入模型列表後，可能沒有自動設定 `activeGeologyModelId`。需要確認載入後是否自動選取第一個模型。
 
-- [ ] **檢查**: `uploadStore.fetchGeologyModels()` 完成後是否自動 `setActiveGeologyModelId`
-- [ ] **如果沒有**: 在 `fetchGeologyModels` 完成時，自動將第一個模型設為 active
-- [ ] **如果有但失敗**: 檢查 API response 格式是否與預期一致
+- [x] **檢查**: `uploadStore.fetchGeologyModels()` 完成後是否自動 `setActiveGeologyModelId`
+- [x] **如果沒有**: 在 `fetchGeologyModels` 完成時，自動將第一個模型設為 active
+- [x] **如果有但失敗**: 檢查 API response 格式是否與預期一致
 
 **相關檔案**:
 
 - `src/stores/uploadStore.ts`
 - `server/routes/geology-model.ts`
 
-#### 3. 相機重置精確度優化
+#### 3. 相機重置精確度優化 （這一點可以暫時略過，目前功能符合需求）
 
 **背景**: 目前 `scene.traverse()` 會掃描所有可見物件包含 DEM 地形 (約 2000m 寬)，若用戶只想 focus 在地質模型上，可能需要更精確的控制。
 
@@ -153,7 +164,7 @@ Password: postgres
 - `src/components/scene/CameraController.tsx`
 - `src/stores/cameraStore.ts`
 
-#### 4. 斷層面功能完善
+#### 4. 斷層面功能完善 （這一點可以暫時略過，目前目前功能符合需求）
 
 - [ ] **3D 視覺增強**: 增加斷層名稱標籤 (Html Label) 與傾向指示箭頭
 - [ ] **批次匯入驗證**: 使用實際大量資料測試 CSV 解析與匯入效能
@@ -163,11 +174,10 @@ Password: postgres
 
 #### 5. 資料管理 UX 優化
 
-- [ ] **UI**: 批次上傳功能 (多檔案同時上傳)
-- [ ] **UI**: 上傳進度條 (Progress Bar) 取代 spinner
-- [ ] **Feature**: 地質模型版本切換 (Version Control)
-- [ ] **Feature**: 地球物理探查詳細資料 Modal 新增「在 3D 場景中定位」按鈕
-- [ ] **UI**: 各個 Upload Section 統一固定表格高度 + Sticky Header (已完成位態部分)
+- [x] **UI**: 上傳進度條 (Progress Bar) 取代 spinner — 使用 XMLHttpRequest 追蹤真實上傳進度
+- [x] **Feature**: 地質模型版本切換 (Version Control) — 已有 activate/deactivate UI
+- [x] **Feature**: 地球物理探查詳細資料 Modal 新增「在 3D 場景中定位」按鈕 — flyTo cameraStore + 導航
+- [x] **UI**: 各個 Upload Section 統一固定表格高度 + Sticky Header (BH/Attitude/FaultPlane 全部完成)
 
 #### 6. 岩性系統整合
 
@@ -182,6 +192,8 @@ Password: postgres
 - [ ] 大型 GLB 檔案的 LOD 支援
 - [ ] 縮圖 Lazy Loading
 - [ ] `StrikeDipSymbol` InstancedMesh 化 (目前 100 個個別 mesh 物件)
+- [ ] **Terrain LOD**: 針對超大範圍地形實作 Chunk LOD 機制
+- [ ] **Terrain Interaction**: 實作 Raycasting 取得地形上一點的座標與高度
 
 #### 8. 新模組開發
 

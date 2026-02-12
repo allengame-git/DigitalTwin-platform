@@ -6,8 +6,8 @@
  * 權限：admin/engineer only
  */
 
-import React, { useEffect, useState, useRef } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
     useUploadStore,
@@ -23,18 +23,23 @@ import { setOrigin } from '../utils/coordinates';
 import { BoreholeUploadSection } from '../components/data/BoreholeUploadSection';
 import { FaultPlaneUploadSection } from '../components/data/FaultPlaneUploadSection';
 import { AttitudeUploadSection } from '../components/data/AttitudeUploadSection';
+import { TerrainUploadSection } from '../components/data/TerrainUploadSection';
 import LithologySection from '../components/data/LithologySection';
 import { useLithologyStore } from '../stores/lithologyStore';
+import { useCameraStore } from '../stores/cameraStore';
+import { twd97ToWorld } from '../utils/coordinates';
 
 
 export const DataManagementPage: React.FC = () => {
     const { user } = useAuth();
     const { projectCode } = useParams<{ projectCode: string }>();
+    const navigate = useNavigate();
     const {
         imageryFiles,
         geophysicsFiles,
         geologyModels,
         isUploading,
+        uploadProgress,
         uploadError,
         fetchImageryFiles,
         fetchGeophysicsFiles,
@@ -62,6 +67,15 @@ export const DataManagementPage: React.FC = () => {
         activeProject.originY !== 0 &&
         lithologies.length > 0;
 
+    // Toast Notification State
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+    const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        setToast({ message, type });
+        toastTimerRef.current = setTimeout(() => setToast(null), 3500);
+    }, []);
+
     // Project Settings State
     const [originForm, setOriginForm] = useState({ x: '', y: '' });
     const [isSavingOrigin, setIsSavingOrigin] = useState(false);
@@ -82,7 +96,7 @@ export const DataManagementPage: React.FC = () => {
         const y = parseFloat(originForm.y);
 
         if (isNaN(x) || isNaN(y)) {
-            alert('請輸入有效的數字');
+            showToast('請輸入有效的數字', 'error');
             return;
         }
 
@@ -95,13 +109,13 @@ export const DataManagementPage: React.FC = () => {
 
             if (updated) {
                 setOrigin(x, y);
-                alert('專案座標設定已更新');
+                showToast('專案座標設定已更新', 'success');
             } else {
-                alert('更新失敗');
+                showToast('更新失敗', 'error');
             }
         } catch (error) {
             console.error('Update origin error:', error);
-            alert('更新時發生錯誤');
+            showToast('更新時發生錯誤', 'error');
         } finally {
             setIsSavingOrigin(false);
         }
@@ -200,9 +214,6 @@ export const DataManagementPage: React.FC = () => {
         name: '',
         description: '',
         sourceData: '',
-        cellSizeX: '',
-        cellSizeY: '',
-        cellSizeZ: '',
     });
     const [geoModelFormErrors, setGeoModelFormErrors] = useState<Record<string, string>>({});
     const geoModelInputRef = useRef<HTMLInputElement>(null);
@@ -215,12 +226,12 @@ export const DataManagementPage: React.FC = () => {
         const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
 
         if (!allowedExts.includes(ext)) {
-            alert('不支援的檔案格式。只接受 JPG, PNG, TIF');
+            showToast('不支援的檔案格式。只接受 JPG, PNG, TIF', 'error');
             return;
         }
 
         if (file.size > 50 * 1024 * 1024) {
-            alert('檔案大小超過 50MB 限制');
+            showToast('檔案大小超過 50MB 限制', 'error');
             return;
         }
 
@@ -329,11 +340,11 @@ export const DataManagementPage: React.FC = () => {
         const allowedExts = ['.jpg', '.jpeg', '.png', '.tif', '.tiff'];
         const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
         if (!allowedExts.includes(ext)) {
-            alert('不支援的檔案格式。只接受 JPG, PNG, TIF');
+            showToast('不支援的檔案格式。只接受 JPG, PNG, TIF', 'error');
             return;
         }
         if (file.size > 50 * 1024 * 1024) {
-            alert('檔案大小超過 50MB 限制');
+            showToast('檔案大小超過 50MB 限制', 'error');
             return;
         }
         setGeoFile(file);
@@ -407,14 +418,14 @@ export const DataManagementPage: React.FC = () => {
     // 3D 地質模型 Handlers
     // ===============================
     const handleGeoModelFileSelect = (file: File) => {
-        const allowedExts = ['.csv', '.json'];
+        const allowedExts = ['.dat'];
         const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
         if (!allowedExts.includes(ext)) {
-            alert('不支援的檔案格式。只接受 CSV 或 JSON');
+            showToast('不支援的檔案格式。只接受 Tecplot DAT 檔案', 'error');
             return;
         }
-        if (file.size > 100 * 1024 * 1024) {
-            alert('檔案大小超過 100MB 限制');
+        if (file.size > 200 * 1024 * 1024) {
+            showToast('檔案大小超過 200MB 限制', 'error');
             return;
         }
         setGeoModelFile(file);
@@ -448,7 +459,8 @@ export const DataManagementPage: React.FC = () => {
 
     const handleGeoModelSubmit = async () => {
         if (!geoModelFile || !validateGeoModelForm()) return;
-        await uploadGeologyModel(geoModelFile, geoModelFormData);
+        const submitData = { ...geoModelFormData };
+        await uploadGeologyModel(geoModelFile, submitData);
         if (!uploadError) {
             setShowGeoModelForm(false);
             setGeoModelFile(null);
@@ -458,9 +470,6 @@ export const DataManagementPage: React.FC = () => {
                 name: '',
                 description: '',
                 sourceData: '',
-                cellSizeX: '',
-                cellSizeY: '',
-                cellSizeZ: '',
             });
         }
     };
@@ -1129,16 +1138,10 @@ export const DataManagementPage: React.FC = () => {
                     </section>
 
                     {/* Other sections... */}
-                    <section className="dm-section">
-                        <div className="dm-section-header">
-                            <div className="dm-section-icon" style={{ background: '#dcfce7' }}>⛰️</div>
-                            <div>
-                                <h2 className="dm-section-title">DEM 地形資料</h2>
-                                <p className="dm-section-desc">高程模型資料管理</p>
-                            </div>
-                        </div>
-                        <div className="dm-coming-soon">🚧 功能開發中</div>
-                    </section>
+                    {/* GeoTIFF / DEM 地形資料管理 */}
+                    <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                        <TerrainUploadSection />
+                    </div>
                 </div>
 
                 {/* 3D 地質模型 */}
@@ -1148,7 +1151,7 @@ export const DataManagementPage: React.FC = () => {
                             <div className="dm-section-icon" style={{ background: '#dcfce7' }}>🧊</div>
                             <div>
                                 <h2 className="dm-section-title">3D 地質模型</h2>
-                                <p className="dm-section-desc">Voxel 地質模型版本管理 (CSV 格式: x,y,z,lith_id)</p>
+                                <p className="dm-section-desc">3D 地質模型版本管理 (CSV / Tecplot DAT 格式)</p>
                             </div>
                         </div>
 
@@ -1163,15 +1166,15 @@ export const DataManagementPage: React.FC = () => {
                                 type="file"
                                 ref={geoModelInputRef}
                                 style={{ display: 'none' }}
-                                accept=".csv,.json"
+                                accept=".dat"
                                 onChange={handleGeoModelInputChange}
                             />
                             <div className="dm-upload-icon">📤</div>
                             <div className="dm-upload-text">
-                                拖曳或點擊上傳 Voxel 資料
+                                拖曳或點擊上傳 Tecplot 地質模型
                             </div>
                             <div className="dm-upload-hint">
-                                支援 CSV 或 JSON 格式，最大 100MB
+                                支援 Tecplot DAT 格式 (FETetrahedron)，最大 200MB
                             </div>
                         </div>
 
@@ -1389,8 +1392,24 @@ export const DataManagementPage: React.FC = () => {
                         </div>
 
                         <div className="dm-modal-footer">
-                            <button className="dm-btn dm-btn-secondary" onClick={handleCancelUpload}>取消</button>
-                            <button className="dm-btn dm-btn-primary" onClick={handleSubmit} disabled={isUploading}>{isUploading ? '上傳中...' : '上傳'}</button>
+                            {isUploading ? (
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
+                                        <span>上傳中...</span>
+                                        <span>{uploadProgress}%</span>
+                                    </div>
+                                    <div className="dm-progress-container" style={{ marginTop: 0 }}>
+                                        <div className="dm-progress-bar" style={{ width: `${Math.max(2, uploadProgress)}%` }}>
+                                            <div className="dm-progress-shimmer"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <button className="dm-btn dm-btn-secondary" onClick={handleCancelUpload}>取消</button>
+                                    <button className="dm-btn dm-btn-primary" onClick={handleSubmit}>上傳</button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1582,10 +1601,24 @@ export const DataManagementPage: React.FC = () => {
                             </div>
                         </div>
                         <div className="dm-modal-footer">
-                            <button className="dm-btn dm-btn-secondary" onClick={handleCancelGeoUpload}>取消</button>
-                            <button className="dm-btn dm-btn-primary" onClick={handleGeoSubmit} disabled={isUploading}>
-                                {isUploading ? '上傳中...' : '上傳'}
-                            </button>
+                            {isUploading ? (
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
+                                        <span>上傳中...</span>
+                                        <span>{uploadProgress}%</span>
+                                    </div>
+                                    <div className="dm-progress-container" style={{ marginTop: 0 }}>
+                                        <div className="dm-progress-bar" style={{ width: `${Math.max(2, uploadProgress)}%` }}>
+                                            <div className="dm-progress-shimmer"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <button className="dm-btn dm-btn-secondary" onClick={handleCancelGeoUpload}>取消</button>
+                                    <button className="dm-btn dm-btn-primary" onClick={handleGeoSubmit}>上傳</button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1645,6 +1678,25 @@ export const DataManagementPage: React.FC = () => {
                             )}
                         </div>
                         <div className="dm-modal-footer">
+                            <button
+                                className="dm-btn dm-btn-secondary"
+                                style={{ marginRight: 'auto', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}
+                                onClick={() => {
+                                    const g = selectedGeoDetail;
+                                    const midX = (Number(g.x1) + Number(g.x2)) / 2;
+                                    const midY = (Number(g.y1) + Number(g.y2)) / 2;
+                                    const midZ = (Number(g.z1) + Number(g.z2)) / 2;
+                                    const world = twd97ToWorld({ x: midX, y: midY, z: midZ });
+                                    // Camera offset: look from above and slightly offset
+                                    const camPos: [number, number, number] = [world.x + 50, world.y + 80, world.z + 50];
+                                    const lookAt: [number, number, number] = [world.x, world.y, world.z];
+                                    useCameraStore.getState().flyTo({ position: camPos, lookAt });
+                                    setShowGeoDetail(false);
+                                    if (projectCode) navigate(`/project/${projectCode}`);
+                                }}
+                            >
+                                在 3D 場景中定位
+                            </button>
                             <button className="dm-btn dm-btn-primary" onClick={() => setShowGeoDetail(false)}>關閉</button>
                         </div>
                     </div>
@@ -1664,6 +1716,7 @@ export const DataManagementPage: React.FC = () => {
                                 <div style={{ fontWeight: 500, color: '#1f2937' }}>{geoModelFile.name}</div>
                                 <div style={{ fontSize: 12, color: '#94a3b8' }}>{formatFileSize(geoModelFile.size)}</div>
                             </div>
+
 
                             {/* 必填欄位 */}
                             <div className="dm-form-row">
@@ -1724,27 +1777,27 @@ export const DataManagementPage: React.FC = () => {
                                 />
                             </div>
 
-                            {/* 網格解析度 (選填) */}
-                            <div style={{ marginTop: '16px', padding: '12px', background: '#f8fafc', borderRadius: '8px' }}>
-                                <label className="dm-form-label" style={{ marginBottom: '8px', display: 'block' }}>網格解析度 (選填)</label>
-                                <div className="dm-form-row">
-                                    <div className="dm-form-group">
-                                        <input type="text" className="dm-form-input" placeholder="X (m)" value={geoModelFormData.cellSizeX || ''} onChange={e => setGeoModelFormData({ ...geoModelFormData, cellSizeX: e.target.value })} />
-                                    </div>
-                                    <div className="dm-form-group">
-                                        <input type="text" className="dm-form-input" placeholder="Y (m)" value={geoModelFormData.cellSizeY || ''} onChange={e => setGeoModelFormData({ ...geoModelFormData, cellSizeY: e.target.value })} />
-                                    </div>
-                                    <div className="dm-form-group">
-                                        <input type="text" className="dm-form-input" placeholder="Z (m)" value={geoModelFormData.cellSizeZ || ''} onChange={e => setGeoModelFormData({ ...geoModelFormData, cellSizeZ: e.target.value })} />
-                                    </div>
-                                </div>
-                            </div>
+
                         </div>
                         <div className="dm-modal-footer">
-                            <button className="dm-btn dm-btn-secondary" onClick={handleCancelGeoModelUpload}>取消</button>
-                            <button className="dm-btn dm-btn-primary" onClick={handleGeoModelSubmit} disabled={isUploading}>
-                                {isUploading ? '上傳中...' : '上傳'}
-                            </button>
+                            {isUploading ? (
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
+                                        <span>上傳中...</span>
+                                        <span>{uploadProgress}%</span>
+                                    </div>
+                                    <div className="dm-progress-container" style={{ marginTop: 0 }}>
+                                        <div className="dm-progress-bar" style={{ width: `${Math.max(2, uploadProgress)}%` }}>
+                                            <div className="dm-progress-shimmer"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <button className="dm-btn dm-btn-secondary" onClick={handleCancelGeoModelUpload}>取消</button>
+                                    <button className="dm-btn dm-btn-primary" onClick={handleGeoModelSubmit}>上傳</button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1767,6 +1820,45 @@ export const DataManagementPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 24,
+                        right: 24,
+                        zIndex: 10000,
+                        padding: '14px 24px',
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: '#fff',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                        animation: 'dm-toast-in 0.3s ease-out',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        maxWidth: '420px',
+                        background: toast.type === 'success'
+                            ? 'linear-gradient(135deg, #059669, #10b981)'
+                            : toast.type === 'error'
+                                ? 'linear-gradient(135deg, #dc2626, #ef4444)'
+                                : 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                    }}
+                    onClick={() => setToast(null)}
+                >
+                    <span>{toast.type === 'success' ? '✓' : toast.type === 'error' ? '!' : 'i'}</span>
+                    <span>{toast.message}</span>
+                </div>
+            )}
+
+            <style>{`
+                @keyframes dm-toast-in {
+                    from { opacity: 0; transform: translateX(40px); }
+                    to   { opacity: 1; transform: translateX(0); }
+                }
+            `}</style>
         </div>
     );
 };

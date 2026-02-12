@@ -1,6 +1,3 @@
-// Prisma Schema for DigitalTwin Platform
-// https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,29 +8,23 @@ datasource db {
 
 /// 專案
 model Project {
-  id           String   @id @default(uuid())
-  name         String   @unique    // 專案名稱
-  code         String   @unique    // 專案代碼 (URL-friendly)
-  description  String?
-  
-  // TWD97 座標原點 (場景中心)
-  originX      Float    @default(224000)
-  originY      Float    @default(2429000)
-  
-  // 專案狀態
-  isActive     Boolean  @default(true)
-  
-  // 關聯資料
-  geologyModels GeologyModel[]
-  imagery       Imagery[]
-  geophysics    Geophysics[]
-  boreholes     Borehole[]
-  lithologies   ProjectLithology[]
-  faultPlanes   FaultPlane[]
+  id            String             @id @default(uuid())
+  name          String             @unique
+  code          String             @unique
+  description   String?
+  originX       Float              @default(224000)
+  originY       Float              @default(2429000)
+  isActive      Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
   attitudes     Attitude[]
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  boreholes     Borehole[]
+  faultPlanes   FaultPlane[]
+  geologyModels GeologyModel[]
+  geophysics    Geophysics[]
+  imagery       Imagery[]
+  lithologies   ProjectLithology[]
+  terrains      Terrain[]
 
   @@map("projects")
 }
@@ -42,15 +33,13 @@ model Project {
 model ProjectLithology {
   id        String   @id @default(uuid())
   projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  lithId    Int      // 岩性 ID (用於 voxel 資料)
-  code      String   // 岩性代碼 (e.g., CL, SM)
-  name      String   // 中文名稱 (e.g., 黏土)
-  color     String   // Hex 顏色 (e.g., #8b4513)
-  
+  lithId    Int
+  code      String
+  name      String
+  color     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, code])
   @@unique([projectId, lithId])
@@ -62,32 +51,21 @@ model Imagery {
   id           String   @id @default(uuid())
   filename     String   @unique
   originalName String?
-  
-  // Metadata (必填)
-  year         Int      // 資料年份
-  name         String   // 資料名稱
-  
-  // Metadata (選填)
-  source       String?  // 資料來源
-  description  String?  // 資料說明
-  
-  // 地理定位資訊 (Optional - 可自動解析或手動輸入)
-  minX         Float?
-  maxX         Float?
-  minY         Float?
-  maxY         Float?
-  
-  // 檔案資訊
+  year         Int
+  name         String
+  source       String?
+  description  String?
   size         Int
   url          String
   thumbnailUrl String
-  
-  // 專案關聯
-  projectId    String?
-  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  maxX         Float?
+  maxY         Float?
+  minX         Float?
+  minY         Float?
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("imagery")
 }
@@ -97,122 +75,87 @@ model Geophysics {
   id           String   @id @default(uuid())
   filename     String   @unique
   originalName String?
-  
-  // Metadata
-  year         Int              // 資料年份 (必填)
-  name         String           // 資料名稱 (必填)
-  lineId       String?          // 測線編號
-  method       String           // 探查方法 (必填: ERT/GPR/Seismic)
-  description  String?          // 資料說明
-  
-  // 左端點座標 - TWD97 (必填, 公尺)
+  year         Int
+  name         String
+  lineId       String?
+  method       String
+  description  String?
   x1           Float
   y1           Float
   z1           Float
-  
-  // 右端點座標 - TWD97 (必填, 公尺)
   x2           Float
   y2           Float
   z2           Float
-  
-  // 深度範圍 (可選 - 未填則依圖片比例換算)
-  depthTop     Float?           // 剖面頂部深度 (預設 0)
-  depthBottom  Float?           // 剖面底部深度
-  
-  // 檔案資訊
+  depthTop     Float?
+  depthBottom  Float?
   size         Int
   url          String
   thumbnailUrl String
-  
-  // 專案關聯
-  projectId    String?
-  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("geophysics")
 }
 
 /// 3D 地質模型 (Voxel 資料)
 model GeologyModel {
-  id           String   @id @default(uuid())
-  filename     String   @unique    // 儲存的檔名
-  originalName String?             // 上傳時原始檔名
-  
-  // Metadata
-  version      String              // 版本號 e.g. "v1.0"
-  year         Int                 // 資料年份
-  name         String              // 模型名稱
-  description  String?             // 說明
-  sourceData   String?             // 資料來源 e.g. "GemPy 模擬"
-  
-  // 網格資訊
-  cellSizeX    Float?              // X 方向解析度 (m)
-  cellSizeY    Float?              // Y 方向解析度 (m)
-  cellSizeZ    Float?              // Z 方向解析度 (m)
-  
-  // 空間範圍 (TWD97, 公尺)
-  minX         Float?
-  maxX         Float?
-  minY         Float?
-  maxY         Float?
-  minZ         Float?
-  maxZ         Float?
-  
-  // 檔案資訊
-  tilesetUrl   String?             // 舊版: 3D Tiles tileset.json 路徑
-  meshUrl      String?             // 新版: GLB mesh 路徑
-  meshFormat   String?             // 格式: 'glb' | 'pnts'
-  size         Int                 // 檔案大小 (bytes)
-  
-  // 轉換狀態: pending | processing | completed | failed
-  conversionStatus String @default("pending")
-  conversionProgress Int @default(0) // 0-100
-  conversionError  String?
-  
-  // 版本控制
-  isActive     Boolean @default(false)
-  
-  // 專案關聯
-  projectId    String?
-  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  filename           String   @unique
+  originalName       String?
+  version            String
+  year               Int
+  name               String
+  description        String?
+  sourceData         String?
+  cellSizeX          Float?
+  cellSizeY          Float?
+  cellSizeZ          Float?
+  minX               Float?
+  maxX               Float?
+  minY               Float?
+  maxY               Float?
+  minZ               Float?
+  maxZ               Float?
+  tilesetUrl         String?
+  size               Int
+  conversionStatus   String   @default("pending")
+  conversionError    String?
+  isActive           Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  conversionProgress Int      @default(0)
+  meshFormat         String?
+  meshUrl            String?
+  projectId          String?
+  demFilePath        String?
+  demOriginalName    String?
+  project            Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("geology_models")
 }
 
 /// 鑽孔資料
 model Borehole {
-  id           String   @id @default(uuid())
-  boreholeNo   String              // 鑽孔編號 (e.g. BH-001)
-  name         String?             // 鑽孔名稱
-  
-  // TWD97 座標 (公尺)
-  x            Float               // X 座標
-  y            Float               // Y 座標
-  elevation    Float               // 孔口高程
-  totalDepth   Float               // 總深度
-  
-  // Metadata
-  drilledDate  DateTime?           // 鑽探日期
-  contractor   String?             // 鑽探單位
-  area         String?             // 所屬區域
-  description  String?             // 備註
-  
-  // 關聯資料
-  layers       BoreholeLayer[]
-  properties   BoreholeProperty[]
-  photos       BoreholePhoto[]
-  
-  // 專案關聯
-  projectId    String?
-  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String             @id @default(uuid())
+  boreholeNo  String
+  name        String?
+  x           Float
+  y           Float
+  elevation   Float
+  totalDepth  Float
+  drilledDate DateTime?
+  contractor  String?
+  area        String?
+  description String?
+  projectId   String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  layers      BoreholeLayer[]
+  photos      BoreholePhoto[]
+  properties  BoreholeProperty[]
+  project     Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, boreholeNo])
   @@map("boreholes")
@@ -220,32 +163,28 @@ model Borehole {
 
 /// 鑽孔地層資料
 model BoreholeLayer {
-  id           String   @id @default(uuid())
-  boreholeId   String
-  borehole     Borehole @relation(fields: [boreholeId], references: [id], onDelete: Cascade)
-  
-  topDepth     Float               // 頂深 (公尺)
-  bottomDepth  Float               // 底深 (公尺)
-  lithologyCode String             // 岩性代碼
-  lithologyName String?            // 岩性名稱
-  description  String?             // 地層描述
-  
-  createdAt    DateTime @default(now())
+  id            String   @id @default(uuid())
+  boreholeId    String
+  topDepth      Float
+  bottomDepth   Float
+  lithologyCode String
+  lithologyName String?
+  description   String?
+  createdAt     DateTime @default(now())
+  borehole      Borehole @relation(fields: [boreholeId], references: [id], onDelete: Cascade)
 
   @@map("borehole_layers")
 }
 
 /// 鑽孔物性資料
 model BoreholeProperty {
-  id           String   @id @default(uuid())
-  boreholeId   String
-  borehole     Borehole @relation(fields: [boreholeId], references: [id], onDelete: Cascade)
-  
-  depth        Float               // 取樣深度 (公尺)
-  nValue       Int?                // SPT N 值
-  rqd          Float?              // RQD (%)
-  
-  createdAt    DateTime @default(now())
+  id         String   @id @default(uuid())
+  boreholeId String
+  depth      Float
+  nValue     Int?
+  rqd        Float?
+  createdAt  DateTime @default(now())
+  borehole   Borehole @relation(fields: [boreholeId], references: [id], onDelete: Cascade)
 
   @@map("borehole_properties")
 }
@@ -254,71 +193,86 @@ model BoreholeProperty {
 model BoreholePhoto {
   id           String   @id @default(uuid())
   boreholeId   String
-  borehole     Borehole @relation(fields: [boreholeId], references: [id], onDelete: Cascade)
-  
-  depth        Float               // 對應深度 (公尺)
-  url          String              // 圖片 URL
-  thumbnailUrl String              // 縮圖 URL
-  caption      String?             // 備註
-  
+  depth        Float
+  url          String
+  thumbnailUrl String
+  caption      String?
   createdAt    DateTime @default(now())
+  borehole     Borehole @relation(fields: [boreholeId], references: [id], onDelete: Cascade)
 
   @@map("borehole_photos")
 }
 
 /// 斷層面資料
 model FaultPlane {
-  id             String   @id @default(uuid())
-  name           String                         // 斷層名稱
-  type           String                         // normal | reverse | strike-slip
-  dipAngle       Float                          // 傾角 (度)
-  dipDirection   Float                          // 傾向 (度)
-  depth          Float                          // 向下延伸深度 (m)
-  color          String   @default("#ff4444")   // 顯示顏色
-
-  // 關聯座標點
-  coordinates    FaultCoordinate[]
-
-  // 專案關聯 (必填)
-  projectId      String
-  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id           String            @id @default(uuid())
+  name         String
+  type         String
+  dipAngle     Float
+  dipDirection Float
+  depth        Float
+  color        String            @default("#ff4444")
+  projectId    String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  coordinates  FaultCoordinate[]
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("fault_planes")
 }
 
 /// 斷層座標點
 model FaultCoordinate {
-  id           String   @id @default(uuid())
+  id           String     @id @default(uuid())
   faultPlaneId String
-  faultPlane   FaultPlane @relation(fields: [faultPlaneId], references: [id], onDelete: Cascade)
-
-  // TWD97 座標 (公尺)
   x            Float
   y            Float
-  z            Float           // 高程 / 深度
-  sortOrder    Int             // 座標點順序
+  z            Float
+  sortOrder    Int
+  faultPlane   FaultPlane @relation(fields: [faultPlaneId], references: [id], onDelete: Cascade)
 
   @@map("fault_coordinates")
 }
 
 /// 位態資料 (Strike/Dip)
 model Attitude {
-  id             String   @id @default(uuid())
-  projectId      String
-  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  x              Float               // TWD97 X
-  y              Float               // TWD97 Y
-  z              Float               // 高程 (m)
-  strike         Float               // 走向 (0-360)
-  dip            Float               // 傾角 (0-90)
-  dipDirection   String?             // 傾向 (N/NE/E/SE/S/SW/W/NW)
-  description    String?             // 備註
-
-  createdAt      DateTime @default(now())
+  id           String   @id @default(uuid())
+  projectId    String
+  x            Float
+  y            Float
+  z            Float
+  strike       Float
+  dip          Float
+  dipDirection String?
+  description  String?
+  createdAt    DateTime @default(now())
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("attitudes")
+}
+
+/// 地形資料 (DEM)
+model Terrain {
+  id           String   @id @default(uuid())
+  projectId    String
+  name         String
+  filename     String   @unique
+  originalName String?
+  path         String
+  heightmap    String
+  texture      String?
+  minX         Float
+  maxX         Float
+  minY         Float
+  maxY         Float
+  minZ         Float
+  maxZ         Float
+  width        Int
+  height       Int
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("terrains")
 }

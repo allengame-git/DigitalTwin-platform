@@ -4,26 +4,32 @@
  */
 
 import React from 'react';
+import { useParams } from 'react-router-dom';
 import { GeologyCanvas } from '../components/scene/GeologyCanvas';
 import { GeologyErrorBoundary } from '../components/scene/GeologyErrorBoundary';
 import { InspectorPanel } from '../components/overlay/InspectorPanel';
 import { GeologySidebar } from '../components/layout/GeologySidebar';
-import { useParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore';
+import { useLithologyStore } from '../stores/lithologyStore';
+import { useTerrainStore } from '../stores/terrainStore';
 
 export const GeologyPage: React.FC = () => {
     const { projectCode } = useParams<{ projectCode: string }>();
     const { projects, setActiveProject } = useProjectStore();
+    const { fetchLithologies } = useLithologyStore();
+    const { fetchTerrains } = useTerrainStore();
 
-    // 同步專案狀態
+    // 同步專案狀態與岩性資料 / 地形資料
     React.useEffect(() => {
         if (projectCode) {
             const project = projects.find(p => p.code === projectCode);
             if (project) {
                 setActiveProject(project.id);
+                fetchLithologies(project.id); // 確保獲取岩性設定，支援 3D 模型動態上色
+                fetchTerrains(project.id);    // 獲取地形資料
             }
         }
-    }, [projectCode, projects, setActiveProject]);
+    }, [projectCode, projects, setActiveProject, fetchLithologies, fetchTerrains]);
 
     return (
         <div style={{ width: '100vw', height: '100vh', display: 'flex', overflow: 'hidden' }}>

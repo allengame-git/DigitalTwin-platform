@@ -15,6 +15,7 @@ import { ModelVersionSelector } from '../controls/ModelVersionSelector';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProjectStore } from '../../stores/projectStore';
 import { setOrigin } from '../../utils/coordinates';
+import { TerrainLegendControl } from '../controls/TerrainLegendControl';
 
 interface LayerPanelProps {
     position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -345,6 +346,9 @@ const SettingsTab: React.FC = () => {
             {/* Auto LOD Toggle */}
             <AutoLodToggle />
 
+            {/* Fog Toggle */}
+            <FogToggle />
+
             {/* Background Color Picker */}
             <BackgroundColorPicker />
 
@@ -371,7 +375,11 @@ const SettingsTab: React.FC = () => {
                     <span style={{ fontSize: '18px' }}>→</span>
                 </button>
                 <ImagerySelector isOpen={imageryOpen} onClose={() => setImageryOpen(false)} />
+                <ImagerySelector isOpen={imageryOpen} onClose={() => setImageryOpen(false)} />
             </div>
+
+            {/* Terrain Legend Control */}
+            <TerrainLegendControl />
 
             {/* Model Management Link */}
             <div style={{ marginTop: '12px' }}>
@@ -469,6 +477,37 @@ const AutoLodToggle: React.FC = () => {
                     type="checkbox"
                     checked={config.autoLOD}
                     onChange={(e) => handleToggle(e.target.checked)}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+            </label>
+        </div>
+    );
+};
+
+// Sub-component for Fog
+const FogToggle: React.FC = () => {
+    const { config, setConfig } = useViewerStore();
+
+    return (
+        <div style={{
+            marginTop: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+        }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+                    🌫️ 霧氣效果
+                </span>
+                <span style={{ fontSize: '10px', color: '#9ca3af' }}>
+                    {config.showFog ? '開啟遠景霧化' : '關閉霧化 (視覺較清晰)'}
+                </span>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                    type="checkbox"
+                    checked={config.showFog}
+                    onChange={(e) => setConfig({ showFog: e.target.checked })}
                     style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
             </label>

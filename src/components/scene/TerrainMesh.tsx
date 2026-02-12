@@ -3,88 +3,165 @@
  * @module components/scene/TerrainMesh
  * 
  * DEM 地形網格
- * Task: T043c
+ * Task: T043c (Real DEM Integration)
  */
 
 import React, { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useLayerStore } from '../../stores/layerStore';
 import { useViewerStore } from '../../stores/viewerStore';
-import { generateMockElevation } from '../../utils/terrain';
+import { useTerrainStore } from '../../stores/terrainStore';
+import { useProjectStore } from '../../stores/projectStore';
+import { useLoader, useFrame } from '@react-three/fiber';
+import { generateColorRampTexture } from '../../utils/colorRamps';
 
-interface TerrainMeshProps {
-    width?: number;
-    height?: number;
-    widthSegments?: number;
-    heightSegments?: number;
-    maxElevation?: number;
-    position?: [number, number, number];
-}
-
-export function TerrainMesh({
-    width = 2000,
-    height = 2000,
-    widthSegments = 64,
-    heightSegments = 64,
-    maxElevation = 300,
-    position = [0, -2, 0],
-}: TerrainMeshProps) {
-    const { layers } = useLayerStore();
+export function TerrainMesh() {
+    const { layers, terrainSettings } = useLayerStore();
     const terrainLayer = layers.terrain;
+    const { getActiveProject } = useProjectStore();
+    const project = getActiveProject();
+
+    // Clipping
     const clippingConfig = useViewerStore(state => state.clippingPlane);
+
+    // Data
+    const { terrains, activeTerrainId } = useTerrainStore();
+    const activeTerrain = useMemo(() =>
+        terrains.find(t => t.id === activeTerrainId),
+        [terrains, activeTerrainId]);
+
     const meshRef = useRef<THREE.Mesh>(null);
+    const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+    const shaderRef = useRef<THREE.Shader>(null);
 
-    // 建立地形幾何
-    const geometry = useMemo(() => {
-        const geo = new THREE.PlaneGeometry(width, height, widthSegments, heightSegments);
-        geo.rotateX(-Math.PI / 2);
+    // API Base URL (Fallback to localhost if env not set)
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-        // 應用高程
-        const elevations = generateMockElevation(widthSegments, heightSegments, maxElevation);
-        const positions = geo.attributes.position.array as Float32Array;
+    // Generate Color Ramp Texture
+    const rampTexture = useMemo(() => {
+        return generateColorRampTexture(terrainSettings.colorRamp, terrainSettings.reverse);
+    }, [terrainSettings.colorRamp, terrainSettings.reverse]);
 
-        for (let i = 0; i < elevations.length; i++) {
-            // Y 軸是高度 (因為已經旋轉過)
-            positions[i * 3 + 1] = elevations[i];
+    // Load textures if terrain exists
+    // Note: useLoader might suspend, better to handle gracefully or use TextureLoader manually if inside a non-Suspense tree.
+    // Here we assume Suspense is available up tree or we accept the suspend.
+    const [heightMap, textureMap] = useLoader(THREE.TextureLoader, [
+        activeTerrain?.heightmap ? `${API_BASE}${activeTerrain.heightmap}` : '',
+        activeTerrain?.texture ? `${API_BASE}${activeTerrain.texture}` : ''
+    ].filter(Boolean) as string[]);
+
+    // If no active terrain or visible is false, return null
+    if (!terrainLayer.visible || !activeTerrain) return null;
+
+    // Update Uniforms
+    useFrame(() => {
+        if (shaderRef.current) {
+            shaderRef.current.uniforms.uMinZ.value = terrainSettings.minZ;
+            shaderRef.current.uniforms.uMaxZ.value = terrainSettings.maxZ;
+            shaderRef.current.uniforms.uRamp.value = rampTexture;
         }
+    });
 
-        geo.computeVertexNormals();
-        return geo;
-    }, [width, height, widthSegments, heightSegments, maxElevation]);
+    // Custom Shader Logic
+    const onBeforeCompile = (shader: THREE.Shader) => {
+        shaderRef.current = shader;
 
-    // Clipping setup
-    const clippingPlanes = useMemo(() => {
-        if (!clippingConfig.enabled) return [];
-        return [new THREE.Plane(new THREE.Vector3(...clippingConfig.normal), clippingConfig.constant)];
-    }, [clippingConfig]);
+        shader.uniforms.uRamp = { value: rampTexture };
+        shader.uniforms.uMinZ = { value: terrainSettings.minZ };
+        shader.uniforms.uMaxZ = { value: terrainSettings.maxZ };
 
-    // 材質
-    const material = useMemo(() => {
-        return new THREE.MeshStandardMaterial({
-            color: 0x7c9a6e,
-            roughness: 0.9,
-            metalness: 0.1,
-            flatShading: false,
-            transparent: terrainLayer.opacity < 1,
-            opacity: terrainLayer.opacity,
-            side: THREE.DoubleSide,
-            clippingPlanes: clippingPlanes,
-            clipShadows: true,
-        });
-    }, [terrainLayer.opacity, clippingPlanes]);
+        // Vertex Shader: Pass height to Fragment Shader
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <common>',
+            `
+            #include <common>
+            varying float vMyHeight;
+            `
+        );
 
-    if (!terrainLayer.visible) return null;
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <displacementmap_vertex>',
+            `
+            #include <displacementmap_vertex>
+            vMyHeight = transformed.z;
+            `
+        );
+
+        // Fragment Shader: Map height to color
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <common>',
+            `
+            #include <common>
+            uniform sampler2D uRamp;
+            uniform float uMinZ;
+            uniform float uMaxZ;
+            varying float vMyHeight;
+            `
+        );
+
+        // Replace map_fragment logic
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <map_fragment>',
+            `
+            #include <map_fragment>
+            
+            float normHeight = (vMyHeight - uMinZ) / (uMaxZ - uMinZ);
+            normHeight = clamp(normHeight, 0.01, 0.99);
+            
+            vec4 rampColor = texture2D(uRamp, vec2(normHeight, 0.5));
+            diffuseColor *= rampColor;
+            `
+        );
+    };
+
+    // Calculate dimensions
+    const width = activeTerrain.maxX - activeTerrain.minX;
+    const height = activeTerrain.maxY - activeTerrain.minY; // map visual height (Z in 3D)
+
+    // Calculate relative position (World Coords - Project Origin)
+    const originX = project?.originX || 0;
+    const originY = project?.originY || 0;
+
+    // Center of terrain in Map Coordinates
+    const centerX = activeTerrain.minX + width / 2;
+    const centerY = activeTerrain.minY + height / 2;
+
+    const xSize = width;
+    const ySize = height; // North-South span
+
+    // Geometry
+    const segs = 256;
+
+    const clippingPlanes = clippingConfig.enabled
+        ? [new THREE.Plane(new THREE.Vector3(...clippingConfig.normal), clippingConfig.constant)]
+        : [];
 
     return (
         <mesh
             ref={meshRef}
-            geometry={geometry}
-            material={material}
-            position={position}
+            rotation={[-Math.PI / 2, 0, 0]} // Rotate to ground plane
+            position={[centerX - originX, 0, -(centerY - originY)]}
             receiveShadow
             castShadow
-            raycast={() => null}
-        />
+        >
+            <planeGeometry args={[xSize, ySize, segs, segs]} />
+            <meshStandardMaterial
+                ref={materialRef}
+                color={0xffffff}
+                map={textureMap || null}
+                displacementMap={heightMap || null}
+                displacementScale={activeTerrain.maxZ - activeTerrain.minZ}
+                displacementBias={activeTerrain.minZ}
+                roughness={1.0}
+                metalness={0.0}
+                side={THREE.DoubleSide}
+                clippingPlanes={clippingPlanes}
+                clipShadows={true}
+                transparent={terrainLayer.opacity < 1}
+                opacity={terrainLayer.opacity}
+                onBeforeCompile={onBeforeCompile}
+            />
+        </mesh>
     );
 }
 

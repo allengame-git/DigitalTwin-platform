@@ -143,6 +143,26 @@ export function CameraController() {
         });
     }, [resetTrigger, targetCenter, camera, controls, scene, size, getActiveGeologyModel]);
 
+    // === flyTo: 由外部觸發的相機飛行 ===
+    const { flyToTarget, flyToTrigger } = useCameraStore();
+    const prevFlyTrigger = useRef(flyToTrigger);
+
+    useEffect(() => {
+        if (prevFlyTrigger.current === flyToTrigger || !flyToTarget) return;
+        prevFlyTrigger.current = flyToTrigger;
+
+        const { position, lookAt } = flyToTarget;
+        camera.position.set(...position);
+        camera.lookAt(new THREE.Vector3(...lookAt));
+
+        if (controls && 'target' in controls) {
+            (controls.target as THREE.Vector3).set(...lookAt);
+            (controls as any).update?.();
+        }
+
+        console.log('✈️ FlyTo:', { position, lookAt });
+    }, [flyToTrigger, flyToTarget, camera, controls]);
+
     return null;
 }
 

@@ -22,6 +22,7 @@ import boreholeRoutes from './routes/borehole';
 import lithologyRoutes from './routes/lithology';
 import faultPlaneRoutes from './routes/faultPlane';
 import attitudeRoutes from './routes/attitude';
+import terrainRoutes from './routes/terrain';
 import { requestIdMiddleware, requestLogger, errorLogger } from './middleware/errorLogger';
 import path from 'path';
 
@@ -45,7 +46,7 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 
 // Static file serving for uploads
@@ -62,6 +63,7 @@ app.use('/api/borehole', boreholeRoutes);
 app.use('/api/lithology', lithologyRoutes);
 app.use('/api/fault-plane', faultPlaneRoutes);
 app.use('/api/attitude', attitudeRoutes);
+app.use('/api/terrain', terrainRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
