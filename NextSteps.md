@@ -6,7 +6,7 @@
 
 ## 📍 目前狀態
 
-**最後更新**: 2026-02-10
+**最後更新**: 2026-02-12
 
 ### 已完成功能
 
@@ -15,7 +15,9 @@
 - ✅ 3D 場景初始化 (React Three Fiber + Three.js)
 - ✅ 800+ 鑽孔 InstancedMesh 高效渲染
 - ✅ LOD (Level of Detail) 自動切換機制
-- ✅ 鑽孔點選互動與詳細資訊面板
+- ✅ 鑽孔點選互動與詳細資訊面板 (**動態高度優化**)
+- ✅ **Inspector Panel**: 針對鑽孔資料檢視進行 UI 優化，長度可動態延展。
+- ✅ **Borehole Lithology Colors**: 修復 Inspector 中地層顏色未跟隨專案設定的問題。
 - ✅ 圖層控制面板 (開關、透明度)
 - ✅ 剖面切片工具 (Clipping Plane)
 - ✅ 斷層線與位態符號視覺化
@@ -34,6 +36,10 @@
 
 #### 2. 地形與著色 (Terrain & Visualization) - 2026-02-12
 
+- ✅ **DEM 地形整合**
+  - 支援 GeoTIFF 與 CSV 點雲上傳與處理
+  - 自動生成 16-bit Heightmap 與 Texture
+  - **Clipping Plane 同步**: 自動計算地形與模型邊界，調整 slider 範圍與 TWD97 座標顯示
 - ✅ **Terrain Legend (地形圖例)**
   - Color Ramp 支援 (Rainbow, Spectral, Viridis...)
   - 高度反轉 (Reverse) 與 Z-axis 範圍手動/自動設定
@@ -43,13 +49,14 @@
 - ✅ **Default View Optimization**
   - 首次進入僅顯示鑽孔與地形，優化使用者體驗
 
-#### 2. 3D 地質模型 (2026-02-06)
+#### 3. 3D 地質模型 (2026-02-12)
 
 - ✅ **Isosurface Mesh Generation**
   - CSV Voxel 資料自動轉換為 GLB 格式
   - Marching Cubes 演算法產生平滑表面
   - 支援多岩性 (lith_id) 分層著色
   - TWD97 座標自動轉換為場景座標
+- ✅ **Bounds Storage**: 上傳時自動計算並儲存模型邊界 (Min/Max XYZ)，解決 Clipping Plane 範圍錯誤問題。
 - ✅ **前端 GLB 渲染**
   - `GeologyTiles.tsx` 使用 `useGLTF` 載入 GLB mesh
   - 支援 clipping plane 切片
@@ -124,9 +131,9 @@ Password: postgres
 
 ### 🚨 高優先級 - 立即需要處理
 
-#### 1. 地質模型載入驗證
+#### 1. 地質模型載入完整性驗證 (Ongoing)
 
-**背景**: 已修復 `GeologyCanvas` 未呼叫 `fetchGeologyModels()` 的問題，但需要驗證完整的模型載入流程。
+**背景**: 已修復 `GeologyCanvas` 未呼叫 `fetchGeologyModels()` 的問題，目前模型可正常顯示。需持續觀察邊界計算準確度。
 
 - [x] **驗證**: 進入地質頁面後，Console 應顯示 `geologyModelsCount: 1` 而非 0
 - [x] **驗證**: Camera Reset 的 log 應顯示 `hasContent: true` 且 `strategy: 'scene-traverse'`

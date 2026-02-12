@@ -8,6 +8,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAttitudeStore, AttitudeData, CreateAttitudeData, AttitudeImportRow } from '../../stores/attitudeStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { readFileContent } from '../../utils/fileImport';
 
 interface AttitudeFormData {
     x: string;
@@ -139,18 +140,15 @@ export const AttitudeUploadSection: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            let content = event.target?.result as string;
-            // Remove BOM if present
+        readFileContent(file).then((content) => {
+            // Remove BOM if present (already handled but safe to keep)
             if (content.charCodeAt(0) === 0xFEFF) {
                 content = content.slice(1);
             }
             setCsvData(content);
-            setHasImported(false); // Reset imported state on new file
+            setHasImported(false);
             setImportResult(null);
-        };
-        reader.readAsText(file);
+        });
     };
 
     const handleCsvImport = async () => {

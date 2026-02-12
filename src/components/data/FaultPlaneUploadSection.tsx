@@ -8,6 +8,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useFaultPlaneStore, FaultPlane, FaultCoordinate, CreateFaultPlaneData, FaultPlaneImportRow } from '../../stores/faultPlaneStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { readFileContent } from '../../utils/fileImport';
 
 interface FaultPlaneFormData {
     name: string;
@@ -178,16 +179,13 @@ export const FaultPlaneUploadSection: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            let text = event.target?.result as string;
-            // Remove UTF-8 BOM if present
+        readFileContent(file).then((text) => {
+            // Remove UTF-8 BOM if present (already handled by readFileContent but kept for safety)
             if (text.startsWith('\uFEFF')) {
                 text = text.substring(1);
             }
             setCsvData(text);
-        };
-        reader.readAsText(file);
+        });
     };
 
     const handleCsvImport = async () => {

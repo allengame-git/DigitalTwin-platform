@@ -246,7 +246,7 @@ def export_volume_texture(
 
     if lith_field is None:
         progress(65, 'WARNING: No lith_id found for volume texture')
-        return
+        return None
 
     # Round to nearest integer lith_id
     volume_data = np.round(lith_field).astype(np.uint8)
@@ -296,6 +296,17 @@ def export_volume_texture(
         json.dump(meta, f, indent=2)
 
     progress(75, f'Volume texture saved: {bin_path} ({os.path.getsize(bin_path)//1024}KB)')
+    
+    # Return original TWD97 bounds for DB storage
+    twd97_bounds = {
+        'minX': float(xmin),
+        'maxX': float(xmax),
+        'minY': float(ymin),
+        'maxY': float(ymax),
+        'minZ': float(zmin),
+        'maxZ': float(zmax),
+    }
+    return twd97_bounds
 
 
 # =====================================================
@@ -387,7 +398,7 @@ def main():
 
     # 3. Volume Texture — 3D lith_id for GPU shader cap
     output_dir = os.path.dirname(args.output)
-    export_volume_texture(
+    world_bounds = export_volume_texture(
         grid, output_dir, origin,
         spacing_m=10.0, # 改回 10m
     )
@@ -398,6 +409,7 @@ def main():
     print(json.dumps({
         'status': 'completed',
         'output': args.output,
+        'bounds': world_bounds,
     }), flush=True)
 
 

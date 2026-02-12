@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { useBoreholeStore } from '../../stores/boreholeStore';
 import { useViewerStore } from '../../stores/viewerStore';
 import { useLayerStore } from '../../stores/layerStore';
+import { useLithologyStore } from '../../stores/lithologyStore';
 import { twd97ToWorld } from '../../utils/coordinates';
 import { calculateLODLevel } from '../../utils/lod';
 import { INSTANCED_MESH_CONFIG, GEOLOGY_COLORS } from '../../config/three';
@@ -22,6 +23,7 @@ export function BoreholeInstances() {
     const { boreholes, selectedBorehole, selectBorehole } = useBoreholeStore();
     const { setLODLevel, config } = useViewerStore();
     const { layers: layerSettings } = useLayerStore();
+    const { lithologies } = useLithologyStore();
     const { camera } = useThree();
 
     // 懸停狀態
@@ -58,6 +60,8 @@ export function BoreholeInstances() {
             boreholes.forEach((borehole) => {
                 const isSelected = selectedBorehole?.id === borehole.id;
 
+
+
                 if (borehole.layers && borehole.layers.length > 0) {
                     borehole.layers.forEach((layer) => {
                         const thickness = layer.bottomDepth - layer.topDepth;
@@ -75,7 +79,13 @@ export function BoreholeInstances() {
                         if (isSelected) {
                             tempColors.push(GEOLOGY_COLORS.SELECTED);
                         } else {
-                            tempColors.push(new THREE.Color(layer.color));
+                            // 優先使用 LithologyStore 的動態顏色
+                            const lithology = lithologies.find(l => l.code === layer.lithologyCode);
+                            if (lithology) {
+                                tempColors.push(new THREE.Color(lithology.color));
+                            } else {
+                                tempColors.push(new THREE.Color(layer.color));
+                            }
                         }
 
                         tempIds.push(borehole.id);
@@ -96,7 +106,7 @@ export function BoreholeInstances() {
         }
 
         return { positions: tempPositions, colors: tempColors, ids: tempIds };
-    }, [boreholes, selectedBorehole, isIconMode]);
+    }, [boreholes, selectedBorehole, isIconMode, lithologies]);
 
     // 建立幾何體
     const geometry = useMemo(() => {

@@ -50,9 +50,6 @@ export function TerrainMesh() {
         activeTerrain?.texture ? `${API_BASE}${activeTerrain.texture}` : ''
     ].filter(Boolean) as string[]);
 
-    // If no active terrain or visible is false, return null
-    if (!terrainLayer.visible || !activeTerrain) return null;
-
     // Update Uniforms
     useFrame(() => {
         if (shaderRef.current) {
@@ -61,6 +58,9 @@ export function TerrainMesh() {
             shaderRef.current.uniforms.uRamp.value = rampTexture;
         }
     });
+
+    // If no active terrain or visible is false, return null
+    if (!terrainLayer.visible || !activeTerrain) return null;
 
     // Custom Shader Logic
     const onBeforeCompile = (shader: THREE.Shader) => {

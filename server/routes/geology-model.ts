@@ -295,6 +295,7 @@ async function startConversion(
 ) {
     let lastProgressUpdate = 0;
     const PROGRESS_THROTTLE = 2000;
+    let capturedBounds: { minX: number, maxX: number, minY: number, maxY: number, minZ: number, maxZ: number } | null = null;
 
     try {
         // 取得專案設定的原點
@@ -360,7 +361,7 @@ async function startConversion(
         console.log(`   Command: ${venvPython} ${args.join(' ')}`);
 
         // Spawn Python process
-        await new Promise<void>((resolve, reject) => {
+        const capturedBounds = await new Promise<{ minX: number, maxX: number, minY: number, maxY: number, minZ: number, maxZ: number } | null>((resolve, reject) => {
             const proc = spawn(venvPython, args, {
                 cwd: path.dirname(scriptPath),
                 env: { ...process.env, PYTHONUNBUFFERED: '1' },
@@ -368,12 +369,13 @@ async function startConversion(
 
             let stderr = '';
             let settled = false;
+            let bounds: { minX: number, maxX: number, minY: number, maxY: number, minZ: number, maxZ: number } | null = null;
 
             const safeReject = (err: Error) => {
                 if (!settled) { settled = true; reject(err); }
             };
             const safeResolve = () => {
-                if (!settled) { settled = true; resolve(); }
+                if (!settled) { settled = true; resolve(bounds); }
             };
 
             proc.stdout.on('data', (data: Buffer) => {
@@ -381,6 +383,12 @@ async function startConversion(
                 for (const line of lines) {
                     try {
                         const msg = JSON.parse(line);
+
+                        // Capture bounds if completed
+                        if (msg.status === 'completed' && msg.bounds) {
+                            bounds = msg.bounds;
+                        }
+
                         if (msg.progress !== undefined) {
                             const now = Date.now();
                             if ((now - lastProgressUpdate > PROGRESS_THROTTLE) || msg.progress >= 100) {
@@ -427,14 +435,27 @@ async function startConversion(
 
         // 更新為 completed
         const meshUrl = `/uploads/geology-tiles/${modelId}/model.glb`;
+
+        // Update DB
+        const updateData: any = {
+            conversionStatus: 'completed',
+            conversionProgress: 100,
+            meshUrl,
+            meshFormat: 'glb',
+        };
+
+        if (capturedBounds) {
+            updateData.minX = capturedBounds.minX;
+            updateData.maxX = capturedBounds.maxX;
+            updateData.minY = capturedBounds.minY;
+            updateData.maxY = capturedBounds.maxY;
+            updateData.minZ = capturedBounds.minZ;
+            updateData.maxZ = capturedBounds.maxZ;
+        }
+
         await prisma.geologyModel.update({
             where: { id: modelId },
-            data: {
-                conversionStatus: 'completed',
-                conversionProgress: 100,
-                meshUrl,
-                meshFormat: 'glb',
-            },
+            data: updateData,
         });
 
         console.log(`✅ Geology model ${modelId} PyVista conversion completed`);

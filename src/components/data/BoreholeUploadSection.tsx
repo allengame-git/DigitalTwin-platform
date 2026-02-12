@@ -9,6 +9,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useBoreholeStore } from '../../stores/boreholeStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLithologyStore } from '../../stores/lithologyStore';
+import { readFileContent } from '../../utils/fileImport';
 
 interface BoreholeFormData {
     boreholeNo: string;
@@ -336,7 +337,7 @@ export const BoreholeUploadSection: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file || !activeProjectId) return;
 
-        let text = await file.text();
+        let text = await readFileContent(file);
 
         // 1. 強健的 BOM 移除 (移除 UTF-8, UTF-16 等 BOM)
         text = text.replace(/^\uFEFF/, '').replace(/^\uFFFE/, '');
@@ -384,7 +385,7 @@ export const BoreholeUploadSection: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file || !activeProjectId) return;
 
-        let text = await file.text();
+        let text = await readFileContent(file);
         text = text.replace(/^\uFEFF/, '').replace(/^\uFFFE/, '');
         const lines = text.split(/\r?\n|\r/).map(l => l.trim()).filter(line => line.length > 0);
 
@@ -405,6 +406,41 @@ export const BoreholeUploadSection: React.FC = () => {
 
             // 驗證：需有鑽孔編號與地層深度
             if (row.boreholeNo && row.topDepth !== undefined && row.bottomDepth !== undefined) {
+                // 自動轉換 Elevation to Depth
+                // 取得該鑽孔的孔口高程
+                const borehole = boreholes.find(b => b.boreholeNo === row.boreholeNo);
+                if (borehole) {
+                    let top = parseFloat(row.topDepth);
+                    let bottom = parseFloat(row.bottomDepth);
+
+                    // 判斷是否為高程 (Elevation) 資料
+                    // 條件 1: 數值為負 (Depth 通常為正)
+                    // 條件 2: Top > Bottom (高程由大變小，深度由小變大)
+                    const isElevation = top < 0 || bottom < 0 || top > bottom;
+
+                    if (isElevation) {
+                        // 轉換公式: Depth = CollarElevation - LayerElevation
+                        const originalTop = top;
+                        const originalBottom = bottom;
+
+                        top = borehole.elevation - originalTop;
+                        bottom = borehole.elevation - originalBottom;
+
+                        // 確保 Top < Bottom (若轉換後相反則交換)
+                        if (top > bottom) {
+                            const temp = top;
+                            top = bottom;
+                            bottom = temp;
+                        }
+
+                        // 更新 row 資料 (轉為字串以符合介面)
+                        row.topDepth = top.toString();
+                        row.bottomDepth = bottom.toString();
+
+                        console.log(`[AutoConvert] ${row.boreholeNo}: Elev(${originalTop}, ${originalBottom}) -> Depth(${top.toFixed(2)}, ${bottom.toFixed(2)})`);
+                    }
+                }
+
                 layerData.push(row);
             }
         }
@@ -427,7 +463,7 @@ export const BoreholeUploadSection: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file || !activeProjectId) return;
 
-        let text = await file.text();
+        let text = await readFileContent(file);
         text = text.replace(/^\uFEFF/, '').replace(/^\uFFFE/, '');
         const lines = text.split(/\r?\n|\r/).map(l => l.trim()).filter(line => line.length > 0);
 
@@ -448,6 +484,21 @@ export const BoreholeUploadSection: React.FC = () => {
 
             // 驗證：需有鑽孔編號與深度
             if (row.boreholeNo && row.depth !== undefined) {
+                // 自動轉換 Elevation to Depth (邏輯同 Layer)
+                const borehole = boreholes.find(b => b.boreholeNo === row.boreholeNo);
+                if (borehole) {
+                    let depth = parseFloat(row.depth);
+
+                    // 判斷是否為高程 (Elevation) 資料
+                    // 條件: 數值為負 (Depth 通常為正)
+                    if (depth < 0) {
+                        const originalDepth = depth;
+                        depth = borehole.elevation - originalDepth;
+                        row.depth = depth.toString();
+                        console.log(`[AutoConvert-Property] ${row.boreholeNo}: Elev(${originalDepth}) -> Depth(${depth.toFixed(2)})`);
+                    }
+                }
+
                 propertyData.push(row);
             }
         }

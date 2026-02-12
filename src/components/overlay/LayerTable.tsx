@@ -5,12 +5,15 @@
 
 import React from 'react';
 import type { Layer } from '../../types/geology';
+import { useLithologyStore } from '../../stores/lithologyStore';
 
 interface LayerTableProps {
     layers: Layer[];
 }
 
 export function LayerTable({ layers }: LayerTableProps) {
+    const lithologies = useLithologyStore(state => state.lithologies);
+
     if (layers.length === 0) {
         return (
             <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
@@ -36,29 +39,36 @@ export function LayerTable({ layers }: LayerTableProps) {
                     </tr>
                 </thead>
                 <tbody>
-                    {layers.map((layer) => (
-                        <tr key={layer.id} style={{ borderBottom: '1px solid #eee' }}>
-                            <td style={tdStyle}>
-                                {layer.topDepth.toFixed(1)} - {layer.bottomDepth.toFixed(1)}
-                            </td>
-                            <td style={tdStyle}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span
-                                        style={{
-                                            display: 'inline-block',
-                                            width: '16px',
-                                            height: '16px',
-                                            borderRadius: '3px',
-                                            background: layer.color,
-                                            border: '1px solid #ddd',
-                                        }}
-                                    />
-                                    <span>{layer.lithologyName}</span>
-                                </div>
-                            </td>
-                            <td style={tdStyle}>{layer.description || '-'}</td>
-                        </tr>
-                    ))}
+                    {layers.map((layer) => {
+                        // Dynamic lookup from project settings
+                        const lithology = lithologies.find(l => l.code === layer.lithologyCode);
+                        const displayColor = lithology?.color || layer.color;
+                        const displayName = lithology?.name || layer.lithologyName;
+
+                        return (
+                            <tr key={layer.id} style={{ borderBottom: '1px solid #eee' }}>
+                                <td style={tdStyle}>
+                                    {layer.topDepth.toFixed(1)} - {layer.bottomDepth.toFixed(1)}
+                                </td>
+                                <td style={tdStyle}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span
+                                            style={{
+                                                display: 'inline-block',
+                                                width: '16px',
+                                                height: '16px',
+                                                borderRadius: '3px',
+                                                background: displayColor,
+                                                border: '1px solid #ddd',
+                                            }}
+                                        />
+                                        <span>{displayName}</span>
+                                    </div>
+                                </td>
+                                <td style={tdStyle}>{layer.description || '-'}</td>
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
 
@@ -77,23 +87,27 @@ export function LayerTable({ layers }: LayerTableProps) {
                     }}
                 >
                     {layers.map((layer) => {
+                        const lithology = lithologies.find(l => l.code === layer.lithologyCode);
+                        const displayColor = lithology?.color || layer.color;
+                        const displayName = lithology?.name || layer.lithologyName;
+
                         const height = (layer.bottomDepth - layer.topDepth) * 3; // 3px per meter
                         return (
                             <div
                                 key={layer.id}
                                 style={{
                                     height: `${Math.max(height, 20)}px`,
-                                    background: layer.color,
+                                    background: displayColor,
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
                                     padding: '0 8px',
                                     borderBottom: '1px solid rgba(255,255,255,0.3)',
                                     fontSize: '11px',
-                                    color: getContrastColor(layer.color),
+                                    color: getContrastColor(displayColor),
                                 }}
                             >
-                                <span>{layer.lithologyName}</span>
+                                <span>{displayName}</span>
                                 <span>{layer.topDepth.toFixed(1)}m</span>
                             </div>
                         );

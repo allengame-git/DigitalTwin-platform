@@ -240,7 +240,11 @@ const IconFault = (
 
 type BoreholeTab = 'info' | 'layers' | 'properties' | 'photos';
 
-function BoreholeSection() {
+interface BoreholeSectionProps {
+    isMaximized?: boolean;
+}
+
+function BoreholeSection({ isMaximized = false }: BoreholeSectionProps) {
     const { selectedBorehole, clearSelection } = useBoreholeStore();
     const [tab, setTab] = useState<BoreholeTab>('info');
 
@@ -252,6 +256,14 @@ function BoreholeSection() {
         { key: 'properties', label: '物性' },
         { key: 'photos', label: '照片' },
     ];
+
+    // Dynamic height based on maximize state
+    const contentMaxHeight = isMaximized ? 'calc(100vh - 280px)' : '300px';
+    const contentStyle = {
+        maxHeight: contentMaxHeight,
+        overflow: 'auto',
+        transition: 'max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    };
 
     return (
         <SectionCard
@@ -306,17 +318,17 @@ function BoreholeSection() {
                 </div>
             )}
             {tab === 'layers' && (
-                <div style={{ maxHeight: '300px', overflow: 'auto' }}>
+                <div style={contentStyle}>
                     <LayerTable layers={selectedBorehole.layers} />
                 </div>
             )}
             {tab === 'properties' && (
-                <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+                <div style={contentStyle}>
                     <PropertyChart properties={selectedBorehole.properties} />
                 </div>
             )}
             {tab === 'photos' && (
-                <div style={{ maxHeight: '300px', overflow: 'auto' }}>
+                <div style={contentStyle}>
                     <PhotoGallery photos={selectedBorehole.photos} />
                 </div>
             )}
@@ -418,6 +430,10 @@ export function InspectorPanel() {
 
     const hasAny = !!selectedBorehole || !!selectedAttitudeId || !!selectedFaultId;
 
+    // Determine if we should maximize the borehole view
+    // Rule: Only maximize if borehole is selected AND (no attitude AND no fault selected)
+    const isBoreholeOnly = !!selectedBorehole && !selectedAttitudeId && !selectedFaultId;
+
     if (!hasAny) return null;
 
     return (
@@ -463,6 +479,7 @@ export function InspectorPanel() {
                     pointerEvents: 'none',
                     animation: 'inspectorSlideUp 0.25s ease-out',
                     fontFamily: T.font,
+                    transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)', // Smooth width transition if we ever change it
                 }}
             >
                 <div style={{ pointerEvents: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -510,7 +527,7 @@ export function InspectorPanel() {
                         flexDirection: 'column',
                         gap: '8px',
                     }}>
-                        <BoreholeSection />
+                        <BoreholeSection isMaximized={isBoreholeOnly} />
                         <AttitudeSection />
                         <FaultSection />
                     </div>
