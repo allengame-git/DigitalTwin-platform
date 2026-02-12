@@ -20,6 +20,7 @@ interface LayerConfig {
     name: string;
     visible: boolean;
     opacity: number;
+    zOffset?: number;
 }
 
 
@@ -39,6 +40,7 @@ interface LayerState {
 interface LayerActions {
     toggleLayer: (layerId: LayerType) => void;
     setOpacity: (layerId: LayerType, opacity: number) => void;
+    setLayerZOffset: (layerId: LayerType, zOffset: number) => void;
     setLayerVisible: (layerId: LayerType, visible: boolean) => void;
     resetLayers: () => void;
     setTerrainSettings: (settings: Partial<TerrainSettings>) => void;
@@ -50,7 +52,7 @@ const defaultLayers: Record<LayerType, LayerConfig> = {
     faults: { id: 'faults', name: '斷層線', visible: false, opacity: 1 },
     attitudes: { id: 'attitudes', name: '位態符號', visible: false, opacity: 1 },
     terrain: { id: 'terrain', name: 'DEM 地形', visible: true, opacity: 1 },
-    imagery: { id: 'imagery', name: '航照圖', visible: false, opacity: 0.7 },
+    imagery: { id: 'imagery', name: '航照圖', visible: false, opacity: 0.7, zOffset: 5 }, // Default zOffset 5m
     geophysics: { id: 'geophysics', name: '地球物理探查', visible: false, opacity: 1 },
 };
 
@@ -89,6 +91,18 @@ export const useLayerStore = create<LayerState & LayerActions>()(
                         [layerId]: {
                             ...state.layers[layerId],
                             opacity: Math.max(0, Math.min(1, opacity)),
+                        },
+                    },
+                }));
+            },
+
+            setLayerZOffset: (layerId, zOffset) => {
+                set(state => ({
+                    layers: {
+                        ...state.layers,
+                        [layerId]: {
+                            ...state.layers[layerId],
+                            zOffset,
                         },
                     },
                 }));

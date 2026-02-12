@@ -36,15 +36,16 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
     const { fetchBoreholes, status } = useBoreholeStore();
     const { activeProjectId } = useProjectStore();
     const { attitudes, fetchAttitudes } = useAttitudeStore();
-    const { fetchGeologyModels } = useUploadStore();
+    const { fetchGeologyModels, fetchImageryFiles } = useUploadStore();
 
     useEffect(() => {
         if (activeProjectId) {
             fetchBoreholes(activeProjectId);
             fetchAttitudes(activeProjectId);
             fetchGeologyModels();
+            fetchImageryFiles();
         }
-    }, [fetchBoreholes, fetchAttitudes, fetchGeologyModels, activeProjectId]);
+    }, [fetchBoreholes, fetchAttitudes, fetchGeologyModels, fetchImageryFiles, activeProjectId]);
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%', ...style }}>

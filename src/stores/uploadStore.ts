@@ -243,7 +243,10 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
             const res = await fetch(`${API_BASE}/api/upload/imagery?projectId=${projectId}`);
             const data = await res.json();
             if (data.success) {
-                set({ imageryFiles: data.data });
+                set(state => ({
+                    imageryFiles: data.data,
+                    activeImageryId: state.activeImageryId || (data.data.length > 0 ? data.data[0].id : null)
+                }));
             }
         } catch (error) {
             console.error('Fetch imagery files error:', error);

@@ -120,7 +120,7 @@ export function generateAccessToken(
     return jwt.sign(
         { userId, email, role },
         JWT_SECRET,
-        { expiresIn: '15m' }
+        { expiresIn: '24h' }
     );
 }
 
@@ -132,7 +132,7 @@ export function generateRefreshToken(
     role: UserRole
 ): string {
     const refreshSecret = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret';
-    const expiresIn = role === 'engineer' ? '8h' : '1h';
+    const expiresIn = '7d';
 
     return jwt.sign(
         { userId, role, type: 'refresh' },

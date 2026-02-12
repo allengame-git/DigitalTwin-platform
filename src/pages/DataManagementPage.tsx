@@ -8,6 +8,24 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
+import {
+    ChevronLeft,
+    Settings,
+    UploadCloud,
+    Trash2,
+    FileText,
+    Image as ImageIcon,
+    Box,
+    Activity,
+    Layers,
+    MoreVertical,
+    X,
+    Check,
+    AlertTriangle,
+    ChevronDown,
+    ChevronUp,
+    File
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
     useUploadStore,
@@ -230,8 +248,8 @@ export const DataManagementPage: React.FC = () => {
             return;
         }
 
-        if (file.size > 50 * 1024 * 1024) {
-            showToast('檔案大小超過 50MB 限制', 'error');
+        if (file.size > 500 * 1024 * 1024) {
+            showToast('檔案大小超過 500MB 限制', 'error');
             return;
         }
 
@@ -275,7 +293,11 @@ export const DataManagementPage: React.FC = () => {
 
         await uploadImagery(selectedFile, formData);
 
-        if (!uploadError) {
+        // Check fresh state from store directly to avoid closure stale state
+        const currentError = useUploadStore.getState().uploadError;
+
+        if (!currentError) {
+            showToast('上傳成功', 'success');
             setShowUploadForm(false);
             setSelectedFile(null);
             setShowAdvanced(false);
@@ -511,7 +533,375 @@ export const DataManagementPage: React.FC = () => {
     return (
         <div className="data-management-page">
             <style>{`
-                /* ... (existing styles) ... */
+                /* Global Variables & Reset */
+                :root {
+                    --primary: #2563eb;
+                    --primary-hover: #1d4ed8;
+                    --danger: #dc2626;
+                    --danger-hover: #b91c1c;
+                    --success: #16a34a;
+                    --gray-50: #f9fafb;
+                    --gray-100: #f3f4f6;
+                    --gray-200: #e5e7eb;
+                    --gray-300: #d1d5db;
+                    --gray-400: #9ca3af;
+                    --gray-500: #6b7280;
+                    --gray-600: #4b5563;
+                    --gray-700: #374151;
+                    --gray-800: #1f2937;
+                    --gray-900: #111827;
+                }
+
+                .data-management-page {
+                    min-height: 100vh;
+                    background: #f8fafc;
+                    color: var(--gray-800);
+                    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                }
+
+                /* Header */
+                .dm-header {
+                    background: white;
+                    border-bottom: 1px solid var(--gray-200);
+                    padding: 16px 24px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    position: sticky;
+                    top: 0;
+                    z-index: 50;
+                }
+
+                .dm-header-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 16px;
+                }
+
+                .dm-back-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 8px 12px;
+                    background: var(--gray-100);
+                    border: 1px solid transparent;
+                    border-radius: 6px;
+                    color: var(--gray-600);
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    text-decoration: none;
+                    transition: all 0.2s;
+                }
+
+                .dm-back-btn:hover {
+                    background: var(--gray-200);
+                    color: var(--gray-900);
+                }
+
+                .dm-title {
+                    font-size: 20px;
+                    font-weight: 600;
+                    color: var(--gray-900);
+                    letter-spacing: -0.025em;
+                }
+
+                .dm-content {
+                    padding: 32px 24px;
+                    max-width: 1200px;
+                    margin: 0 auto;
+                }
+
+                /* Sections */
+                .dm-section {
+                    background: white;
+                    border-radius: 12px;
+                    padding: 24px;
+                    margin-bottom: 24px;
+                    border: 1px solid var(--gray-200);
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                }
+
+                .dm-section-header {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 16px;
+                    margin-bottom: 24px;
+                }
+
+                .dm-section-icon {
+                    width: 40px;
+                    height: 40px;
+                    background: var(--gray-50);
+                    border: 1px solid var(--gray-200);
+                    border-radius: 10px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--gray-600);
+                }
+
+                .dm-section-title {
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: var(--gray-900);
+                    margin-bottom: 4px;
+                }
+
+                .dm-section-desc {
+                    font-size: 14px;
+                    color: var(--gray-500);
+                }
+
+                /* Buttons */
+                .dm-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    padding: 8px 16px;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    line-height: 1.25rem;
+                }
+
+                .dm-btn-primary {
+                    background: var(--primary);
+                    color: white;
+                    border: 1px solid transparent;
+                    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+                }
+                .dm-btn-primary:hover { background: var(--primary-hover); }
+                .dm-btn-primary:disabled { background: var(--gray-400); cursor: not-allowed; }
+
+                .dm-btn-secondary {
+                    background: white;
+                    color: var(--gray-700);
+                    border: 1px solid var(--gray-300);
+                    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+                }
+                .dm-btn-secondary:hover { background: var(--gray-50); border-color: var(--gray-400); }
+
+                .dm-btn-danger {
+                    background: #fee2e2;
+                    color: var(--danger);
+                    border: 1px solid #fecaca;
+                }
+                .dm-btn-danger:hover { background: #fecaca; }
+
+                .dm-btn-danger-solid {
+                    background: var(--danger);
+                    color: white;
+                    border: 1px solid transparent;
+                }
+                .dm-btn-danger-solid:hover { background: var(--danger-hover); }
+
+                /* Upload Zone */
+                .dm-upload-zone {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    border: 2px dashed var(--gray-300);
+                    border-radius: 8px;
+                    padding: 40px;
+                    text-align: center;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    background: var(--gray-50);
+                    margin-bottom: 16px;
+                }
+                .dm-upload-zone:hover, .dm-upload-zone.dragging {
+                    border-color: var(--primary);
+                    background: #eff6ff;
+                }
+                .dm-upload-icon {
+                    color: var(--gray-400);
+                    margin-bottom: 16px;
+                    padding: 16px;
+                    background: white;
+                    border-radius: 50%;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                }
+                .dm-upload-zone:hover .dm-upload-icon {
+                    color: var(--primary);
+                    transform: scale(1.05);
+                    transition: all 0.2s;
+                }
+                .dm-upload-text {
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: var(--gray-700);
+                    margin-bottom: 8px;
+                }
+                .dm-upload-hint {
+                    font-size: 13px;
+                    color: var(--gray-500);
+                }
+
+                /* Modals */
+                .dm-modal-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0,0,0,0.5);
+                    backdrop-filter: blur(4px);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 1000;
+                }
+                .dm-modal {
+                    background: white;
+                    border-radius: 12px;
+                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+                    width: 100%;
+                    max-width: 500px;
+                    max-height: 90vh;
+                    display: flex;
+                    flex-direction: column;
+                    border: 1px solid var(--gray-200);
+                }
+                .dm-modal-header {
+                    padding: 16px 24px;
+                    border-bottom: 1px solid var(--gray-200);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .dm-modal-title { font-weight: 600; font-size: 16px; color: var(--gray-900); }
+                .dm-modal-body { padding: 24px; overflow-y: auto; }
+                .dm-modal-footer {
+                    padding: 16px 24px;
+                    background: var(--gray-50);
+                    border-top: 1px solid var(--gray-200);
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 12px;
+                }
+
+                /* Forms */
+                .dm-form-group { margin-bottom: 16px; }
+                .dm-form-label {
+                    display: block;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: var(--gray-700);
+                    margin-bottom: 4px;
+                }
+                .dm-form-input {
+                    display: block;
+                    width: 100%;
+                    padding: 8px 12px;
+                    background: white;
+                    border: 1px solid var(--gray-300);
+                    border-radius: 6px;
+                    font-size: 14px;
+                    color: var(--gray-900);
+                    transition: all 0.15s;
+                    box-sizing: border-box;
+                }
+                .dm-form-input:focus {
+                    outline: none;
+                    border-color: var(--primary);
+                    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+                }
+                .dm-form-error {
+                    font-size: 12px;
+                    color: var(--danger);
+                    margin-top: 4px;
+                }
+
+                /* Cards & Grids */
+                .dm-file-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+                    gap: 16px;
+                }
+                .dm-file-card {
+                    background: white;
+                    border: 1px solid var(--gray-200);
+                    border-radius: 8px;
+                    overflow: hidden;
+                    transition: all 0.2s;
+                    position: relative;
+                }
+                .dm-file-card:hover {
+                    border-color: var(--gray-300);
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                    transform: translateY(-1px);
+                }
+                .dm-file-thumb {
+                    width: 100%;
+                    height: 140px;
+                    object-fit: cover;
+                    background: var(--gray-100);
+                }
+                .dm-file-info { padding: 12px; }
+                .dm-file-name {
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: var(--gray-900);
+                    margin-bottom: 4px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .dm-file-meta {
+                    font-size: 12px;
+                    color: var(--gray-500);
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+
+                /* Tables */
+                .dm-table-wrapper {
+                    border: 1px solid var(--gray-200);
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                }
+                .dm-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+                .dm-table th {
+                    background: var(--gray-50);
+                    padding: 12px 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    color: var(--gray-600);
+                    border-bottom: 1px solid var(--gray-200);
+                    white-space: nowrap;
+                }
+                .dm-table td {
+                    padding: 12px 16px;
+                    border-bottom: 1px solid var(--gray-200);
+                    color: var(--gray-700);
+                }
+                .dm-table tr:last-child td { border-bottom: none; }
+                .dm-table tr:hover { background: var(--gray-50); }
+
+                /* Misc */
+                .dm-empty-state {
+                    text-align: center;
+                    padding: 40px;
+                    background: var(--gray-50);
+                    border: 1px dashed var(--gray-300);
+                    border-radius: 8px;
+                }
+                .dm-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    padding: 2px 8px;
+                    border-radius: 9999px;
+                    font-size: 12px;
+                    font-weight: 500;
+                }
+                .dm-badge-blue { background: #dbeafe; color: #1e40af; }
+                .dm-badge-green { background: #dcfce7; color: #15803d; }
+                .dm-badge-gray { background: #f3f4f6; color: #374151; }
+                
                 @keyframes progress-shimmer {
                     0% { transform: translateX(-100%); }
                     100% { transform: translateX(100%); }
@@ -541,420 +931,13 @@ export const DataManagementPage: React.FC = () => {
                     );
                     animation: progress-shimmer 1.5s infinite linear;
                 }
-                .data-management-page {
-                    min-height: 100vh;
-                    background: #f8fafc;
-                }
-                .dm-header {
-                    background: white;
-                    border-bottom: 1px solid #e2e8f0;
-                    padding: 16px 24px;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-                .dm-header-left {
-                    display: flex;
-                    align-items: center;
-                    gap: 16px;
-                }
-                .dm-back-btn {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    padding: 8px 12px;
-                    background: #f1f5f9;
-                    border: none;
-                    border-radius: 6px;
-                    color: #475569;
-                    font-size: 14px;
-                    cursor: pointer;
-                    text-decoration: none;
-                }
-                .dm-back-btn:hover {
-                    background: #e2e8f0;
-                }
-                .dm-title {
-                    font-size: 20px;
-                    font-weight: 600;
-                    color: #0f172a;
-                }
-                .dm-content {
-                    padding: 24px;
-                    max-width: 1200px;
-                    margin: 0 auto;
-                }
-                .dm-section {
-                    background: white;
-                    border-radius: 12px;
-                    padding: 24px;
-                    margin-bottom: 24px;
-                    border: 1px solid #e2e8f0;
-                }
-                .dm-section-header {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    margin-bottom: 20px;
-                }
-                .dm-section-icon {
-                    width: 40px;
-                    height: 40px;
-                    background: #dbeafe;
-                    border-radius: 10px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 20px;
-                }
-                .dm-section-title {
-                    font-size: 18px;
-                    font-weight: 600;
-                    color: #0f172a;
-                }
-                .dm-section-desc {
-                    font-size: 14px;
-                    color: #64748b;
-                }
-                .dm-upload-zone {
-                    border: 2px dashed #d1d5db;
-                    border-radius: 12px;
-                    padding: 40px;
-                    text-align: center;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    margin-bottom: 24px;
-                }
-                .dm-upload-zone:hover,
-                .dm-upload-zone.dragging {
-                    border-color: #3b82f6;
-                    background: rgba(59,130,246,0.05);
-                }
-                .dm-upload-icon {
-                    font-size: 48px;
-                    margin-bottom: 12px;
-                }
-                .dm-upload-text {
-                    font-size: 16px;
-                    color: #374151;
-                    margin-bottom: 8px;
-                }
-                .dm-upload-hint {
-                    font-size: 14px;
-                    color: #9ca3af;
-                }
-                .dm-error {
-                    background: #fef2f2;
-                    color: #dc2626;
-                    padding: 12px 16px;
-                    border-radius: 8px;
-                    margin-bottom: 16px;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-                .dm-file-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-                    gap: 16px;
-                }
-                .dm-file-card {
-                    background: #f8fafc;
-                    border-radius: 10px;
-                    overflow: hidden;
-                    border: 1px solid #e2e8f0;
-                    transition: all 0.2s;
-                }
-                .dm-file-card:hover {
-                    border-color: #cbd5e1;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-                }
-                .dm-file-thumb {
-                    width: 100%;
-                    height: 140px;
-                    object-fit: cover;
-                    background: #e2e8f0;
-                }
-                .dm-file-info {
-                    padding: 12px;
-                }
-                .dm-file-name {
-                    font-size: 14px;
-                    font-weight: 600;
-                    color: #0f172a;
-                    margin-bottom: 4px;
-                }
-                .dm-file-meta {
-                    font-size: 12px;
-                    color: #64748b;
-                    margin-bottom: 4px;
-                }
-                .dm-file-year {
-                    display: inline-block;
-                    background: #dbeafe;
-                    color: #1e40af;
-                    font-size: 11px;
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    margin-right: 6px;
-                }
-                .dm-file-actions {
-                    display: flex;
-                    gap: 8px;
-                    margin-top: 8px;
-                }
-                .dm-file-btn {
-                    flex: 1;
-                    padding: 6px 12px;
-                    border: none;
-                    border-radius: 6px;
-                    font-size: 12px;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-                .dm-file-btn-delete {
-                    background: #fef2f2;
-                    color: #dc2626;
-                }
-                .dm-file-btn-delete:hover {
-                    background: #fee2e2;
-                }
-                .dm-empty {
-                    text-align: center;
-                    padding: 40px;
-                    color: #9ca3af;
-                }
-                .dm-coming-soon {
-                    background: #f8fafc;
-                    border-radius: 8px;
-                    padding: 40px;
-                    text-align: center;
-                    color: #9ca3af;
-                }
-                /* Upload Form Modal */
-                .dm-modal-overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(0,0,0,0.5);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 1000;
-                }
-                .dm-modal {
-                    background: white;
-                    border-radius: 12px;
-                    width: 90%;
-                    max-width: 500px;
-                    max-height: 90vh;
-                    display: flex;
-                    flex-direction: column;
-                    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-                }
-                .dm-modal-delete {
-                    max-width: 400px;
-                    height: auto;
-                }
-                .dm-modal-header {
-                    padding: 16px 20px;
-                    border-bottom: 1px solid #e5e7eb;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    flex-shrink: 0;
-                }
-                .dm-modal-title {
-                    font-size: 16px;
-                    font-weight: 600;
-                }
-                .dm-modal-body {
-                    padding: 20px;
-                    overflow-y: auto;
-                }
-                .dm-form-group {
-                    margin-bottom: 16px;
-                }
-                .dm-form-label {
-                    display: block;
-                    font-size: 13px;
-                    font-weight: 500;
-                    color: #374151;
-                    margin-bottom: 6px;
-                }
-                .dm-form-label .required {
-                    color: #dc2626;
-                }
-                .dm-form-input {
-                    width: 100%;
-                    padding: 10px 12px;
-                    border: 1px solid #d1d5db;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    box-sizing: border-box;
-                }
-                .dm-form-input:focus {
-                    outline: none;
-                    border-color: #3b82f6;
-                    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
-                }
-                .dm-form-input.error {
-                    border-color: #dc2626;
-                }
-                .dm-form-error {
-                    color: #dc2626;
-                    font-size: 12px;
-                    margin-top: 4px;
-                }
-                .dm-form-textarea {
-                    resize: vertical;
-                    min-height: 80px;
-                }
-                .dm-form-row {
-                    display: flex;
-                    gap: 12px;
-                }
-                .dm-form-col {
-                    flex: 1;
-                }
-                .dm-modal-footer {
-                    padding: 16px 20px;
-                    border-top: 1px solid #e5e7eb;
-                    display: flex;
-                    gap: 12px;
-                    justify-content: flex-end;
-                    flex-shrink: 0;
-                }
-                .dm-btn {
-                    padding: 10px 20px;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-                .dm-btn-primary {
-                    background: #3b82f6;
-                    color: white;
-                    border: none;
-                }
-                .dm-btn-primary:hover {
-                    background: #2563eb;
-                }
-                .dm-btn-primary:disabled {
-                    background: #9ca3af;
-                    cursor: not-allowed;
-                }
-                .dm-btn-danger {
-                    background: #dc2626;
-                    color: white;
-                    border: none;
-                }
-                .dm-btn-danger:hover {
-                    background: #b91c1c;
-                }
-                .dm-btn-secondary {
-                    background: white;
-                    color: #374151;
-                    border: 1px solid #d1d5db;
-                }
-                .dm-btn-secondary:hover {
-                    background: #f9fafb;
-                }
-                .dm-file-preview {
-                    background: #f3f4f6;
-                    padding: 12px;
-                    border-radius: 8px;
-                    margin-bottom: 16px;
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                }
-                .dm-file-preview-icon {
-                    font-size: 24px;
-                }
-                .dm-file-preview-name {
-                    font-weight: 500;
-                    font-size: 14px;
-                }
-                .dm-file-preview-size {
-                    font-size: 12px;
-                    color: #6b7280;
-                }
-                .dm-advanced-toggle {
-                    width: 100%;
-                    text-align: left;
-                    background: white;
-                    border: 1px solid #e2e8f0;
-                    padding: 10px 12px;
-                    border-radius: 8px;
-                    color: #374151;
-                    font-size: 13px;
-                    font-weight: 500;
-                    cursor: pointer;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 12px;
-                }
-                .dm-advanced-toggle:hover {
-                    background: #f8fafc;
-                }
-                .dm-coords-hint {
-                    font-size: 12px;
-                    color: #64748b;
-                    margin-bottom: 12px;
-                    background: #f0f9ff;
-                    padding: 8px;
-                    border-radius: 6px;
-                    border: 1px solid #e0f2fe;
-                }
-                .dm-coords-status {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 4px;
-                    font-size: 11px;
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    background: #f0fdf4;
-                    color: #166534;
-                    border: 1px solid #dcfce7;
-                    margin-left: 6px;
-                }
-                /* Data Table Styles */
-                .dm-table-wrapper {
-                    border: 1px solid #e5e7eb;
-                    border-radius: 8px;
-                    overflow: hidden;
-                }
-                .dm-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                .dm-table th {
-                    background: #f9fafb;
-                    font-weight: 600;
-                    font-size: 12px;
-                    color: #374151;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                    border-bottom: 1px solid #e5e7eb;
-                }
-                .dm-table td {
-                    border-bottom: 1px solid #f3f4f6;
-                }
-                .dm-table tbody tr:last-child td {
-                    border-bottom: none;
-                }
             `}</style>
-
             {/* Same header... */}
             <header className="dm-header">
                 <div className="dm-header-left">
                     <Link to={projectCode ? `/project/${projectCode}` : '/'} className="dm-back-btn">
-                        ← 返回{projectCode ? '專案' : '首頁'}
+                        <ChevronLeft size={16} />
+                        返回{projectCode ? '專案' : '首頁'}
                     </Link>
                     <h1 className="dm-title">資料管理</h1>
                 </div>
@@ -970,7 +953,9 @@ export const DataManagementPage: React.FC = () => {
                 {activeProject && (
                     <section className="dm-section">
                         <div className="dm-section-header">
-                            <div className="dm-section-icon">⚙️</div>
+                            <div className="dm-section-icon">
+                                <Settings size={20} />
+                            </div>
                             <div>
                                 <div className="dm-section-title">專案設定 (TWD97 座標原點)</div>
                                 <div className="dm-section-desc">設定此專案的場景中心座標，所有 3D 模型將以此為基準進行定位。</div>
@@ -1018,23 +1003,26 @@ export const DataManagementPage: React.FC = () => {
                 <LithologySection />
 
                 {/* Required setup message */}
+                {/* Required setup message (Moved logic to inside the conditional render for cleaner code) */}
                 {!isSetupComplete && (
                     <div style={{
-                        background: '#fef3c7',
+                        background: '#fffbeb',
                         border: '1px solid #fcd34d',
                         borderRadius: '12px',
                         padding: '20px',
                         marginBottom: '24px',
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px'
+                        alignItems: 'flex-start',
+                        gap: '16px'
                     }}>
-                        <span style={{ fontSize: '24px' }}>⚠️</span>
+                        <div style={{ background: '#fef3c7', padding: '8px', borderRadius: '8px', color: '#b45309' }}>
+                            <AlertTriangle size={24} />
+                        </div>
                         <div>
-                            <div style={{ fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>
+                            <div style={{ fontWeight: 600, color: '#92400e', marginBottom: '4px', fontSize: '16px' }}>
                                 請先完成專案設定
                             </div>
-                            <div style={{ color: '#a16207', fontSize: '13px' }}>
+                            <div style={{ color: '#b45309', fontSize: '14px', lineHeight: '1.5' }}>
                                 需設定 TWD97 座標原點並載入岩性資料後，才可使用以下資料管理功能。
                             </div>
                         </div>
@@ -1060,7 +1048,9 @@ export const DataManagementPage: React.FC = () => {
                 <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
                     <section className="dm-section">
                         <div className="dm-section-header">
-                            <div className="dm-section-icon">📷</div>
+                            <div className="dm-section-icon">
+                                <ImageIcon size={20} />
+                            </div>
                             <div>
                                 <h2 className="dm-section-title">航照圖管理</h2>
                                 <p className="dm-section-desc">上傳與管理航照底圖，支援 JPG、PNG、TIF 格式</p>
@@ -1069,7 +1059,7 @@ export const DataManagementPage: React.FC = () => {
 
                         {/* 上傳區域 (Same...) */}
                         <div
-                            className={`dm-upload-zone ${isDragging ? 'dragging' : ''}`}
+                            className={`dm - upload - zone ${isDragging ? 'dragging' : ''} `}
                             onDrop={handleDrop}
                             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                             onDragLeave={() => setIsDragging(false)}
@@ -1082,7 +1072,9 @@ export const DataManagementPage: React.FC = () => {
                                 onChange={handleInputChange}
                                 style={{ display: 'none' }}
                             />
-                            <div className="dm-upload-icon">📁</div>
+                            <div className="dm-upload-icon">
+                                <UploadCloud size={48} strokeWidth={1} />
+                            </div>
                             <div className="dm-upload-text">拖放檔案或點擊選擇</div>
                             <div className="dm-upload-hint">支援 JPG, PNG, TIF (最大 50MB)</div>
                         </div>
@@ -1091,7 +1083,7 @@ export const DataManagementPage: React.FC = () => {
                         {uploadError && (
                             <div className="dm-error">
                                 <span>{uploadError}</span>
-                                <button onClick={clearError} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}>✕</button>
+                                <button onClick={clearError} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex' }}><X size={16} /></button>
                             </div>
                         )}
 
@@ -1115,7 +1107,7 @@ export const DataManagementPage: React.FC = () => {
                                             <div className="dm-file-meta">
                                                 <span className="dm-file-year">{file.year}</span>
                                                 {formatFileSize(file.size)}
-                                                {file.minX && <span className="dm-coords-status">📍 已定位</span>}
+                                                {file.minX && <span className="dm-coords-status"><Check size={10} style={{ marginRight: 2 }} /> 已定位</span>}
                                             </div>
                                             {file.source && (
                                                 <div className="dm-file-meta">來源: {file.source}</div>
@@ -1133,7 +1125,7 @@ export const DataManagementPage: React.FC = () => {
                                 ))}
                             </div>
                         ) : (
-                            <div className="dm-empty">尚無上傳的航照圖</div>
+                            <div className="dm-empty-state">尚無上傳的航照圖</div>
                         )}
                     </section>
 
@@ -1148,7 +1140,9 @@ export const DataManagementPage: React.FC = () => {
                 <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
                     <section className="dm-section">
                         <div className="dm-section-header">
-                            <div className="dm-section-icon" style={{ background: '#dcfce7' }}>🧊</div>
+                            <div className="dm-section-icon">
+                                <Box size={20} />
+                            </div>
                             <div>
                                 <h2 className="dm-section-title">3D 地質模型</h2>
                                 <p className="dm-section-desc">3D 地質模型版本管理 (CSV / Tecplot DAT 格式)</p>
@@ -1169,7 +1163,9 @@ export const DataManagementPage: React.FC = () => {
                                 accept=".dat"
                                 onChange={handleGeoModelInputChange}
                             />
-                            <div className="dm-upload-icon">📤</div>
+                            <div className="dm-upload-icon">
+                                <UploadCloud size={48} strokeWidth={1} />
+                            </div>
                             <div className="dm-upload-text">
                                 拖曳或點擊上傳 Tecplot 地質模型
                             </div>
@@ -1199,7 +1195,7 @@ export const DataManagementPage: React.FC = () => {
                                             </div>
                                             <div className="dm-file-meta" style={{ marginTop: '4px' }}>
                                                 {model.year}年 · {formatFileSize(model.size)}
-                                                {model.sourceData && ` · ${model.sourceData}`}
+                                                {model.sourceData && ` · ${model.sourceData} `}
                                             </div>
                                             {(model.conversionStatus === 'pending' || model.conversionStatus === 'processing') && (
                                                 <div style={{ marginTop: '10px' }}>
@@ -1210,7 +1206,7 @@ export const DataManagementPage: React.FC = () => {
                                                     <div className="dm-progress-container" style={{ marginTop: 0 }}>
                                                         <div
                                                             className="dm-progress-bar"
-                                                            style={{ width: `${Math.max(5, model.conversionProgress)}%` }}
+                                                            style={{ width: `${Math.max(5, model.conversionProgress)}% ` }}
                                                         >
                                                             <div className="dm-progress-shimmer"></div>
                                                         </div>
@@ -1238,7 +1234,7 @@ export const DataManagementPage: React.FC = () => {
                                                 style={{ fontSize: '12px', padding: '4px 8px', color: '#dc2626' }}
                                                 onClick={() => handleGeoModelDeleteClick(model.id)}
                                             >
-                                                🗑
+                                                <Trash2 size={14} />
                                             </button>
                                         </div>
                                     </div>
@@ -1252,7 +1248,9 @@ export const DataManagementPage: React.FC = () => {
                 <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
                     <section className="dm-section">
                         <div className="dm-section-header">
-                            <div className="dm-section-icon" style={{ background: '#e0e7ff' }}>📡</div>
+                            <div className="dm-section-icon">
+                                <Activity size={20} />
+                            </div>
                             <div>
                                 <h2 className="dm-section-title">地球物理探查資料</h2>
                                 <p className="dm-section-desc">ERT、GPR、震測剖面圖資料管理</p>
@@ -1273,7 +1271,9 @@ export const DataManagementPage: React.FC = () => {
                                 onChange={handleGeoInputChange}
                                 style={{ display: 'none' }}
                             />
-                            <div className="dm-upload-icon">📊</div>
+                            <div className="dm-upload-icon">
+                                <UploadCloud size={48} strokeWidth={1} />
+                            </div>
                             <div className="dm-upload-text">拖放探查剖面圖或點擊選擇</div>
                             <div className="dm-upload-hint">支援 JPG, PNG, TIF (最大 50MB)</div>
                         </div>
@@ -1326,14 +1326,16 @@ export const DataManagementPage: React.FC = () => {
                                 onClick={handleCancelUpload}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#6b7280' }}
                             >
-                                ✕
+                                <X size={20} />
                             </button>
                         </div>
 
                         <div className="dm-modal-body">
                             {/* ... upload form content specific ... */}
                             <div className="dm-file-preview">
-                                <span className="dm-file-preview-icon">📄</span>
+                                <div className="dm-file-preview-icon">
+                                    <File size={24} />
+                                </div>
                                 <div>
                                     <div className="dm-file-preview-name">{selectedFile.name}</div>
                                     <div className="dm-file-preview-size">{formatFileSize(selectedFile.size)}</div>
@@ -1344,7 +1346,7 @@ export const DataManagementPage: React.FC = () => {
                                 <label className="dm-form-label">資料年份 <span className="required">*</span></label>
                                 <input
                                     type="number"
-                                    className={`dm-form-input ${formErrors.year ? 'error' : ''}`}
+                                    className={`dm - form - input ${formErrors.year ? 'error' : ''} `}
                                     value={formData.year}
                                     onChange={e => setFormData(prev => ({ ...prev, year: parseInt(e.target.value) || 0 }))}
                                     min="1900" max="2100" placeholder="例如：2024"
@@ -1355,7 +1357,7 @@ export const DataManagementPage: React.FC = () => {
                                 <label className="dm-form-label">資料名稱 <span className="required">*</span></label>
                                 <input
                                     type="text"
-                                    className={`dm-form-input ${formErrors.name ? 'error' : ''}`}
+                                    className={`dm - form - input ${formErrors.name ? 'error' : ''} `}
                                     value={formData.name}
                                     onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                                     placeholder="例如：廠區正射影像"
@@ -1373,12 +1375,15 @@ export const DataManagementPage: React.FC = () => {
 
                             <button className="dm-advanced-toggle" onClick={() => setShowAdvanced(!showAdvanced)}>
                                 <span>🛠️ 進階設定 (地理座標)</span>
-                                <span>{showAdvanced ? '▲' : '▼'}</span>
+                                <span>{showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</span>
                             </button>
 
                             {showAdvanced && (
                                 <div className="dm-advanced-section">
-                                    <div className="dm-coords-hint">💡 若上傳GeoTIFF檔，系統將嘗試自動解析。您也可手動輸入本地座標。</div>
+                                    <div className="dm-coords-hint" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <div style={{ color: 'var(--primary)' }}><Activity size={16} /></div>
+                                        <span>若上傳GeoTIFF檔，系統將嘗試自動解析。您也可手動輸入本地座標。</span>
+                                    </div>
                                     <div className="dm-form-row">
                                         <div className="dm-form-col"><div className="dm-form-group"><label className="dm-form-label">Min X</label><input type="number" className="dm-form-input" value={formData.minX || ''} onChange={e => setFormData(prev => ({ ...prev, minX: e.target.value }))} placeholder="0.00" /></div></div>
                                         <div className="dm-form-col"><div className="dm-form-group"><label className="dm-form-label">Max X</label><input type="number" className="dm-form-input" value={formData.maxX || ''} onChange={e => setFormData(prev => ({ ...prev, maxX: e.target.value }))} placeholder="0.00" /></div></div>
@@ -1399,7 +1404,7 @@ export const DataManagementPage: React.FC = () => {
                                         <span>{uploadProgress}%</span>
                                     </div>
                                     <div className="dm-progress-container" style={{ marginTop: 0 }}>
-                                        <div className="dm-progress-bar" style={{ width: `${Math.max(2, uploadProgress)}%` }}>
+                                        <div className="dm-progress-bar" style={{ width: `${Math.max(2, uploadProgress)}% ` }}>
                                             <div className="dm-progress-shimmer"></div>
                                         </div>
                                     </div>
@@ -1421,7 +1426,7 @@ export const DataManagementPage: React.FC = () => {
                     <div className="dm-modal dm-modal-delete" onClick={e => e.stopPropagation()}>
                         <div className="dm-modal-header">
                             <h3 className="dm-modal-title" style={{ color: '#dc2626' }}>刪除確認</h3>
-                            <button onClick={cancelDelete} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#6b7280' }}>✕</button>
+                            <button onClick={cancelDelete} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#6b7280' }}><X size={20} /></button>
                         </div>
                         <div className="dm-modal-body">
                             <p style={{ margin: 0, color: '#374151' }}>確定要永久刪除此航照圖嗎？此動作無法復原。</p>
@@ -1444,7 +1449,7 @@ export const DataManagementPage: React.FC = () => {
                     <div className="dm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                         <div className="dm-modal-header">
                             <h3 className="dm-modal-title">資料詳細內容</h3>
-                            <button onClick={handleCloseDetail} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#6b7280' }}>✕</button>
+                            <button onClick={handleCloseDetail} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#6b7280' }}><X size={20} /></button>
                         </div>
                         <div className="dm-modal-body">
                             <div style={{ marginBottom: '20px', textAlign: 'center', background: '#f1f5f9', borderRadius: '8px', overflow: 'hidden' }}>
@@ -1506,11 +1511,13 @@ export const DataManagementPage: React.FC = () => {
                     <div className="dm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                         <div className="dm-modal-header">
                             <h3 className="dm-modal-title">上傳地球物理探查資料</h3>
-                            <button onClick={handleCancelGeoUpload} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#6b7280' }}>✕</button>
+                            <button onClick={handleCancelGeoUpload} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#6b7280' }}><X size={20} /></button>
                         </div>
                         <div className="dm-modal-body">
                             <div className="dm-file-preview">
-                                <span className="dm-file-preview-icon">📊</span>
+                                <div className="dm-file-preview-icon">
+                                    <Activity size={24} />
+                                </div>
                                 <div>
                                     <div className="dm-file-preview-name">{geoFile.name}</div>
                                     <div className="dm-file-preview-size">{formatFileSize(geoFile.size)}</div>
@@ -1608,7 +1615,7 @@ export const DataManagementPage: React.FC = () => {
                                         <span>{uploadProgress}%</span>
                                     </div>
                                     <div className="dm-progress-container" style={{ marginTop: 0 }}>
-                                        <div className="dm-progress-bar" style={{ width: `${Math.max(2, uploadProgress)}%` }}>
+                                        <div className="dm-progress-bar" style={{ width: `${Math.max(2, uploadProgress)}% ` }}>
                                             <div className="dm-progress-shimmer"></div>
                                         </div>
                                     </div>
@@ -1692,7 +1699,7 @@ export const DataManagementPage: React.FC = () => {
                                     const lookAt: [number, number, number] = [world.x, world.y, world.z];
                                     useCameraStore.getState().flyTo({ position: camPos, lookAt });
                                     setShowGeoDetail(false);
-                                    if (projectCode) navigate(`/project/${projectCode}`);
+                                    if (projectCode) navigate(`/ project / ${projectCode} `);
                                 }}
                             >
                                 在 3D 場景中定位
@@ -1787,7 +1794,7 @@ export const DataManagementPage: React.FC = () => {
                                         <span>{uploadProgress}%</span>
                                     </div>
                                     <div className="dm-progress-container" style={{ marginTop: 0 }}>
-                                        <div className="dm-progress-bar" style={{ width: `${Math.max(2, uploadProgress)}%` }}>
+                                        <div className="dm-progress-bar" style={{ width: `${Math.max(2, uploadProgress)}% ` }}>
                                             <div className="dm-progress-shimmer"></div>
                                         </div>
                                     </div>
@@ -1854,11 +1861,11 @@ export const DataManagementPage: React.FC = () => {
             )}
 
             <style>{`
-                @keyframes dm-toast-in {
-                    from { opacity: 0; transform: translateX(40px); }
+@keyframes dm-toast-in {
+    from { opacity: 0; transform: translateX(40px); }
                     to   { opacity: 1; transform: translateX(0); }
                 }
-            `}</style>
+`}</style>
         </div>
     );
 };

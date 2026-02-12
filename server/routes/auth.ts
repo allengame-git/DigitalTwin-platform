@@ -119,7 +119,7 @@ router.post('/login', async (req: Request, res: Response) => {
             },
             tokens: {
                 accessToken,
-                expiresIn: 15 * 60 * 1000, // 15 minutes in ms
+                expiresIn: 24 * 60 * 60 * 1000, // 24 hours in ms
             },
         });
     } catch (error) {

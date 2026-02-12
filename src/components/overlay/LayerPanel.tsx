@@ -167,6 +167,7 @@ const LayersTab: React.FC = () => {
         layers,
         toggleLayer,
         setOpacity,
+        setLayerZOffset,
     } = useLayerStore();
 
     return (
@@ -175,57 +176,85 @@ const LayersTab: React.FC = () => {
             {Object.values(layers).map((layer) => (
                 <div
                     key={layer.id}
-                    style={{
+                    style={{ borderBottom: '1px solid #f3f4f6', padding: '6px 0' }}
+                >
+                    <div style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '6px 0',
-                        borderBottom: '1px solid #f3f4f6',
-                    }}
-                >
-                    <label
-                        style={{
+                    }}>
+                        <label
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                cursor: 'pointer',
+                                flex: 1,
+                            }}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={layer.visible}
+                                onChange={() => toggleLayer(layer.id)}
+                                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '13px' }}>
+                                {LAYER_ICONS[layer.id]} {layer.name}
+                            </span>
+                        </label>
+
+                        {layer.visible && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {layer.id === 'attitudes' && (
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', marginRight: '4px' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={useViewerStore.getState().config.showAttitudeLabels}
+                                            onChange={(e) => useViewerStore.getState().setConfig({ showAttitudeLabels: e.target.checked })}
+                                            style={{ width: '12px', height: '12px', cursor: 'pointer' }}
+                                        />
+                                        <span style={{ fontSize: '11px', color: '#6b7280' }}>標籤</span>
+                                    </label>
+                                )}
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.1"
+                                    value={layer.opacity}
+                                    onChange={(e) => setOpacity(layer.id, parseFloat(e.target.value))}
+                                    style={{ width: '60px', cursor: 'pointer' }}
+                                    title={`透明度: ${Math.round(layer.opacity * 100)}%`}
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {layer.visible && layer.id === 'imagery' && (
+                        <div style={{
+                            marginTop: '8px',
+                            paddingLeft: '24px',
+                            paddingRight: '4px',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            cursor: 'pointer',
-                            flex: 1,
-                        }}
-                    >
-                        <input
-                            type="checkbox"
-                            checked={layer.visible}
-                            onChange={() => toggleLayer(layer.id)}
-                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                        />
-                        <span style={{ fontSize: '13px' }}>
-                            {LAYER_ICONS[layer.id]} {layer.name}
-                        </span>
-                    </label>
-
-                    {layer.visible && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {layer.id === 'attitudes' && (
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', marginRight: '4px' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={useViewerStore.getState().config.showAttitudeLabels}
-                                        onChange={(e) => useViewerStore.getState().setConfig({ showAttitudeLabels: e.target.checked })}
-                                        style={{ width: '12px', height: '12px', cursor: 'pointer' }}
-                                    />
-                                    <span style={{ fontSize: '11px', color: '#6b7280' }}>標籤</span>
-                                </label>
-                            )}
+                            background: '#f8fafc',
+                            padding: '8px',
+                            borderRadius: '6px',
+                            margin: '4px 0 0 24px'
+                        }}>
+                            <span style={{ fontSize: '11px', color: '#6b7280', whiteSpace: 'nowrap' }}>高程Offset:</span>
                             <input
                                 type="range"
-                                min="0"
-                                max="1"
-                                step="0.1"
-                                value={layer.opacity}
-                                onChange={(e) => setOpacity(layer.id, parseFloat(e.target.value))}
-                                style={{ width: '60px', cursor: 'pointer' }}
-                                title={`透明度: ${Math.round(layer.opacity * 100)}%`}
+                                min="-500"
+                                max="100"
+                                step="10"
+                                value={layer.zOffset ?? 5}
+                                onChange={(e) => setLayerZOffset(layer.id, parseFloat(e.target.value))}
+                                style={{ flex: 1, cursor: 'pointer' }}
+                                title={`高程: ${layer.zOffset ?? 5}m`}
                             />
+                            <span style={{ fontSize: '11px', color: '#6b7280', width: '40px', textAlign: 'right' }}>{layer.zOffset ?? 5}m</span>
                         </div>
                     )}
                 </div>

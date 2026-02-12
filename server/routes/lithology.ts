@@ -118,6 +118,36 @@ router.delete('/:id', async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 
+        // 1. 檢查岩性是否存在並取得代碼
+        const lithology = await prisma.projectLithology.findUnique({
+            where: { id: id as string }
+        });
+
+        if (!lithology) {
+            return res.status(404).json({ error: '找不到岩性資料' });
+        }
+
+        // 2. 檢查是否有地層資料使用此岩性代碼
+        // 注意：這裡是跨專案檢查還是單一專案？ BoreholeLayer 沒有 projectId，是跟隨 Borehole
+        // 但 lithology code 在專案內是唯一的。
+        // 若要精確檢查，需 join Borehole -> Project，確認是同一個專案下的使用
+        // 簡化作法：若 BoreholeLayer 有此 lithologyCode 且其所屬 Borehole 的 projectId 與此 lithology 的 projectId 相同
+
+        const usageCount = await prisma.boreholeLayer.count({
+            where: {
+                lithologyCode: lithology.code,
+                borehole: {
+                    projectId: lithology.projectId
+                }
+            }
+        });
+
+        if (usageCount > 0) {
+            return res.status(400).json({
+                error: `無法刪除：此岩性已被 ${usageCount} 筆地層資料使用中，請先修改或刪除相關資料`
+            });
+        }
+
         await prisma.projectLithology.delete({
             where: { id: id as string }
         });
@@ -168,6 +198,63 @@ router.post('/init-defaults', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Error initializing default lithologies:', error);
         res.status(500).json({ error: '無法初始化預設岩性' });
+    }
+});
+
+/**
+ * POST /api/lithology/batch
+ * 批次匯入岩性 (CSV)
+ */
+router.post('/batch', async (req: Request, res: Response) => {
+    try {
+        const { projectId, lithologies } = req.body;
+
+        if (!projectId || !Array.isArray(lithologies) || lithologies.length === 0) {
+            return res.status(400).json({ error: '無效的請求資料' });
+        }
+
+        // 檢查 projectId
+        const project = await prisma.project.findUnique({
+            where: { id: projectId }
+        });
+
+        if (!project) {
+            return res.status(404).json({ error: '找不到專案' });
+        }
+
+        // 檢查是否已有重複的 lithId 或 code (僅在這次 batch 內檢查)
+        // 實際寫入時由 database constraint把關
+        // 使用 transaction 確保全部成功或全部失敗
+        const result = await prisma.$transaction(async (tx) => {
+            let count = 0;
+            for (const item of lithologies) {
+                // 檢查是否存在，若存在則忽略或更新？
+                // 這裡選用 upsert 或者先 check
+                // 簡單起見，直接 create，若失敗則整批失敗 (符合一般 CSV import 邏輯)
+                // 但為了使用者體驗，我們可以先檢查
+
+                await tx.projectLithology.create({
+                    data: {
+                        projectId,
+                        lithId: parseInt(item.lithId),
+                        code: item.code.trim().toUpperCase(),
+                        name: item.name.trim(),
+                        color: item.color.trim()
+                    }
+                });
+                count++;
+            }
+            return count;
+        });
+
+        res.status(201).json({ success: true, count: result });
+
+    } catch (error: any) {
+        console.error('Error batch importing lithologies:', error);
+        if (error.code === 'P2002') {
+            return res.status(400).json({ error: '部分岩性代碼或 ID 已存在，請檢查資料' });
+        }
+        res.status(500).json({ error: '無法匯入岩性資料' });
     }
 });
 

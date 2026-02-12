@@ -25,6 +25,7 @@ interface LithologyState {
 interface LithologyActions {
     fetchLithologies: (projectId: string) => Promise<void>;
     createLithology: (projectId: string, data: Omit<ProjectLithology, 'id'>) => Promise<ProjectLithology | null>;
+    importLithologies: (projectId: string, data: Omit<ProjectLithology, 'id'>[]) => Promise<number | null>;
     updateLithology: (id: string, data: Partial<ProjectLithology>) => Promise<ProjectLithology | null>;
     deleteLithology: (id: string) => Promise<boolean>;
     initDefaults: (projectId: string) => Promise<boolean>;
@@ -84,6 +85,36 @@ export const useLithologyStore = create<LithologyState & LithologyActions>((set,
         }
     },
 
+    importLithologies: async (projectId: string, data: Omit<ProjectLithology, 'id'>[]) => {
+        set({ status: 'loading', error: null });
+        try {
+            const response = await fetch(`${API_BASE}/api/lithology/batch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ projectId, lithologies: data }),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || '匯入岩性失敗');
+            }
+
+            const result = await response.json();
+
+            // 重新讀取完整清單以確保順序正確
+            await get().fetchLithologies(projectId);
+
+            return result.count;
+        } catch (error) {
+            set({
+                status: 'error',
+                error: error instanceof Error ? error.message : '匯入岩性失敗'
+            });
+            return null;
+        }
+    },
+
     updateLithology: async (id: string, data: Partial<ProjectLithology>) => {
         try {
             const response = await fetch(`${API_BASE}/api/lithology/${id}`, {
@@ -118,11 +149,13 @@ export const useLithologyStore = create<LithologyState & LithologyActions>((set,
             });
 
             if (!response.ok) {
-                throw new Error('刪除岩性失敗');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || '刪除岩性失敗');
             }
 
             set(state => ({
-                lithologies: state.lithologies.filter(l => l.id !== id)
+                lithologies: state.lithologies.filter(l => l.id !== id),
+                error: null
             }));
 
             return true;

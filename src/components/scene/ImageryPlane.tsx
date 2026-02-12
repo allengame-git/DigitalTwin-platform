@@ -10,6 +10,7 @@ import React, { useMemo, Suspense } from 'react';
 import { useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import { useLayerStore } from '../../stores/layerStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { useUploadStore } from '../../stores/uploadStore';
 
 interface ImageryPlaneProps {
@@ -141,23 +142,34 @@ export function ImageryPlane({
     const imageUrl = activeImagery?.url || propImageUrl;
 
     // 計算地理位置 (如果有的話)
+    const activeProject = useProjectStore(state => state.getActiveProject());
+
+    // 計算地理位置 (如果有的話)
     const { finalWidth, finalHeight, finalPosition } = useMemo(() => {
         if (activeImagery?.minX !== null && activeImagery?.minX !== undefined &&
             activeImagery?.maxX !== null && activeImagery?.maxX !== undefined &&
             activeImagery?.minY !== null && activeImagery?.minY !== undefined &&
-            activeImagery?.maxY !== null && activeImagery?.maxY !== undefined) {
+            activeImagery?.maxY !== null && activeImagery?.maxY !== undefined &&
+            activeProject) {
 
-            const w = Math.abs(activeImagery.maxX - activeImagery.minX);
-            const h = Math.abs(activeImagery.maxY - activeImagery.minY);
-            const centerX = (activeImagery.minX + activeImagery.maxX) / 2;
-            const centerY = (activeImagery.minY + activeImagery.maxY) / 2;
+            // Apply project origin offset
+            const minX = activeImagery.minX - activeProject.originX;
+            const maxX = activeImagery.maxX - activeProject.originX;
+            const minY = activeImagery.minY - activeProject.originY; // Note: Y in 3D is usually up, but here we map TWD97 Y to -Z or similar. 
+            // Wait, TWD97 Y is North. In 3D (x, y, z), usually x=East, z=-North (or South).
+            // Let's stick to the existing logic: TWD97 X -> 3D X, TWD97 Y -> 3D -Z.
+            const maxY = activeImagery.maxY - activeProject.originY;
+
+            const w = Math.abs(maxX - minX);
+            const h = Math.abs(maxY - minY);
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
 
             return {
                 finalWidth: w,
                 finalHeight: h,
-                // Y設為 5: 確保在地形上方 (地形如果是 DEM，可能會有高度起伏)
-                // 這裡假設航照圖是要當作「覆蓋層」
-                finalPosition: [centerX, 5, -centerY] as [number, number, number]
+                // Y設為 zOffset: 確保在地形上方，可由使用者調整
+                finalPosition: [centerX, (imageryLayer.zOffset ?? 5), -centerY] as [number, number, number]
             };
         }
 
@@ -167,7 +179,7 @@ export function ImageryPlane({
             // 預設高度也稍微抬高
             finalPosition: [defaultPosition[0], 0.5, defaultPosition[2]] as [number, number, number]
         };
-    }, [activeImagery, defaultWidth, defaultHeight, defaultPosition]);
+    }, [activeImagery, activeProject, defaultWidth, defaultHeight, defaultPosition, imageryLayer]);
 
 
     if (!imageryLayer.visible) return null;
