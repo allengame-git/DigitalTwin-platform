@@ -91,6 +91,10 @@ export const BoreholeUploadSection: React.FC = () => {
     const [showDeletePhotoConfirm, setShowDeletePhotoConfirm] = useState<string | null>(null);
     const photoInputRef = useRef<HTMLInputElement>(null);
 
+    // CSV Import Result
+    const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: { boreholeNo: string; error: string }[] } | null>(null);
+    const [showResultModal, setShowResultModal] = useState(false);
+
     useEffect(() => {
         if (activeProjectId) {
             fetchBoreholes(activeProjectId);
@@ -373,7 +377,9 @@ export const BoreholeUploadSection: React.FC = () => {
         }
 
         const result = await batchImport(activeProjectId, boreholeData);
-        alert(`匯入完成：成功 ${result.success} 筆，失敗 ${result.failed} 筆${result.failed > 0 ? '\n請檢查編號是否重複或格式錯誤。' : ''}`);
+
+        setImportResult(result);
+        setShowResultModal(true);
 
         if (csvInputRef.current) {
             csvInputRef.current.value = '';
@@ -451,7 +457,9 @@ export const BoreholeUploadSection: React.FC = () => {
         }
 
         const result = await batchImportLayers(activeProjectId, layerData);
-        alert(`地層資料匯入完成：成功 ${result.success} 筆，失敗 ${result.failed} 筆`);
+
+        setImportResult(result);
+        setShowResultModal(true);
 
         if (layerCsvInputRef.current) {
             layerCsvInputRef.current.value = '';
@@ -509,7 +517,9 @@ export const BoreholeUploadSection: React.FC = () => {
         }
 
         const result = await batchImportProperties(activeProjectId, propertyData);
-        alert(`物性資料匯入完成：成功 ${result.success} 筆，失敗 ${result.failed} 筆`);
+
+        setImportResult(result);
+        setShowResultModal(true);
 
         if (propertyCsvInputRef.current) {
             propertyCsvInputRef.current.value = '';
@@ -1090,6 +1100,57 @@ BH-002,2.0,8,`}
                         <div className="dm-modal-footer">
                             <button className="dm-btn dm-btn-secondary" onClick={() => setShowDeletePhotoConfirm(null)}>取消</button>
                             <button className="dm-btn dm-btn-primary" style={{ background: '#dc2626' }} onClick={() => handleDeletePhoto(showDeletePhotoConfirm)}>刪除</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showResultModal && importResult && (
+                <div className="dm-modal-overlay">
+                    <div className="dm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+                        <div className="dm-modal-header">
+                            <h3 className="dm-modal-title">匯入結果</h3>
+                            <button onClick={() => setShowResultModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#6b7280' }}>✕</button>
+                        </div>
+                        <div className="dm-modal-body">
+                            <div style={{ marginBottom: '16px' }}>
+                                <p style={{ fontSize: '15px', fontWeight: 500 }}>
+                                    匯入完成：成功 <span style={{ color: '#16a34a' }}>{importResult.success}</span> 筆，
+                                    失敗 <span style={{ color: '#dc2626' }}>{importResult.failed}</span> 筆
+                                </p>
+                            </div>
+
+                            {importResult.failed > 0 && (
+                                <div style={{ marginTop: '12px' }}>
+                                    <p style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', color: '#dc2626' }}>失敗詳情：</p>
+                                    <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #fee2e2', borderRadius: '6px', background: '#fef2f2' }}>
+                                        <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
+                                            <thead style={{ position: 'sticky', top: 0, background: '#fee2e2' }}>
+                                                <tr>
+                                                    <th style={{ padding: '8px', textAlign: 'left', color: '#b91c1c' }}>編號 / ID</th>
+                                                    <th style={{ padding: '8px', textAlign: 'left', color: '#b91c1c' }}>錯誤原因</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {importResult.errors.map((err, idx) => (
+                                                    <tr key={idx} style={{ borderTop: '1px solid #fecaca' }}>
+                                                        <td style={{ padding: '8px', fontFamily: 'monospace' }}>{err.boreholeNo}</td>
+                                                        <td style={{ padding: '8px', color: '#ef4444' }}>{err.error}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                                <button
+                                    className="dm-btn dm-btn-primary"
+                                    onClick={() => setShowResultModal(false)}
+                                >
+                                    確定
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
