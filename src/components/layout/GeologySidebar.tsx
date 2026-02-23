@@ -19,7 +19,7 @@ export const GeologySidebar: React.FC = () => {
     // 收合狀態
     const [isCollapsed, setIsCollapsed] = React.useState(false);
     const { fps, memory, triangles } = usePerformanceStore();
-    const { resetCamera } = useCameraStore();
+    const { resetCamera, resetTarget, setResetTarget, viewPreset, setViewPreset } = useCameraStore();
     const { boreholes } = useBoreholeStore();
 
     const { projectCode } = useParams<{ projectCode: string }>();
@@ -163,8 +163,75 @@ export const GeologySidebar: React.FC = () => {
                 {/* Camera Tools Section */}
                 <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb' }}>
                     <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                        📷 相機控制
+                        相機控制
                     </div>
+
+                    {/* 框選目標 */}
+                    <div style={{ marginBottom: '8px' }}>
+                        <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                            重置範圍
+                        </label>
+                        <select
+                            value={resetTarget}
+                            onChange={(e) => setResetTarget(e.target.value as any)}
+                            style={{
+                                width: '100%',
+                                padding: '6px 8px',
+                                fontSize: '12px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                background: 'white',
+                                color: '#374151',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            <option value="all">全部</option>
+                            <option value="geology">僅地質模型</option>
+                            <option value="borehole">僅鑽孔</option>
+                        </select>
+                    </div>
+
+                    {/* 角度快捷按鈕 */}
+                    <div style={{ marginBottom: '8px' }}>
+                        <label style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                            快速切換視角
+                        </label>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                            {([
+                                { preset: 'top' as const, label: 'Top' },
+                                { preset: 'xPositive' as const, label: '+X' },
+                                { preset: 'yPositive' as const, label: '+Y' },
+                                { preset: 'default' as const, label: '預設' },
+                            ]).map(({ preset, label }) => (
+                                <button
+                                    key={preset}
+                                    onClick={() => setViewPreset(preset)}
+                                    style={{
+                                        flex: 1,
+                                        padding: '6px 0',
+                                        fontSize: '12px',
+                                        fontWeight: 500,
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '4px',
+                                        background: viewPreset === preset ? '#3b82f6' : '#f9fafb',
+                                        color: viewPreset === preset ? 'white' : '#374151',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s',
+                                    }}
+                                    onMouseOver={(e) => {
+                                        if (viewPreset !== preset) e.currentTarget.style.background = '#e5e7eb';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        if (viewPreset !== preset) e.currentTarget.style.background = '#f9fafb';
+                                    }}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 重置相機按鈕 */}
                     <button
                         onClick={resetCamera}
                         style={{
@@ -186,10 +253,10 @@ export const GeologySidebar: React.FC = () => {
                         onMouseOver={(e) => (e.currentTarget.style.background = '#2563eb')}
                         onMouseOut={(e) => (e.currentTarget.style.background = '#3b82f6')}
                     >
-                        🎯 重置相機位置
+                        重置相機位置
                     </button>
                     <div style={{ marginTop: '6px', fontSize: '11px', color: '#6b7280' }}>
-                        將相機移動到當前模型的中心位置
+                        依據選定範圍與視角重置相機
                     </div>
                 </div>
             </div>

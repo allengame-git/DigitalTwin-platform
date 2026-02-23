@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
+import { z } from "zod";
 
 const router = Router();
 
@@ -147,7 +148,16 @@ router.post('/', async (req: Request, res: Response) => {
 router.put('/:id', async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        const { name, description, originX, originY, isActive } = req.body;
+        const updateProjectSchema = z.object({
+            name: z.string().min(1, "Name is required").optional(),
+            description: z.string().optional(),
+            originX: z.number().optional(),
+            originY: z.number().optional(),
+            northAngle: z.number().optional(),
+            isActive: z.boolean().optional(),
+        });
+
+        const { name, description, originX, originY, northAngle, isActive } = updateProjectSchema.parse(req.body);
 
         const project = await prisma.project.update({
             where: { id },
@@ -156,6 +166,7 @@ router.put('/:id', async (req: Request, res: Response) => {
                 ...(description !== undefined && { description }),
                 ...(originX !== undefined && { originX }),
                 ...(originY !== undefined && { originY }),
+                ...(northAngle !== undefined && { northAngle }),
                 ...(isActive !== undefined && { isActive }),
             }
         });

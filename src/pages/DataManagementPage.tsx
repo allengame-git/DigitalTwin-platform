@@ -95,14 +95,15 @@ export const DataManagementPage: React.FC = () => {
     }, []);
 
     // Project Settings State
-    const [originForm, setOriginForm] = useState({ x: '', y: '' });
+    const [originForm, setOriginForm] = useState({ x: '', y: '', northAngle: '' });
     const [isSavingOrigin, setIsSavingOrigin] = useState(false);
 
     useEffect(() => {
         if (activeProject) {
             setOriginForm({
                 x: activeProject.originX.toString(),
-                y: activeProject.originY.toString()
+                y: activeProject.originY.toString(),
+                northAngle: (activeProject.northAngle || 0).toString()
             });
         }
     }, [activeProject]);
@@ -112,6 +113,7 @@ export const DataManagementPage: React.FC = () => {
 
         const x = parseFloat(originForm.x);
         const y = parseFloat(originForm.y);
+        const northAngle = parseFloat(originForm.northAngle) || 0;
 
         if (isNaN(x) || isNaN(y)) {
             showToast('請輸入有效的數字', 'error');
@@ -122,7 +124,8 @@ export const DataManagementPage: React.FC = () => {
         try {
             const updated = await updateProject(activeProject.id, {
                 originX: x,
-                originY: y
+                originY: y,
+                northAngle: northAngle
             });
 
             if (updated) {
@@ -985,6 +988,18 @@ export const DataManagementPage: React.FC = () => {
                                     value={originForm.y}
                                     onChange={e => setOriginForm(prev => ({ ...prev, y: e.target.value }))}
                                     placeholder="2429000"
+                                />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <label className="dm-form-label">
+                                    北方角度 (度) <span className="required">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    className="dm-form-input"
+                                    value={originForm.northAngle}
+                                    onChange={e => setOriginForm(prev => ({ ...prev, northAngle: e.target.value }))}
+                                    placeholder="0 (正北)"
                                 />
                             </div>
                             <button

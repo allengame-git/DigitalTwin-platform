@@ -81,6 +81,7 @@ export const DashboardPage: React.FC = () => {
         description: projectForm.description || undefined,
         originX: 224000,
         originY: 2429000,
+        northAngle: 0,
         isActive: true,
       });
     }

@@ -14,6 +14,8 @@ import { useLithologyStore } from '../../stores/lithologyStore';
 import { BoreholeInstances } from './BoreholeInstances';
 import { SceneEnvironment } from './SceneEnvironment';
 import { LoadingProgress } from '../overlay/LoadingProgress';
+import { ScaleBarCalculator, ScaleBarOverlay, useScaleBar } from '../overlay/ScaleBar';
+import { NorthArrowCalculator, NorthArrowOverlay, useNorthArrow } from '../overlay/NorthArrow';
 // Phase 7-10 新增元件
 import { GeologyTiles } from './GeologyTiles';
 import { ClippingPlane } from './ClippingPlane';
@@ -39,6 +41,8 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
     const { attitudes, fetchAttitudes } = useAttitudeStore();
     const { fetchGeologyModels, fetchImageryFiles } = useUploadStore();
     const { fetchLithologies } = useLithologyStore();
+    const { pixelsPerMeter, handleScaleChange } = useScaleBar();
+    const { cameraRotation, handleRotationChange } = useNorthArrow();
 
     useEffect(() => {
         if (activeProjectId) {
@@ -103,7 +107,19 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
 
                 <PerformanceMonitor />
                 <CameraController />
+
+                {/* 比例尺計算器 (Canvas 內部) */}
+                <ScaleBarCalculator onScaleChange={handleScaleChange} />
+
+                {/* 指北針計算器 (Canvas 內部) */}
+                <NorthArrowCalculator onRotationChange={handleRotationChange} />
             </Canvas>
+
+            {/* 指北針 (HTML Overlay) */}
+            <NorthArrowOverlay cameraRotation={cameraRotation} />
+
+            {/* 動態比例尺 (HTML Overlay) */}
+            <ScaleBarOverlay pixelsPerMeter={pixelsPerMeter} />
 
             {/* 載入進度 */}
             {status === 'loading' && <LoadingProgress />}

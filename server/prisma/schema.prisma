@@ -14,6 +14,7 @@ model Project {
   description   String?
   originX       Float              @default(224000)
   originY       Float              @default(2429000)
+  northAngle    Float              @default(0)
   isActive      Boolean            @default(true)
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt

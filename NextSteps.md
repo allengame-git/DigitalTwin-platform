@@ -6,7 +6,7 @@
 
 ## 📍 目前狀態
 
-**最後更新**: 2026-02-23
+**最後更新**: 2026-02-23 (指北針與相機控制優化)
 
 ### 已完成功能
 
@@ -124,6 +124,24 @@
   - 之前進入地質展示頁面時 `uploadStore.geologyModels` 永遠是空的
   - 導致 `GeologyTiles` 無法顯示 GLB mesh、Camera Reset 判斷 `hasModel: false`
 
+#### 8. 指北針與相機控制 (2026-02-23)
+
+- ✅ **動態指北針 (`NorthArrow`)**
+  - `NorthArrowCalculator`: 在 R3F Canvas 內每幀計算相機方位角
+  - `NorthArrowOverlay`: HTML 羅盤顯示，結合專案 `northAngle` 偏移
+  - 支援專案設定的真北方位角偏移 (`projectStore.northAngle`)
+- ✅ **快速視角切換** (Top / +X / +Y / 預設)
+  - UI 按鈕在 `GeologySidebar.tsx`
+  - `cameraStore.setViewPreset()` 觸發切換
+  - `CameraController.getViewAngles()` 計算各視角的球坐標偏移
+- ✅ **重置範圍過濾** (全部 / 僅地質模型 / 僅鑽孔)
+  - `cameraStore.resetTarget` 控制過濾範圍
+  - `CameraController.computeBounds()` 依 scene traverse + store fallback
+- ✅ **Gimbal Lock 修正**
+  - `CameraController.applyCamera()`: TOP 視角手動設定 `camera.up` 朝北，避免 `lookAt` 在正上方時產生錯誤方向
+  - `NorthArrowCalculator`: 當 forward 向量投影到 xz 平面接近零時，fallback 改用 camera up 向量計算方位角
+  - 非 TOP 視角時恢復預設 `camera.up = (0,1,0)`
+
 #### 7. 基礎架構
 
 - ✅ 身分驗證 (JWT Token + Refresh)
@@ -174,17 +192,20 @@ Password: postgres
 - `src/stores/uploadStore.ts`
 - `server/routes/geology-model.ts`
 
-#### 3. 相機重置精確度優化 （這一點可以暫時略過，目前功能符合需求）
+#### 3. 相機重置精確度優化 & 快速角度切換 (2026-02-23)
 
-**背景**: 目前 `scene.traverse()` 會掃描所有可見物件包含 DEM 地形 (約 2000m 寬)，若用戶只想 focus 在地質模型上，可能需要更精確的控制。
-
-- [ ] **UI**: 新增「框選目標」下拉選單 (全部 / 僅地質模型 / 僅鑽孔)
+- [x] **UI**: 新增「重置範圍」下拉選單 (全部 / 僅地質模型 / 僅鑽孔)
+- [x] **UI**: 新增快速切換視角按鈕 (Top 俯視 / +X / +Y / 預設)
+- [x] **CameraController 重構**: 抽取 `computeBounds` (依 resetTarget 過濾) 與 `applyCamera` (依 ViewPreset 角度)
+- [x] **場景標記**: GeologyTiles / BoreholeInstances / TerrainMesh 加上 `userData.layerType` 標記
+- [x] **指北針整合**: NorthArrow 元件整合專案 northAngle 設定，修正 TOP 視角 Gimbal Lock 問題
 - [ ] **Config**: 讓使用者調整重置時的填充率 (目前 0.7x)
 
 **相關檔案**:
 
 - `src/components/scene/CameraController.tsx`
 - `src/stores/cameraStore.ts`
+- `src/components/layout/GeologySidebar.tsx`
 
 #### 4. 斷層面功能完善 （這一點可以暫時略過，目前目前功能符合需求）
 
@@ -263,7 +284,7 @@ Password: postgres
 | `src/stores/lithologyStore.ts` | 岩性定義 (專案級顏色配置) |
 | `src/stores/layerStore.ts` | 圖層控制 (可見性、透明度) |
 | `src/stores/viewerStore.ts` | 3D 檢視器 (LOD, Clipping Plane, 背景色) |
-| `src/stores/cameraStore.ts` | 相機控制 (reset trigger, target center) |
+| `src/stores/cameraStore.ts` | 相機控制 (reset trigger, target center, viewPreset, resetTarget) |
 
 ### 前端 - 3D 場景元件
 
@@ -278,6 +299,15 @@ Password: postgres
 | `src/components/scene/StructureLines.tsx` | 斷層面 3D 渲染 |
 | `src/components/scene/TerrainMesh.tsx` | DEM 地形渲染 |
 | `src/components/scene/GeophysicsPlane.tsx` | 地球物理探查 3D 剖面 |
+
+### 前端 - Overlay 元件
+
+| 檔案 | 說明 |
+|:---|:---|
+| `src/components/overlay/NorthArrow.tsx` | 動態指北針 (Calculator + Overlay + Hook) |
+| `src/components/overlay/LayerPanel.tsx` | 圖層控制面板 |
+| `src/components/overlay/ClippingTool.tsx` | 剖面切片工具 |
+| `src/components/overlay/BoreholeDetail.tsx` | 鑽孔詳細資訊面板 |
 
 ### 前端 - 資料管理元件
 

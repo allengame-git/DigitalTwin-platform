@@ -15,6 +15,7 @@ export interface Project {
     description?: string;
     originX: number;
     originY: number;
+    northAngle: number;
     isActive: boolean;
     createdAt: string;
     updatedAt: string;

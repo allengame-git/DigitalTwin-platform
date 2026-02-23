@@ -228,6 +228,7 @@ export function BoreholeInstances() {
             onPointerOut={handlePointerOut}
             frustumCulled={false}
             visible={boreholeLayer.visible}
+            userData={{ layerType: 'borehole' }}
         />
     );
 }

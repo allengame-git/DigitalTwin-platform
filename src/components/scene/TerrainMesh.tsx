@@ -144,6 +144,7 @@ export function TerrainMesh() {
             position={[centerX - originX, 0, -(centerY - originY)]}
             receiveShadow
             castShadow
+            userData={{ layerType: 'terrain' }}
         >
             <planeGeometry args={[xSize, ySize, segs, segs]} />
             <meshStandardMaterial

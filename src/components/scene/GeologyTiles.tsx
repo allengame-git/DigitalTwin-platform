@@ -358,7 +358,7 @@ function GeologyMesh({
     }, [geology3dLayer.visible]);
 
     return (
-        <group ref={groupRef}>
+        <group ref={groupRef} userData={{ layerType: 'geology' }}>
             <primitive object={gltfScene} />
 
             {/* Cap plane — only rendered when clipping is active + volume loaded */}
