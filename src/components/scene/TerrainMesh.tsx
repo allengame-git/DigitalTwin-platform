@@ -32,7 +32,7 @@ export function TerrainMesh() {
 
     const meshRef = useRef<THREE.Mesh>(null);
     const materialRef = useRef<THREE.MeshStandardMaterial>(null);
-    const shaderRef = useRef<THREE.Shader>(null);
+    const shaderRef = useRef<any>(null);
 
     // API Base URL (Fallback to localhost if env not set)
     const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -63,7 +63,7 @@ export function TerrainMesh() {
     if (!terrainLayer.visible || !activeTerrain) return null;
 
     // Custom Shader Logic
-    const onBeforeCompile = (shader: THREE.Shader) => {
+    const onBeforeCompile = (shader: any) => {
         shaderRef.current = shader;
 
         shader.uniforms.uRamp = { value: rampTexture };

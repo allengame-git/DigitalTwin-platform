@@ -23,6 +23,7 @@ import lithologyRoutes from './routes/lithology';
 import faultPlaneRoutes from './routes/faultPlane';
 import attitudeRoutes from './routes/attitude';
 import terrainRoutes from './routes/terrain';
+import cleanupRoutes from './routes/cleanup';
 import { requestIdMiddleware, requestLogger, errorLogger } from './middleware/errorLogger';
 import path from 'path';
 
@@ -64,6 +65,7 @@ app.use('/api/lithology', lithologyRoutes);
 app.use('/api/fault-plane', faultPlaneRoutes);
 app.use('/api/attitude', attitudeRoutes);
 app.use('/api/terrain', terrainRoutes);
+app.use('/api/cleanup', cleanupRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

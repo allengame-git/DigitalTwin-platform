@@ -236,6 +236,7 @@ npm run build
   - **3D 地質模型上傳**: CSV Voxel 自動轉換為 GLB Isosurface Mesh
   - **斷層面資料管理**: 支援單筆新增與 CSV 批次匯入斷層資料
   - **位態資料管理**: 支援單筆新增、編輯、刪除與 CSV 批次匯入 (含重複檢查)
+  - **儲存空間管理**: 系統設定中提供掃描與清理孤兒上傳檔案機制 (`/api/cleanup`)
 - [x] **Multi-Project Architecture**:
   - 支援建立、編輯、刪除多個獨立專案
   - 專案 Dashboard 頁面 (`/project/:code`)
@@ -354,3 +355,12 @@ npm run build
 |--------|-------------------------|------------------------|
 | GET    | /api/lithology          | 取得專案岩性定義       |
 | POST   | /api/lithology          | 新增/更新岩性定義      |
+
+### Cleanup API (儲存清理系統)
+
+| Method | Endpoint                | Description              |
+|--------|-------------------------|--------------------------|
+| GET    | /api/cleanup/scan       | 掃描未關聯的孤兒檔案     |
+| POST   | /api/cleanup/execute    | 將孤兒檔案移入 Trash Dir |
+| GET    | /api/cleanup/trash      | 取得 Trash Dir 容量狀態  |
+| POST   | /api/cleanup/purge      | 徹底清除所有垃圾桶檔案   |

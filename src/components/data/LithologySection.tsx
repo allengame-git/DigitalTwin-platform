@@ -79,7 +79,11 @@ const LithologySection: React.FC = () => {
                     {lithologies.length === 0 && (
                         <button
                             className="dm-btn dm-btn-secondary"
-                            onClick={initDefaults} // Assuming handleInitDefaults is initDefaults
+                            onClick={() => {
+                                if (activeProjectId) {
+                                    initDefaults(activeProjectId);
+                                }
+                            }}
                         >
                             載入預設值
                         </button>

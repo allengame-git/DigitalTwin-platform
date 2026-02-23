@@ -8,7 +8,10 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useAuthStore } from '../stores/authStore';
 import { usePageTracking } from '../hooks/usePageTracking';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 interface SettingSection {
     id: string;
@@ -21,6 +24,7 @@ const settingSections: SettingSection[] = [
     { id: 'security', title: '安全性設定', description: 'Session 超時、密碼規則、登入限制' },
     { id: 'notifications', title: '通知設定', description: 'Email 通知、系統提醒' },
     { id: 'integration', title: '整合設定', description: 'API 金鑰、第三方服務連接' },
+    { id: 'storage', title: '儲存空間管理', description: '清理未使用的上傳檔案與垃圾桶' },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -33,6 +37,110 @@ export const AdminSettingsPage: React.FC = () => {
     usePageTracking({ pageName: '系統設定' });
     const { user } = useAuth();
     const [activeSection, setActiveSection] = useState('general');
+
+    // Storage Management States
+    const [scanResult, setScanResult] = useState<{ files: any[], totalFiles: number, totalSize: number } | null>(null);
+    const [trashStatus, setTrashStatus] = useState<any>(null);
+    const [isScanning, setIsScanning] = useState(false);
+    const [isExecuting, setIsExecuting] = useState(false);
+    const [isPurging, setIsPurging] = useState(false);
+    const [scanError, setScanError] = useState('');
+    const [confirmAction, setConfirmAction] = useState<'cleanup' | 'purge' | null>(null);
+    const [resultMessage, setResultMessage] = useState('');
+
+    const formatBytes = (bytes: number, decimals = 2) => {
+        if (!+bytes) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    };
+
+    const handleScan = async () => {
+        setIsScanning(true);
+        setScanError('');
+        try {
+            const token = useAuthStore.getState().accessToken;
+            const res = await fetch(`${API_BASE}/api/cleanup/scan`, {
+                headers: { ...(token && { 'Authorization': `Bearer ${token}` }) },
+                credentials: 'include',
+            });
+            if (!res.ok) throw new Error('掃描失敗');
+            const data = await res.json();
+            setScanResult(data.data);
+            fetchTrashStatus();
+        } catch (error: any) {
+            setScanError(error.message);
+        } finally {
+            setIsScanning(false);
+        }
+    };
+
+    const handleExecuteCleanup = async () => {
+        setConfirmAction(null);
+        setIsExecuting(true);
+        try {
+            const token = useAuthStore.getState().accessToken;
+            const res = await fetch(`${API_BASE}/api/cleanup/execute`, {
+                method: 'POST',
+                headers: { ...(token && { 'Authorization': `Bearer ${token}` }) },
+                credentials: 'include',
+            });
+            if (!res.ok) throw new Error('清理失敗');
+            const data = await res.json();
+            setResultMessage(data.message);
+            setScanResult(null);
+            fetchTrashStatus();
+        } catch (error: any) {
+            setResultMessage(error.message);
+        } finally {
+            setIsExecuting(false);
+        }
+    };
+
+    const fetchTrashStatus = async () => {
+        try {
+            const token = useAuthStore.getState().accessToken;
+            const res = await fetch(`${API_BASE}/api/cleanup/trash`, {
+                headers: { ...(token && { 'Authorization': `Bearer ${token}` }) },
+                credentials: 'include',
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setTrashStatus(data.data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch trash status:', error);
+        }
+    };
+
+    const handlePurgeTrash = async () => {
+        setConfirmAction(null);
+        setIsPurging(true);
+        try {
+            const token = useAuthStore.getState().accessToken;
+            const res = await fetch(`${API_BASE}/api/cleanup/purge`, {
+                method: 'POST',
+                headers: { ...(token && { 'Authorization': `Bearer ${token}` }) },
+                credentials: 'include',
+            });
+            if (!res.ok) throw new Error('清除失敗');
+            const data = await res.json();
+            setResultMessage(data.message);
+            fetchTrashStatus();
+        } catch (error: any) {
+            setResultMessage(error.message);
+        } finally {
+            setIsPurging(false);
+        }
+    };
+
+    React.useEffect(() => {
+        if (activeSection === 'storage') {
+            fetchTrashStatus();
+        }
+    }, [activeSection]);
 
     return (
         <div className="admin-settings-page">
@@ -243,6 +351,19 @@ export const AdminSettingsPage: React.FC = () => {
                     background: #1e293b;
                 }
 
+                .save-btn:disabled {
+                    background: #cbd5e1;
+                    cursor: not-allowed;
+                }
+
+                .danger-btn {
+                    background: #ef4444;
+                }
+
+                .danger-btn:hover {
+                    background: #dc2626;
+                }
+
                 .placeholder-notice {
                     padding: 24px;
                     background: #fef3c7;
@@ -251,6 +372,46 @@ export const AdminSettingsPage: React.FC = () => {
                     color: #92400e;
                     font-size: 14px;
                     text-align: center;
+                }
+                
+                .storage-card {
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    padding: 20px;
+                    margin-bottom: 24px;
+                }
+
+                .storage-card h3 {
+                    margin: 0 0 16px 0;
+                    font-size: 16px;
+                    color: #1e293b;
+                }
+
+                .storage-stats {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 16px;
+                    margin-bottom: 20px;
+                }
+
+                .stat-box {
+                    background: white;
+                    padding: 16px;
+                    border-radius: 8px;
+                    border: 1px solid #e2e8f0;
+                }
+
+                .stat-box-label {
+                    font-size: 12px;
+                    color: #64748b;
+                    margin-bottom: 4px;
+                }
+
+                .stat-box-value {
+                    font-size: 24px;
+                    font-weight: 600;
+                    color: #0f172a;
                 }
             `}</style>
 
@@ -384,6 +545,132 @@ export const AdminSettingsPage: React.FC = () => {
                                 <button className="save-btn">儲存變更</button>
                             </div>
                         </>
+                    )}
+
+                    {activeSection === 'storage' && (
+                        <>
+                            <h2>儲存空間管理</h2>
+                            <p>清理未使用的上傳檔案與過期的垃圾桶</p>
+
+                            <div className="storage-card">
+                                <h3>孤兒檔案掃描</h3>
+                                <p style={{ marginBottom: 16, fontSize: 13 }}>將掃描所有建立時間超過 48 小時，且沒有紀錄在資料庫中的上傳檔案。</p>
+
+                                <button type="button" className="save-btn" onClick={handleScan} disabled={isScanning}>
+                                    {isScanning ? '掃描中...' : '執行掃描'}
+                                </button>
+
+                                {scanError && <p style={{ color: '#ef4444', marginTop: 12 }}>{scanError}</p>}
+
+                                {scanResult && (
+                                    <div style={{ marginTop: 24 }}>
+                                        <div className="storage-stats">
+                                            <div className="stat-box">
+                                                <div className="stat-box-label">發現檔案數</div>
+                                                <div className="stat-box-value">{scanResult.totalFiles}</div>
+                                            </div>
+                                            <div className="stat-box">
+                                                <div className="stat-box-label">總共占用空間</div>
+                                                <div className="stat-box-value">{formatBytes(scanResult.totalSize)}</div>
+                                            </div>
+                                        </div>
+
+                                        {scanResult.totalFiles > 0 && (
+                                            <button
+                                                type="button"
+                                                className="save-btn danger-btn"
+                                                onClick={() => setConfirmAction('cleanup')}
+                                                disabled={isExecuting}
+                                            >
+                                                {isExecuting ? '清理中...' : '將檔案移至垃圾桶'}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="storage-card">
+                                <h3>垃圾桶狀態</h3>
+                                <p style={{ marginBottom: 16, fontSize: 13 }}>被清理的檔案會暫存在此，需由管理員手動永久刪除。</p>
+
+                                {trashStatus ? (
+                                    <>
+                                        <div className="storage-stats">
+                                            <div className="stat-box">
+                                                <div className="stat-box-label">垃圾桶檔案數</div>
+                                                <div className="stat-box-value">{trashStatus.totalFiles}</div>
+                                            </div>
+                                            <div className="stat-box">
+                                                <div className="stat-box-label">總共占用空間</div>
+                                                <div className="stat-box-value">{formatBytes(trashStatus.totalSize)}</div>
+                                            </div>
+                                        </div>
+
+                                        {trashStatus.totalFiles > 0 && (
+                                            <button
+                                                type="button"
+                                                className="save-btn danger-btn"
+                                                onClick={() => setConfirmAction('purge')}
+                                                disabled={isPurging}
+                                            >
+                                                {isPurging ? '處理中...' : '徹底清除垃圾桶'}
+                                            </button>
+                                        )}
+                                    </>
+                                ) : (
+                                    <p style={{ fontSize: 13 }}>載入中...</p>
+                                )}
+                            </div>
+                        </>
+                    )}
+
+                    {/* Confirm Modal */}
+                    {confirmAction && (
+                        <div style={{
+                            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+                        }}>
+                            <div style={{
+                                background: 'white', borderRadius: 12, padding: 24,
+                                maxWidth: 400, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+                            }}>
+                                <h3 style={{ margin: '0 0 12px', fontSize: 16 }}>
+                                    {confirmAction === 'cleanup' ? '確認移至垃圾桶' : '確認清除垃圾桶'}
+                                </h3>
+                                <p style={{ margin: '0 0 20px', fontSize: 14, color: '#64748b' }}>
+                                    {confirmAction === 'cleanup'
+                                        ? '確定要將掃描到的孤兒檔案移至垃圾桶嗎？'
+                                        : '確定要永久刪除垃圾桶中所有的檔案嗎？此操作無法還原。'}
+                                </p>
+                                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                    <button type="button" onClick={() => setConfirmAction(null)}
+                                        style={{ padding: '8px 16px', border: '1px solid #e2e8f0', borderRadius: 6, background: 'white', cursor: 'pointer' }}>
+                                        取消
+                                    </button>
+                                    <button type="button"
+                                        onClick={confirmAction === 'cleanup' ? handleExecuteCleanup : handlePurgeTrash}
+                                        style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: '#ef4444', color: 'white', cursor: 'pointer' }}>
+                                        確認
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Result Toast */}
+                    {resultMessage && (
+                        <div style={{
+                            position: 'fixed', bottom: 24, right: 24, zIndex: 1001,
+                            background: '#0f172a', color: 'white', padding: '12px 20px',
+                            borderRadius: 8, fontSize: 14, boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            display: 'flex', alignItems: 'center', gap: 12
+                        }}>
+                            {resultMessage}
+                            <button type="button" onClick={() => setResultMessage('')}
+                                style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: 16 }}>
+                                x
+                            </button>
+                        </div>
                     )}
                 </div>
             </main>
