@@ -123,7 +123,6 @@ function GeologyMesh({
     const { lithologies } = useLithologyStore();
     const clippingConfig = useViewerStore(state => state.clippingPlane);
     const geology3dLayer = layers.geology3d;
-    const modelOffset = useViewerStore(state => state.config.modelOffset);
 
     // Prepare dynamic color palette for shaders
     const palette = useMemo(() => {
@@ -358,10 +357,8 @@ function GeologyMesh({
         groupRef.current.visible = geology3dLayer.visible;
     }, [geology3dLayer.visible]);
 
-    const offset = modelOffset || [0, 0, 0];
-
     return (
-        <group ref={groupRef} position={[offset[0], offset[1], offset[2]]}>
+        <group ref={groupRef}>
             <primitive object={gltfScene} />
 
             {/* Cap plane — only rendered when clipping is active + volume loaded */}

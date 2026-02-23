@@ -52,6 +52,28 @@ const initialFormData: BoreholeFormData = {
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+const normalizeCsvHeader = (key: string) => {
+    // 移除所有空白與底線，轉為小寫
+    const k = key.toLowerCase().replace(/[\s_]+/g, '');
+    switch (k) {
+        case 'x': return 'x';
+        case 'y': return 'y';
+        case 'boreholeno': return 'boreholeNo';
+        case 'elevation': return 'elevation';
+        case 'totaldepth': return 'totalDepth';
+        case 'drilleddate': return 'drilledDate';
+        case 'area': return 'area';
+        case 'topdepth': return 'topDepth';
+        case 'bottomdepth': return 'bottomDepth';
+        case 'lithologycode': return 'lithologyCode';
+        case 'description': return 'description';
+        case 'depth': return 'depth';
+        case 'nvalue': return 'nValue';
+        case 'rqd': return 'rqd';
+        default: return key;
+    }
+};
+
 export const BoreholeUploadSection: React.FC = () => {
     const { boreholes, status, fetchBoreholes, createBorehole, updateBorehole, deleteBorehole, batchDelete, batchImport, batchImportLayers, batchImportProperties, uploadPhoto, deletePhoto, fetchBoreholePhotos } = useBoreholeStore();
     const { activeProjectId } = useProjectStore();
@@ -76,6 +98,9 @@ export const BoreholeUploadSection: React.FC = () => {
     // CSV Import dropdown
     const [showImportDropdown, setShowImportDropdown] = useState(false);
     const [showCsvImport, setShowCsvImport] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    const [isLayerImporting, setIsLayerImporting] = useState(false);
+    const [isPropertyImporting, setIsPropertyImporting] = useState(false);
     const [showLayerCsvImport, setShowLayerCsvImport] = useState(false);
     const [showPropertyCsvImport, setShowPropertyCsvImport] = useState(false);
     const csvInputRef = useRef<HTMLInputElement>(null);
@@ -341,190 +366,175 @@ export const BoreholeUploadSection: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file || !activeProjectId) return;
 
-        let text = await readFileContent(file);
+        setIsImporting(true);
+        try {
+            let text = await readFileContent(file);
 
-        // 1. 強健的 BOM 移除 (移除 UTF-8, UTF-16 等 BOM)
-        text = text.replace(/^\uFEFF/, '').replace(/^\uFFFE/, '');
+            // 1. 強健的 BOM 移除 (移除 UTF-8, UTF-16 等 BOM)
+            text = text.replace(/^\uFEFF/, '').replace(/^\uFFFE/, '');
 
-        // 2. 處理換行符號 (相容 Windows \r\n, Mac \r, Linux \n) 並移除空行
-        const lines = text.split(/\r?\n|\r/).map(l => l.trim()).filter(line => line.length > 0);
+            // 2. 處理換行符號 (相容 Windows \r\n, Mac \r, Linux \n) 並移除空行
+            const lines = text.split(/\r?\n|\r/).map(l => l.trim()).filter(line => line.length > 0);
 
-        if (lines.length < 2) {
-            alert('CSV 檔案格式錯誤或無資料');
-            return;
-        }
-
-        // 3. 解析標頭與資料
-        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-        const boreholeData = [];
-
-        for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-            const row: any = {};
-            headers.forEach((h, idx) => {
-                if (h) row[h] = values[idx];
-            });
-
-            // 基本驗證：鑽孔編號與座標為必填
-            if (row.boreholeNo && row.x && row.y) {
-                boreholeData.push(row);
+            if (lines.length < 2) {
+                alert('CSV 檔案格式錯誤或無資料');
+                return;
             }
+
+            // 3. 解析標頭與資料
+            const headers = lines[0].split(',').map(h => normalizeCsvHeader(h.trim().replace(/^"|"$/g, '')));
+            const boreholeData = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                const row: any = {};
+                headers.forEach((h, idx) => {
+                    if (h) row[h] = values[idx];
+                });
+
+                // 基本驗證：鑽孔編號與座標為必填
+                if (row.boreholeNo && row.x && row.y) {
+                    boreholeData.push(row);
+                }
+            }
+
+            if (boreholeData.length === 0) {
+                alert('無法解析任何有效的鑽孔基本資料，請檢查 CSV 標頭。');
+                return;
+            }
+
+            const result = await batchImport(activeProjectId, boreholeData);
+
+            setImportResult(result);
+            setShowResultModal(true);
+
+            if (csvInputRef.current) {
+                csvInputRef.current.value = '';
+            }
+            setShowCsvImport(false);
+        } finally {
+            setIsImporting(false);
         }
-
-        if (boreholeData.length === 0) {
-            alert('無法解析任何有效的鑽孔基本資料，請檢查 CSV 標頭。');
-            return;
-        }
-
-        const result = await batchImport(activeProjectId, boreholeData);
-
-        setImportResult(result);
-        setShowResultModal(true);
-
-        if (csvInputRef.current) {
-            csvInputRef.current.value = '';
-        }
-        setShowCsvImport(false);
     };
 
     const handleLayerCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !activeProjectId) return;
 
-        let text = await readFileContent(file);
-        text = text.replace(/^\uFEFF/, '').replace(/^\uFFFE/, '');
-        const lines = text.split(/\r?\n|\r/).map(l => l.trim()).filter(line => line.length > 0);
+        setIsLayerImporting(true);
+        try {
+            let text = await readFileContent(file);
+            text = text.replace(/^\uFEFF/, '').replace(/^\uFFFE/, '');
+            const lines = text.split(/\r?\n|\r/).map(l => l.trim()).filter(line => line.length > 0);
 
-        if (lines.length < 2) {
-            alert('CSV 檔案格式錯誤');
-            return;
-        }
-
-        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-        const layerData = [];
-
-        for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-            const row: any = {};
-            headers.forEach((h, idx) => {
-                if (h) row[h] = values[idx];
-            });
-
-            // 驗證：需有鑽孔編號與地層深度
-            if (row.boreholeNo && row.topDepth !== undefined && row.bottomDepth !== undefined) {
-                // 自動轉換 Elevation to Depth
-                // 取得該鑽孔的孔口高程
-                const borehole = boreholes.find(b => b.boreholeNo === row.boreholeNo);
-                if (borehole) {
-                    let top = parseFloat(row.topDepth);
-                    let bottom = parseFloat(row.bottomDepth);
-
-                    // 判斷是否為高程 (Elevation) 資料
-                    // 條件 1: 數值為負 (Depth 通常為正)
-                    // 條件 2: Top > Bottom (高程由大變小，深度由小變大)
-                    const isElevation = top < 0 || bottom < 0 || top > bottom;
-
-                    if (isElevation) {
-                        // 轉換公式: Depth = CollarElevation - LayerElevation
-                        const originalTop = top;
-                        const originalBottom = bottom;
-
-                        top = borehole.elevation - originalTop;
-                        bottom = borehole.elevation - originalBottom;
-
-                        // 確保 Top < Bottom (若轉換後相反則交換)
-                        if (top > bottom) {
-                            const temp = top;
-                            top = bottom;
-                            bottom = temp;
-                        }
-
-                        // 更新 row 資料 (轉為字串以符合介面)
-                        row.topDepth = top.toString();
-                        row.bottomDepth = bottom.toString();
-
-                        console.log(`[AutoConvert] ${row.boreholeNo}: Elev(${originalTop}, ${originalBottom}) -> Depth(${top.toFixed(2)}, ${bottom.toFixed(2)})`);
-                    }
-                }
-
-                layerData.push(row);
+            if (lines.length < 2) {
+                alert('CSV 檔案格式錯誤');
+                return;
             }
+
+            const headers = lines[0].split(',').map(h => normalizeCsvHeader(h.trim().replace(/^"|"$/g, '')));
+            const layerData = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                const row: any = {};
+                headers.forEach((h, idx) => {
+                    if (h) row[h] = values[idx];
+                });
+
+                // 驗證：需有鑽孔編號與地層深度
+                if (row.boreholeNo && row.topDepth !== undefined && row.bottomDepth !== undefined) {
+                    const borehole = boreholes.find(b => b.boreholeNo === row.boreholeNo);
+                    if (borehole) {
+                        let top = parseFloat(row.topDepth);
+                        let bottom = parseFloat(row.bottomDepth);
+                        const isElevation = top < 0 || bottom < 0 || top > bottom;
+                        if (isElevation) {
+                            const originalTop = top;
+                            const originalBottom = bottom;
+                            top = borehole.elevation - originalTop;
+                            bottom = borehole.elevation - originalBottom;
+                            if (top > bottom) { const temp = top; top = bottom; bottom = temp; }
+                            row.topDepth = top.toString();
+                            row.bottomDepth = bottom.toString();
+                            console.log(`[AutoConvert] ${row.boreholeNo}: Elev(${originalTop}, ${originalBottom}) -> Depth(${top.toFixed(2)}, ${bottom.toFixed(2)})`);
+                        }
+                    }
+                    layerData.push(row);
+                }
+            }
+
+            if (layerData.length === 0) {
+                alert('無法解析任何有效的地層資料。');
+                return;
+            }
+
+            const result = await batchImportLayers(activeProjectId, layerData);
+            setImportResult(result);
+            setShowResultModal(true);
+
+            if (layerCsvInputRef.current) layerCsvInputRef.current.value = '';
+            setShowLayerCsvImport(false);
+        } finally {
+            setIsLayerImporting(false);
         }
-
-        if (layerData.length === 0) {
-            alert('無法解析任何有效的地層資料。');
-            return;
-        }
-
-        const result = await batchImportLayers(activeProjectId, layerData);
-
-        setImportResult(result);
-        setShowResultModal(true);
-
-        if (layerCsvInputRef.current) {
-            layerCsvInputRef.current.value = '';
-        }
-        setShowLayerCsvImport(false);
     };
+
 
     const handlePropertyCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !activeProjectId) return;
 
-        let text = await readFileContent(file);
-        text = text.replace(/^\uFEFF/, '').replace(/^\uFFFE/, '');
-        const lines = text.split(/\r?\n|\r/).map(l => l.trim()).filter(line => line.length > 0);
+        setIsPropertyImporting(true);
+        try {
+            let text = await readFileContent(file);
+            text = text.replace(/^\uFEFF/, '').replace(/^\uFFFE/, '');
+            const lines = text.split(/\r?\n|\r/).map(l => l.trim()).filter(line => line.length > 0);
 
-        if (lines.length < 2) {
-            alert('CSV 檔案格式錯誤');
-            return;
-        }
-
-        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-        const propertyData = [];
-
-        for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-            const row: any = {};
-            headers.forEach((h, idx) => {
-                if (h) row[h] = values[idx];
-            });
-
-            // 驗證：需有鑽孔編號與深度
-            if (row.boreholeNo && row.depth !== undefined) {
-                // 自動轉換 Elevation to Depth (邏輯同 Layer)
-                const borehole = boreholes.find(b => b.boreholeNo === row.boreholeNo);
-                if (borehole) {
-                    let depth = parseFloat(row.depth);
-
-                    // 判斷是否為高程 (Elevation) 資料
-                    // 條件: 數值為負 (Depth 通常為正)
-                    if (depth < 0) {
-                        const originalDepth = depth;
-                        depth = borehole.elevation - originalDepth;
-                        row.depth = depth.toString();
-                        console.log(`[AutoConvert-Property] ${row.boreholeNo}: Elev(${originalDepth}) -> Depth(${depth.toFixed(2)})`);
-                    }
-                }
-
-                propertyData.push(row);
+            if (lines.length < 2) {
+                alert('CSV 檔案格式錯誤');
+                return;
             }
+
+            const headers = lines[0].split(',').map(h => normalizeCsvHeader(h.trim().replace(/^"|"$/g, '')));
+            const propertyData = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                const row: any = {};
+                headers.forEach((h, idx) => {
+                    if (h) row[h] = values[idx];
+                });
+
+                if (row.boreholeNo && row.depth !== undefined) {
+                    const borehole = boreholes.find(b => b.boreholeNo === row.boreholeNo);
+                    if (borehole) {
+                        let depth = parseFloat(row.depth);
+                        if (depth < 0) {
+                            const originalDepth = depth;
+                            depth = borehole.elevation - originalDepth;
+                            row.depth = depth.toString();
+                            console.log(`[AutoConvert-Property] ${row.boreholeNo}: Elev(${originalDepth}) -> Depth(${depth.toFixed(2)})`);
+                        }
+                    }
+                    propertyData.push(row);
+                }
+            }
+
+            if (propertyData.length === 0) {
+                alert('無法解析任何有效的物性資料。');
+                return;
+            }
+
+            const result = await batchImportProperties(activeProjectId, propertyData);
+            setImportResult(result);
+            setShowResultModal(true);
+
+            if (propertyCsvInputRef.current) propertyCsvInputRef.current.value = '';
+            setShowPropertyCsvImport(false);
+        } finally {
+            setIsPropertyImporting(false);
         }
-
-        if (propertyData.length === 0) {
-            alert('無法解析任何有效的物性資料。');
-            return;
-        }
-
-        const result = await batchImportProperties(activeProjectId, propertyData);
-
-        setImportResult(result);
-        setShowResultModal(true);
-
-        if (propertyCsvInputRef.current) {
-            propertyCsvInputRef.current.value = '';
-        }
-        setShowPropertyCsvImport(false);
     };
 
     return (
@@ -963,8 +973,9 @@ BH-002,224600,2429600,118.2,45.0,2024-01-20,A區`}
                                 className="dm-btn dm-btn-primary"
                                 style={{ width: '100%' }}
                                 onClick={() => csvInputRef.current?.click()}
+                                disabled={isImporting}
                             >
-                                選擇 CSV 檔案
+                                {isImporting ? '匯入中...' : '選擇 CSV 檔案'}
                             </button>
                         </div>
                     </div>
@@ -1039,8 +1050,9 @@ BH-002,0,3.0,SF,回填土`}
                                 className="dm-btn dm-btn-primary"
                                 style={{ width: '100%' }}
                                 onClick={() => layerCsvInputRef.current?.click()}
+                                disabled={isLayerImporting}
                             >
-                                選擇 CSV 檔案
+                                {isLayerImporting ? '匯入中...' : '選擇 CSV 檔案'}
                             </button>
                         </div>
                     </div>
@@ -1079,8 +1091,9 @@ BH-002,2.0,8,`}
                                 className="dm-btn dm-btn-primary"
                                 style={{ width: '100%' }}
                                 onClick={() => propertyCsvInputRef.current?.click()}
+                                disabled={isPropertyImporting}
                             >
-                                選擇 CSV 檔案
+                                {isPropertyImporting ? '匯入中...' : '選擇 CSV 檔案'}
                             </button>
                         </div>
                     </div>

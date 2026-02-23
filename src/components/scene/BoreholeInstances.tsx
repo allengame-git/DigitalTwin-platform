@@ -215,7 +215,7 @@ export function BoreholeInstances() {
         document.body.style.cursor = 'auto';
     }, []);
 
-    if (!boreholeLayer.visible || instanceData.positions.length === 0) return null;
+    if (instanceData.positions.length === 0) return null;
 
     return (
         <instancedMesh
@@ -227,6 +227,7 @@ export function BoreholeInstances() {
             onPointerOver={handlePointerOver}
             onPointerOut={handlePointerOut}
             frustumCulled={false}
+            visible={boreholeLayer.visible}
         />
     );
 }

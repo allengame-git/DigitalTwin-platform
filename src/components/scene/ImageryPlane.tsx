@@ -182,36 +182,38 @@ export function ImageryPlane({
     }, [activeImagery, activeProject, defaultWidth, defaultHeight, defaultPosition, imageryLayer]);
 
 
-    if (!imageryLayer.visible) return null;
-
     if (imageUrl) {
         return (
-            <Suspense fallback={
-                <PlaceholderMesh
-                    width={finalWidth}
-                    height={finalHeight}
-                    position={finalPosition}
-                    opacity={imageryLayer.opacity}
-                />
-            }>
-                <ImageryMesh
-                    imageUrl={imageUrl}
-                    width={finalWidth}
-                    height={finalHeight}
-                    position={finalPosition}
-                    opacity={imageryLayer.opacity}
-                />
-            </Suspense>
+            <group visible={imageryLayer.visible}>
+                <Suspense fallback={
+                    <PlaceholderMesh
+                        width={finalWidth}
+                        height={finalHeight}
+                        position={finalPosition}
+                        opacity={imageryLayer.opacity}
+                    />
+                }>
+                    <ImageryMesh
+                        imageUrl={imageUrl}
+                        width={finalWidth}
+                        height={finalHeight}
+                        position={finalPosition}
+                        opacity={imageryLayer.opacity}
+                    />
+                </Suspense>
+            </group>
         );
     }
 
     return (
-        <PlaceholderMesh
-            width={finalWidth}
-            height={finalHeight}
-            position={finalPosition}
-            opacity={imageryLayer.opacity}
-        />
+        <group visible={imageryLayer.visible}>
+            <PlaceholderMesh
+                width={finalWidth}
+                height={finalHeight}
+                position={finalPosition}
+                opacity={imageryLayer.opacity}
+            />
+        </group>
     );
 }
 

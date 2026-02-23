@@ -60,7 +60,7 @@ export function TerrainMesh() {
     });
 
     // If no active terrain or visible is false, return null
-    if (!terrainLayer.visible || !activeTerrain) return null;
+    if (!activeTerrain) return null;
 
     // Custom Shader Logic
     const onBeforeCompile = (shader: any) => {
@@ -138,6 +138,7 @@ export function TerrainMesh() {
 
     return (
         <mesh
+            visible={terrainLayer.visible}
             ref={meshRef}
             rotation={[-Math.PI / 2, 0, 0]} // Rotate to ground plane
             position={[centerX - originX, 0, -(centerY - originY)]}

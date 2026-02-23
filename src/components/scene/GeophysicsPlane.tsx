@@ -115,12 +115,12 @@ export function GeophysicsPlane() {
         }
     }, [fetchGeophysicsFiles, geophysicsFiles.length]);
 
-    if (!isVisible || geophysicsFiles.length === 0) {
+    if (geophysicsFiles.length === 0) {
         return null;
     }
 
     return (
-        <group name="geophysics-planes">
+        <group name="geophysics-planes" visible={isVisible}>
             {geophysicsFiles.map(gf => (
                 <React.Suspense key={gf.id} fallback={null}>
                     <GeophysicsPlaneItem data={gf} />

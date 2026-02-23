@@ -10,6 +10,7 @@ import { RENDERER_CONFIG, DEFAULT_CAMERA_CONFIG } from '../../config/three';
 import { useBoreholeStore } from '../../stores/boreholeStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useUploadStore } from '../../stores/uploadStore';
+import { useLithologyStore } from '../../stores/lithologyStore';
 import { BoreholeInstances } from './BoreholeInstances';
 import { SceneEnvironment } from './SceneEnvironment';
 import { LoadingProgress } from '../overlay/LoadingProgress';
@@ -37,15 +38,17 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
     const { activeProjectId } = useProjectStore();
     const { attitudes, fetchAttitudes } = useAttitudeStore();
     const { fetchGeologyModels, fetchImageryFiles } = useUploadStore();
+    const { fetchLithologies } = useLithologyStore();
 
     useEffect(() => {
         if (activeProjectId) {
+            fetchLithologies(activeProjectId);
             fetchBoreholes(activeProjectId);
             fetchAttitudes(activeProjectId);
             fetchGeologyModels();
             fetchImageryFiles();
         }
-    }, [fetchBoreholes, fetchAttitudes, fetchGeologyModels, fetchImageryFiles, activeProjectId]);
+    }, [fetchBoreholes, fetchAttitudes, fetchGeologyModels, fetchImageryFiles, fetchLithologies, activeProjectId]);
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%', ...style }}>

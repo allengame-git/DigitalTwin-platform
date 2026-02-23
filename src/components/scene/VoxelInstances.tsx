@@ -185,10 +185,11 @@ export function VoxelInstances({
         }
     }, [geology3dLayer.opacity, material]);
 
-    if (!geology3dLayer.visible || data.count === 0) return null;
+    if (data.count === 0) return null;
 
     return (
         <instancedMesh
+            visible={geology3dLayer.visible}
             ref={meshRef}
             args={[geometry, material, sampledCount]}
             frustumCulled={true}  // 啟用視錐剔除

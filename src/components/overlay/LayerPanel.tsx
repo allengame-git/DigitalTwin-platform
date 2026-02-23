@@ -10,7 +10,6 @@
 import React, { useState } from 'react';
 import { useLayerStore, LayerType } from '../../stores/layerStore';
 import { useViewerStore } from '../../stores/viewerStore';
-import { ImagerySelector } from '../controls/ImagerySelector';
 import { ModelVersionSelector } from '../controls/ModelVersionSelector';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProjectStore } from '../../stores/projectStore';
@@ -369,9 +368,6 @@ const SettingsTab: React.FC = () => {
                 </div>
             </div>
 
-            {/* Model Offset Settings */}
-            <ModelOffsetControls />
-
             {/* Auto LOD Toggle */}
             <AutoLodToggle />
 
@@ -381,58 +377,8 @@ const SettingsTab: React.FC = () => {
             {/* Background Color Picker */}
             <BackgroundColorPicker />
 
-            {/* Imagery Selector */}
-            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
-                <button
-                    onClick={() => setImageryOpen(true)}
-                    style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        background: '#f1f5f9',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '13px',
-                        fontWeight: 500,
-                        color: '#374151',
-                    }}
-                >
-                    <span>🛰️ 圖資管理</span>
-                    <span style={{ fontSize: '18px' }}>→</span>
-                </button>
-                <ImagerySelector isOpen={imageryOpen} onClose={() => setImageryOpen(false)} />
-                <ImagerySelector isOpen={imageryOpen} onClose={() => setImageryOpen(false)} />
-            </div>
-
             {/* Terrain Legend Control */}
             <TerrainLegendControl />
-
-            {/* Model Management Link */}
-            <div style={{ marginTop: '12px' }}>
-                <a
-                    href="/data"
-                    style={{
-                        display: 'flex',
-                        width: '100%',
-                        padding: '10px 12px',
-                        background: '#f1f5f9',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        textDecoration: 'none',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '13px',
-                        fontWeight: 500,
-                        color: '#374151',
-                    }}
-                >
-                    <span>🗄️ 資料管理</span>
-                    <span style={{ fontSize: '18px' }}>→</span>
-                </a>
-            </div>
         </>
     );
 };
@@ -540,77 +486,6 @@ const FogToggle: React.FC = () => {
                     style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
             </label>
-        </div>
-    );
-};
-
-// Sub-component for Model Offset
-const ModelOffsetControls: React.FC = () => {
-    const { config, setConfig } = useViewerStore();
-    const offset = config.modelOffset || [0, 0, 0];
-
-    const handleChange = (index: number, value: string) => {
-        const newVal = parseFloat(value) || 0;
-        const newOffset = [...offset] as [number, number, number];
-        newOffset[index] = newVal;
-        setConfig({ modelOffset: newOffset });
-    };
-
-    return (
-        <div style={{
-            marginTop: '12px',
-            paddingTop: '12px',
-            borderTop: '1px solid #e5e7eb',
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
-                    📐 模型位移微調 (XYZ)
-                </span>
-                <button
-                    onClick={() => setConfig({ modelOffset: [0, 0, 0] })}
-                    style={{
-                        fontSize: '11px',
-                        padding: '2px 6px',
-                        background: 'transparent',
-                        color: '#6b7280',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                    }}
-                >
-                    重設
-                </button>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-                {[
-                    { label: 'X (東)', color: '#ef4444' },
-                    { label: 'Y (北)', color: '#22c55e' },
-                    { label: 'Z (高)', color: '#3b82f6' }
-                ].map((axis, i) => (
-                    <div key={axis.label} style={{ flex: 1 }}>
-                        <label style={{ display: 'block', fontSize: '9px', color: axis.color, marginBottom: '2px', fontWeight: 600 }}>
-                            {axis.label}
-                        </label>
-                        <input
-                            type="number"
-                            value={offset[i]}
-                            step="1"
-                            onChange={e => handleChange(i, e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '4px 6px',
-                                fontSize: '12px',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '4px',
-                                background: 'white'
-                            }}
-                        />
-                    </div>
-                ))}
-            </div>
-            <p style={{ fontSize: '10px', color: '#9ca3af', marginTop: '6px' }}>
-                用於校正模型與鑽孔之間的小幅度偏差。
-            </p>
         </div>
     );
 };

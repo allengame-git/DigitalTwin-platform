@@ -119,10 +119,8 @@ export function StructureLines() {
         selectFault(selectedFaultId === fault.id ? null : fault.id);
     };
 
-    if (!faultsLayer.visible) return null;
-
     return (
-        <group>
+        <group visible={faultsLayer.visible}>
             {faultGeometries.map((fault) => (
                 <mesh
                     key={fault.id}

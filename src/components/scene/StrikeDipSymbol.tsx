@@ -104,10 +104,8 @@ export function StrikeDipSymbol({
         return new THREE.RingGeometry(discRadius - 0.2, discRadius, 32);
     }, [discRadius]);
 
-    if (!attitudesLayer.visible) return null;
-
     return (
-        <group>
+        <group visible={attitudesLayer.visible}>
             {convertedAttitudes.map((att) => {
                 const isSelected = selectedAttitudeId === att.id;
 

@@ -273,12 +273,12 @@ export function MockGeologyVolume({
         return [[]];
     }, [clippingConfig, multiSection]);
 
-    if (!layer.visible) return null;
+
 
     // 多剖面模式：為每個切片渲染所有地層
     if (multiSection.enabled && clippingPlanes.length > 0) {
         return (
-            <group position={position}>
+            <group position={position} visible={layer.visible}>
                 {clippingPlanes.map((planes, sliceIndex) => (
                     <group key={`slice-${sliceIndex}`}>
                         {layerGeometries.map((layerData, layerIndex) => (
@@ -298,7 +298,7 @@ export function MockGeologyVolume({
 
     // 單一剖面或無剖面
     return (
-        <group position={position}>
+        <group position={position} visible={layer.visible}>
             {layerGeometries.map((layerData, index) => (
                 <LayerMesh
                     key={index}
