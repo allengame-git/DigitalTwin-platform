@@ -136,7 +136,7 @@ export async function scanOrphanFiles(): Promise<OrphanFile[]> {
     // 4. Geology Tiles (依 model id 建目錄)
     const tilesDir = path.join(UPLOADS_ROOT, 'geology-tiles');
     if (fs.existsSync(tilesDir)) {
-        const dbModels = await prisma.geologyModel.findMany({ select: { id: true } });
+        const dbModels = await prisma.geologyModel.findMany({ where: { isActive: true }, select: { id: true } });
         const validModelIds = new Set(dbModels.map(m => m.id));
 
         const subDirs = fs.readdirSync(tilesDir);
