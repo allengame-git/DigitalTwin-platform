@@ -146,55 +146,101 @@ def read_tecplot_mesh(path: str) -> pv.UnstructuredGrid:
 
 
 # =====================================================
-# Display Mesh — 整個 grid 的封閉外殼 + vertex colors
+# Surface Contour Band Extraction (Tecplot-style)
 # =====================================================
-def extract_display_mesh(
+def extract_contoured_surface(
     grid: pv.UnstructuredGrid,
-    lith_colors: dict,
-    smooth_iter: int = 0,
     decimate_ratio: float = 0.3,
 ) -> dict:
     """
-    對整個 UnstructuredGrid 做 extract_surface()，
-    取出四面體體積的外邊界 → 一個封閉的表面 mesh。
-    然後用每個頂點的 lith_id 指派 vertex color。
-    
-    結果：
-    - 表面平滑（保留原始 Tecplot 幾何）
-    - 封閉（watertight）— 可用於 stencil
-    - 顏色按 lith_id 漸變
+    Tecplot 風格的 contour 渲染：
+    1. extract_surface() → 完整實體外殼 (solid body)
+    2. VTK BandedPolyDataContourFilter → 在表面三角形上沿 lith_id
+       等值線精確切割，產生 sharp contour color bands
+    3. 按 lith_id 分組 → per-lithology surface patches
+
+    結果：每種岩性一個 surface patch，合起來構成完整實體外殼，
+         岩性交界處有精確的 smooth boundary。
     """
-    progress(40, 'Extracting display mesh (whole grid outer surface)...')
+    import vtk
+
+    progress(40, 'Extracting outer surface (solid body)...')
 
     surface = grid.extract_surface()
     surface = surface.triangulate()
 
-    progress(45, f'Display surface: {surface.n_points} verts, {surface.n_cells} faces')
+    progress(45, f'Outer surface: {surface.n_points} verts, {surface.n_cells} faces')
 
-    # Decimate if needed (不做 smoothing，保留原始幾何精度)
-    if decimate_ratio > 0 and surface.n_cells > 100000:
-        try:
-            target = max(0.1, 1.0 - decimate_ratio)
-            before = surface.n_cells
-            surface = surface.decimate(target)
-            progress(48, f'Decimated: {before} → {surface.n_cells} faces')
-        except Exception:
-            pass
+    # 準備 float lith_id 用於 contour
+    lith_ids = surface.point_data['lith_id'].astype(np.float64)
+    surface.point_data['lith_float'] = lith_ids
+    unique_liths = sorted(set(int(x) for x in np.unique(lith_ids)))
 
-    # 提取 lith_id
-    lith_ids = surface.point_data.get('lith_id')
-    if lith_ids is None:
-        if 'lith_id' in surface.cell_data:
-            surface = surface.cell_data_to_point_data()
-            lith_ids = surface.point_data['lith_id']
-        else:
-            raise ValueError("No lith_id found on display surface")
+    progress(48, f'Contouring {len(unique_liths)} lithologies on surface: {unique_liths}')
 
-    # 返回表面和原始 lith_id
-    return {
-        'surface': surface,
-        'lith_ids': lith_ids,
-    }
+    # ---- VTK BandedPolyDataContourFilter ----
+    # 在表面 mesh 上，沿著 lith_id 的等值線精確切割三角形
+    # 每個被切割後的 sub-triangle 屬於單一 lith_id band
+    # 這就是 Tecplot contour 的做法
+    banded = vtk.vtkBandedPolyDataContourFilter()
+    banded.SetInputData(surface)
+    banded.SetInputArrayToProcess(
+        0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, 'lith_float'
+    )
+
+    # 在每對相鄰 lith_id 之間設定 contour boundary
+    # 例如 liths [1,2,3,4,5] → boundaries at 0.5, 1.5, 2.5, 3.5, 4.5, 5.5
+    n_values = len(unique_liths) + 1
+    banded.GenerateValues(
+        n_values,
+        float(unique_liths[0]) - 0.5,
+        float(unique_liths[-1]) + 0.5
+    )
+    banded.SetScalarModeToIndex()
+    banded.SetClipping(False)
+    banded.Update()
+
+    banded_surface = pv.wrap(banded.GetOutput())
+
+    progress(55, f'Banded surface: {banded_surface.n_points} verts, {banded_surface.n_cells} faces')
+
+    # ---- 按 band index 分組 → per-lith patches ----
+    band_scalars = banded_surface.cell_data.get('Scalars')
+    if band_scalars is None:
+        # Fallback: 用 point_data 的 lith_float 做 cell majority vote
+        progress(55, 'WARNING: BandedContourFilter no band data, fallback to majority vote')
+        banded_surface = banded_surface.cell_data_to_point_data() if 'lith_float' not in banded_surface.point_data else banded_surface
+        cell_lith = np.round(banded_surface.point_data.get('lith_float', lith_ids)).astype(int)
+        band_scalars = cell_lith
+
+    meshes = {}
+    total = len(unique_liths)
+    for idx, lith in enumerate(unique_liths):
+        pct = 55 + (idx / total) * 20  # 55% ~ 75%
+
+        cell_ids = np.where(band_scalars == idx)[0]
+        if len(cell_ids) == 0:
+            progress(pct, f'  lith={lith}: no cells, skip')
+            continue
+
+        patch = banded_surface.extract_cells(cell_ids)
+        patch = patch.extract_surface().triangulate()
+
+        # Decimate large patches
+        if decimate_ratio > 0 and patch.n_cells > 80000:
+            try:
+                target = max(0.1, 1.0 - decimate_ratio)
+                before = patch.n_cells
+                patch = patch.decimate(target)
+                progress(pct, f'  lith={lith}: decimated {before} → {patch.n_cells}')
+            except Exception:
+                pass
+
+        meshes[lith] = patch
+        progress(pct, f'  lith={lith}: {patch.n_points} verts, {patch.n_cells} faces')
+
+    progress(75, f'Surface contour extraction done: {len(meshes)} lithology patches')
+    return meshes
 
 
 # =====================================================
@@ -310,13 +356,17 @@ def export_volume_texture(
 
 
 # =====================================================
-# GLB Export
+# GLB Export (Per-Lithology Submeshes)
 # =====================================================
-def export_glb(display_mesh: dict, output_path: str, origin_twd97: dict):
-    """Export display mesh with lith_id metadata to GLB."""
+def export_glb(lith_meshes: dict, output_path: str, origin_twd97: dict):
+    """
+    Export per-lithology isosurface meshes to a single GLB file.
+    Each lithology is a separate submesh named 'lith_{id}'.
+    Vertex colors R channel stores lith_id for frontend shader compatibility.
+    """
     import trimesh
 
-    progress(80, 'Building GLB (Dynamic Coloring Mode)...')
+    progress(80, f'Building GLB ({len(lith_meshes)} lithology submeshes)...')
 
     scene = trimesh.Scene()
     ox = origin_twd97.get('x', 0)
@@ -328,17 +378,19 @@ def export_glb(display_mesh: dict, output_path: str, origin_twd97: dict):
         except AttributeError:
             return surface.faces.reshape(-1, 4)[:, 1:]
 
-    surface = display_mesh['surface']
-    lith_ids = display_mesh['lith_ids']
+    total_faces = 0
+    for lith_id, surface in lith_meshes.items():
+        verts = np.array(surface.points, dtype=np.float64)
+        faces = get_faces(surface)
 
-    verts = np.array(surface.points, dtype=np.float64)
-    faces = get_faces(surface)
+        if len(faces) == 0:
+            continue
 
-    if len(faces) > 0:
+        # Coordinate transform: TWD97 → Three.js world
         world_verts = np.zeros_like(verts)
-        world_verts[:, 0] = verts[:, 0] - ox
-        world_verts[:, 1] = verts[:, 2]           # Z → Y
-        world_verts[:, 2] = -(verts[:, 1] - oy)   # -Y → Z
+        world_verts[:, 0] = verts[:, 0] - ox       # X → X
+        world_verts[:, 1] = verts[:, 2]             # Z → Y
+        world_verts[:, 2] = -(verts[:, 1] - oy)    # -Y → Z
 
         mesh = trimesh.Trimesh(
             vertices=world_verts,
@@ -346,18 +398,17 @@ def export_glb(display_mesh: dict, output_path: str, origin_twd97: dict):
             process=True,
         )
 
-        # 將 lith_id 存成 metadata。雖然 GLB 不支援自定義 attribute 的標準化傳遞，
-        # 但我們可以把它混進 vertex_colors 的 Alpha 通道，或者作為 extras。
-        # 更好的做法是直接存入 vertex_colors 的 R 通道 (0-255)，前端 shader 讀出 R
+        # Store lith_id in vertex_colors R channel (frontend shader reads this)
         v_colors = np.zeros((len(world_verts), 4), dtype=np.uint8)
-        v_colors[:, 0] = np.clip(lith_ids, 0, 255).astype(np.uint8)
-        v_colors[:, 3] = 255 # Full alpha
+        v_colors[:, 0] = np.clip(int(lith_id), 0, 255)
+        v_colors[:, 3] = 255  # Full alpha
         mesh.visual.vertex_colors = v_colors
 
-        scene.add_geometry(mesh, node_name='display')
-        progress(85, f'Display mesh: {len(faces)} faces')
+        scene.add_geometry(mesh, node_name=f'lith_{int(lith_id)}')
+        total_faces += len(faces)
+        progress(85, f'  lith_{int(lith_id)}: {len(faces)} faces')
 
-    progress(95, 'Writing GLB...')
+    progress(95, f'Writing GLB... ({total_faces} total faces)')
     with open(output_path, 'wb') as f:
         f.write(scene.export(file_type='glb'))
 
@@ -373,6 +424,7 @@ def main():
     parser.add_argument('--output', required=True, help='Output GLB path')
     parser.add_argument('--origin', required=True, help='TWD97 origin as JSON')
     parser.add_argument('--colors', default='{}', help='Lith colors as JSON')
+    parser.add_argument('--smooth', type=int, default=20, help='Taubin smooth iterations')
     parser.add_argument('--decimate', type=float, default=0.3, help='Decimate ratio')
     parser.add_argument('--volume-resolution', type=int, default=100, help='Volume texture resolution')
     parser.add_argument('--preview', action='store_true', help='Preview')
@@ -387,12 +439,12 @@ def main():
 
     progress(0, 'Starting...')
 
-    # 1. Read Mesh
+    # 1. Read Tecplot Mesh
     grid = read_tecplot_mesh(args.geology)
 
-    # 2. Display Mesh — whole grid outer surface with vertex colors
-    display = extract_display_mesh(
-        grid, colors,
+    # 2. Surface Contour Band Extraction (Tecplot-style)
+    lith_meshes = extract_contoured_surface(
+        grid,
         decimate_ratio=args.decimate,
     )
 
@@ -400,16 +452,17 @@ def main():
     output_dir = os.path.dirname(args.output)
     world_bounds = export_volume_texture(
         grid, output_dir, origin,
-        spacing_m=10.0, # 改回 10m
+        spacing_m=10.0,
     )
 
-    # 4. Export GLB (display only)
-    export_glb(display, args.output, origin)
+    # 4. Export GLB (per-lithology submeshes)
+    export_glb(lith_meshes, args.output, origin)
 
     print(json.dumps({
         'status': 'completed',
         'output': args.output,
         'bounds': world_bounds,
+        'lithologies': len(lith_meshes),
     }), flush=True)
 
 

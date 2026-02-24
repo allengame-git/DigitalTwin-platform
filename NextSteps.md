@@ -142,7 +142,23 @@
   - `NorthArrowCalculator`: 當 forward 向量投影到 xz 平面接近零時，fallback 改用 camera up 向量計算方位角
   - 非 TOP 視角時恢復預設 `camera.up = (0,1,0)`
 
-#### 7. 基礎架構
+#### 9. 3D 地質模型高精度渲染管線 (2026-02-24)
+
+- ✅ **Tecplot `.dat` 解析支援**
+  - 在 `geology_mesh_builder.py` 實作直接讀取 Tecplot FETetrahedron ASCII 格式
+  - 自動解析 Node 座標與 Elements (四面體) 連接關係，並將岩性 (lith_id) 儲存於 node data 內
+- ✅ **Solid Body Contour Band Extraction (Tecplot-style)**
+  - 取代原先的 voxel grid resample，改以原始 unstructured grid 直接運算
+  - 首先呼叫 `extract_surface()` 取得完整實體外殼 (Solid Body)
+  - 接著套用 VTK `BandedPolyDataContourFilter` 在表面上沿 lith_id 等值線切割三角形
+  - 產出具有 **Sharp Boundary** (精確岩性交界帶) 的高精度渲染圖 (類似 Tecplot 軟體呈現效果)
+  - 將表面按岩性分拆為多個 submesh，減少前端 shader 負擔
+- ✅ **相機控制限制說明 (`GeologyCanvas.tsx`)**
+  - 目前使用 `@react-three/drei` 的 `MapControls`
+  - 為了保持地理資訊系統 (GIS) 的「鳥瞰」隱喻，防止相機穿透地平線，設定了 `maxPolarAngle={Math.PI / 2.1}` (約 85度)
+  - 若未來需要 360 度環繞模型察看底部，可考慮放寬 `maxPolarAngle` 或切換為原本的 `OrbitControls`
+
+#### 10. 基礎架構
 
 - ✅ 身分驗證 (JWT Token + Refresh)
 - ✅ Docker PostgreSQL 資料庫設定

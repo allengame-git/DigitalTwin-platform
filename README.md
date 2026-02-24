@@ -51,6 +51,10 @@ LLRWD (Low-Level Radioactive Waste Disposal) DigitalTwin Platform 是一個基�
 - **ORM**: [Prisma 7](https://www.prisma.io/) (PostgreSQL adapter)
 - **Database**: PostgreSQL (Docker container: `llrwd-postgres` on port `5433`)
 - **File Upload**: Multer + Sharp (image processing)
+- **3D Geology Processing** (Python):
+  - [PyVista](https://docs.pyvista.org/) (VTK-based 3D mesh processing)
+  - [NumPy](https://numpy.org/) (Numerical computing)
+  - [trimesh](https://trimsh.org/) (GLB mesh export)
 
 ## 📂 Project Structure
 
@@ -95,6 +99,7 @@ LLRWD (Low-Level Radioactive Waste Disposal) DigitalTwin Platform 是一個基�
 - Node.js (v18+ recommended)
 - npm or yarn
 - Docker (for PostgreSQL database)
+- Python 3.10+ (for geology mesh processing)
 
 ### Database Setup (Docker)
 
@@ -118,6 +123,21 @@ npm install
 # Install backend dependencies
 cd server && npm install
 ```
+
+### Python Dependencies (地質模型處理)
+
+```bash
+# 建立 Python 虛擬環境 (建議)
+python3 -m venv server/venv
+source server/venv/bin/activate
+
+# 安裝 3D 處理套件
+pip install pyvista numpy trimesh
+```
+
+> 地質模型上傳時，後端會呼叫 `server/scripts/geology_mesh_builder.py`
+> 將 Tecplot FETetrahedron (.dat) 轉換為 GLB isosurface mesh。
+> 此腳本需要 PyVista (VTK)、NumPy、trimesh 三個套件。
 
 ### Environment Variables
 

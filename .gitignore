@@ -6,8 +6,9 @@ dist/
 .gemini/
 .agent/
 brain/
-
+specs/
 server/uploads/
+
 NextSteps.md
 地質模型資料格式規範.md
 Requirement Specifications.md
