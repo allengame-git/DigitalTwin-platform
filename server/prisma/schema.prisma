@@ -26,6 +26,7 @@ model Project {
   imagery       Imagery[]
   lithologies   ProjectLithology[]
   terrains      Terrain[]
+  waterLevels   WaterLevel[]
 
   @@map("projects")
 }
@@ -277,4 +278,31 @@ model Terrain {
   project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("terrains")
+}
+
+/// 地下水位面
+model WaterLevel {
+  id           String   @id @default(uuid())
+  projectId    String
+  name         String
+  sourceType   String   // 'well' | 'simulation'
+  filename     String   @unique
+  originalName String?
+  path         String
+  heightmap    String
+  minX         Float
+  maxX         Float
+  minY         Float
+  maxY         Float
+  minZ         Float
+  maxZ         Float
+  width        Int
+  height       Int
+  pointCount   Int
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("water_levels")
 }

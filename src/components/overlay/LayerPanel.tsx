@@ -31,6 +31,7 @@ const LAYER_ICONS: Record<LayerType, string> = {
     attitudes: '📐',
     terrain: '⛰️',
     imagery: '🛰️',
+    waterLevel: '💧',
     geophysics: '📡',
 };
 

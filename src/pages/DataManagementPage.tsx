@@ -42,6 +42,7 @@ import { BoreholeUploadSection } from '../components/data/BoreholeUploadSection'
 import { FaultPlaneUploadSection } from '../components/data/FaultPlaneUploadSection';
 import { AttitudeUploadSection } from '../components/data/AttitudeUploadSection';
 import { TerrainUploadSection } from '../components/data/TerrainUploadSection';
+import { WaterLevelUploadSection } from '../components/data/WaterLevelUploadSection';
 import LithologySection from '../components/data/LithologySection';
 import { useLithologyStore } from '../stores/lithologyStore';
 import { useCameraStore } from '../stores/cameraStore';
@@ -1144,10 +1145,14 @@ export const DataManagementPage: React.FC = () => {
                         )}
                     </section>
 
-                    {/* Other sections... */}
                     {/* GeoTIFF / DEM 地形資料管理 */}
                     <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
                         <TerrainUploadSection />
+                    </div>
+
+                    {/* 地下水位面 */}
+                    <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                        <WaterLevelUploadSection />
                     </div>
                 </div>
 

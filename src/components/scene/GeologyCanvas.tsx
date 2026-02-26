@@ -26,7 +26,9 @@ import { TerrainMesh } from './TerrainMesh';
 import { PerformanceMonitor } from './PerformanceMonitor';
 import { GeophysicsPlane } from './GeophysicsPlane';
 import { CameraController } from './CameraController';
+import { WaterLevelSurface } from './WaterLevelSurface';
 import { useAttitudeStore } from '../../stores/attitudeStore';
+import { useWaterLevelStore } from '../../stores/waterLevelStore';
 
 interface GeologyCanvasProps {
     /** 是否顯示 FPS 統計 */
@@ -41,6 +43,7 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
     const { attitudes, fetchAttitudes } = useAttitudeStore();
     const { fetchGeologyModels, fetchImageryFiles } = useUploadStore();
     const { fetchLithologies } = useLithologyStore();
+    const { fetchWaterLevels } = useWaterLevelStore();
     const { pixelsPerMeter, handleScaleChange } = useScaleBar();
     const { cameraRotation, handleRotationChange } = useNorthArrow();
 
@@ -51,8 +54,9 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
             fetchAttitudes(activeProjectId);
             fetchGeologyModels();
             fetchImageryFiles();
+            fetchWaterLevels(activeProjectId);
         }
-    }, [fetchBoreholes, fetchAttitudes, fetchGeologyModels, fetchImageryFiles, fetchLithologies, activeProjectId]);
+    }, [fetchBoreholes, fetchAttitudes, fetchGeologyModels, fetchImageryFiles, fetchLithologies, fetchWaterLevels, activeProjectId]);
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%', ...style }}>
@@ -79,6 +83,9 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
                     <TerrainMesh />
                     <ImageryPlane />
                     <GeophysicsPlane />
+
+                    {/* 地下水位面 */}
+                    <WaterLevelSurface />
 
                     {/* Phase 7: 3D 地質模型 (使用上傳的模型) */}
                     <GeologyTiles />

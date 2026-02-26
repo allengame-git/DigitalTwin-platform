@@ -13,6 +13,7 @@ export type LayerType =
     | 'attitudes'
     | 'terrain'
     | 'imagery'
+    | 'waterLevel'
     | 'geophysics';
 
 interface LayerConfig {
@@ -54,6 +55,7 @@ const defaultLayers: Record<LayerType, LayerConfig> = {
     attitudes: { id: 'attitudes', name: '位態符號', visible: false, opacity: 1 },
     terrain: { id: 'terrain', name: 'DEM 地形', visible: true, opacity: 1 },
     imagery: { id: 'imagery', name: '航照圖', visible: false, opacity: 0.7, zOffset: 5 }, // Default zOffset 5m
+    waterLevel: { id: 'waterLevel', name: '地下水位面', visible: false, opacity: 0.6 },
     geophysics: { id: 'geophysics', name: '地球物理探查', visible: false, opacity: 1 },
 };
 
@@ -141,6 +143,14 @@ export const useLayerStore = create<LayerState & LayerActions>()(
             partialize: (state) => ({
                 layers: state.layers,
                 terrainSettings: state.terrainSettings
+            }),
+            merge: (persistedState: any, currentState: any) => ({
+                ...currentState,
+                ...persistedState,
+                layers: {
+                    ...defaultLayers,
+                    ...(persistedState as any)?.layers,
+                },
             }),
         }
     )

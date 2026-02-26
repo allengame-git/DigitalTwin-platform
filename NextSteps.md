@@ -6,7 +6,7 @@
 
 ## 📍 目前狀態
 
-**最後更新**: 2026-02-26 (衛星影像 + DEM 3D 地形融合)
+**最後更新**: 2026-02-26 (地下水位面 + 衛星影像 DEM 融合)
 
 ### 已完成功能
 
@@ -70,6 +70,40 @@
   - `TerrainLegendControl.tsx`: 紋理模式按鈕切換 UI (僅有衛星影像時顯示)
   - `TerrainUploadSection.tsx`: 上傳 modal 新增可選衛星影像檔案選擇，已上傳的 card 顯示「衛星影像」badge
 - ✅ **Prisma Schema**: `Terrain` model 新增 `satelliteTexture String?` 欄位
+
+#### 2.6 地下水位面 (Water Level Surface) (2026-02-26)
+
+- ✅ **Python 處理器 (`water_level_processor.py`)**
+  - 支援 CSV/DAT/TXT 格式讀取，自動辨識 X/Y/Head (水位高程) 欄位
+  - SciPy `griddata` 插值 (linear/nearest/cubic)，輸出 16-bit heightmap PNG
+  - 雙模式範圍決定: `well` (使用者指定 bounds) vs `simulation` (自動偏測 + 5% padding)
+  - 輸出 JSON metadata (網格維度、座標範圍、Z-range、點數)
+- ✅ **API Route (`server/routes/water-level.ts`)**
+  - `POST /api/water-level`: 上傳檔案 + 呼叫 Python 處理 + 存入 DB
+  - `GET /api/water-level`: 取得專案水位面列表
+  - `DELETE /api/water-level/:id`: 刪除水位面 + 清除檔案
+  - 使用共用 `../lib/prisma` singleton instance
+- ✅ **Prisma Schema**: 新增 `WaterLevel` model + `Project.waterLevels` relation
+- ✅ **前端 Store (`waterLevelStore.ts`)**
+  - Zustand store: fetch, upload (with sourceType/method/bounds), delete, setActive
+  - 上傳時自動設定新上傳的水位面為 active
+- ✅ **圖層控制**
+  - `layerStore.ts`: 新增 `waterLevel` LayerType，預設 opacity 0.6
+  - `LayerPanel.tsx`: 新增 💧 icon
+  - **持久化修正**: persist `merge` function 確保新 layer key 不被舊 localStorage 覆蓋
+- ✅ **3D 渲染 (`WaterLevelSurface.tsx`)**
+  - 外層 guard component (return null when no data) + 內層 WaterLevelMesh (useLoader)
+  - PlaneGeometry + displacementMap + 半透明藍色 MeshStandardMaterial
+  - 支援 Clipping Plane、透明度調整、DoubleSide
+- ✅ **上傳 UI (`WaterLevelUploadSection.tsx`)**
+  - Drag-and-drop 上傳區域 (CSV/DAT/TXT)
+  - Modal: 資料類型選擇 (水井觀測/數值模擬)、插值方法、手動範圍 (TWD97)
+  - Card 列表: 顯示名稱、類型 badge、點數、水位範圍、active 狀態
+  - 刪除確認 Modal
+- ✅ **整合**
+  - `GeologyCanvas.tsx`: 加入 `<WaterLevelSurface />` + `fetchWaterLevels`
+  - `DataManagementPage.tsx`: 加入 `<WaterLevelUploadSection />`
+  - `server/index.ts`: 註冊 `/api/water-level` 路由
 
 #### 3. 3D 地質模型 (2026-02-12)
 
@@ -278,6 +312,15 @@ Password: postgres
 - [ ] 模擬模組 (Simulation - 污染物傳輸、熱圖視覺化)
 - [ ] 情境分析 (Scenario Analysis - 豐水期 vs 枯水期)
 
+#### 9. 地下水位面後續優化
+
+- [ ] **多層水位面**: 支援同時顯示多個水位面 (例如不同含水層)，每個用不同顏色區分
+- [ ] **時間序列**: 支援上傳不同時間點的水位資料，提供時間滑桿動態切換
+- [ ] **等值線 (Contour)**: 在水位面上顯示水位高程等值線
+- [ ] **色階渲染**: 支援 Color Ramp 著色 (類似地形圖例)，取代純藍色
+- [ ] **水位標籤**: 在 3D 場景中顯示各觀測井的水位數值標籤
+- [ ] **地形交叉分析**: 水位面與地形面的差異計算 (地下水埋深)
+
 ---
 
 ## 📁 關鍵檔案位置
@@ -294,6 +337,7 @@ Password: postgres
 | `server/routes/geology-model.ts` | 地質模型 API (含 CSV→GLB 轉換) |
 | `server/routes/upload.ts` | 航照圖 & 地球物理探查 API |
 | `server/routes/lithology.ts` | 岩性定義 API |
+| `server/routes/water-level.ts` | 地下水位面 API (POST/GET/DELETE) |
 
 ### 後端 - 服務 & 設定
 
@@ -319,6 +363,7 @@ Password: postgres
 | `src/stores/layerStore.ts` | 圖層控制 (可見性、透明度、textureMode) |
 | `src/stores/viewerStore.ts` | 3D 檢視器 (LOD, Clipping Plane, 背景色) |
 | `src/stores/terrainStore.ts` | 地形資料 (fetch, upload, delete, satelliteTexture) |
+| `src/stores/waterLevelStore.ts` | 地下水位面 (fetch, upload, delete, active) |
 | `src/stores/cameraStore.ts` | 相機控制 (reset trigger, target center, viewPreset, resetTarget) |
 
 ### 前端 - 3D 場景元件
@@ -334,6 +379,7 @@ Password: postgres
 | `src/components/scene/StructureLines.tsx` | 斷層面 3D 渲染 |
 | `src/components/scene/TerrainMesh.tsx` | DEM 地形渲染 (衛星/山影/色階三模式) |
 | `src/components/scene/GeophysicsPlane.tsx` | 地球物理探查 3D 剖面 |
+| `src/components/scene/WaterLevelSurface.tsx` | 地下水位面 3D 渲染 (半透明 Displacement Mesh) |
 
 ### 前端 - Overlay 元件
 
@@ -353,6 +399,7 @@ Password: postgres
 | `src/components/data/FaultPlaneUploadSection.tsx` | 斷層面資料管理 |
 | `src/components/data/LithologySection.tsx` | 岩性定義管理 |
 | `src/components/data/TerrainUploadSection.tsx` | DEM + 衛星影像上傳 |
+| `src/components/data/WaterLevelUploadSection.tsx` | 地下水位面資料上傳 |
 
 ### 工具函式
 
@@ -367,7 +414,9 @@ Password: postgres
 | 檔案 | 說明 |
 |:---|:---|
 | `server/scripts/terrain_processor.py` | DEM 處理器 (heightmap + hillshade + 衛星影像對齊) |
+| `server/scripts/water_level_processor.py` | 地下水位插值處理 (CSV/DAT/TXT → 16-bit heightmap) |
 | `server/routes/terrain.ts` | Terrain API (雙檔上傳 DEM+satellite) |
+| `server/routes/water-level.ts` | Water Level API (上傳/列表/刪除) |
 
 ---
 
