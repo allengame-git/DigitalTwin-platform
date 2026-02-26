@@ -2,7 +2,7 @@
  * TerrainMesh Component
  * @module components/scene/TerrainMesh
  * 
- * DEM 地形網格
+ * DEM 地形網格 (支援衛星影像 / 山影圖 / 色階模式)
  * Task: T043c (Real DEM Integration)
  */
 
@@ -42,13 +42,31 @@ export function TerrainMesh() {
         return generateColorRampTexture(terrainSettings.colorRamp, terrainSettings.reverse);
     }, [terrainSettings.colorRamp, terrainSettings.reverse]);
 
+    // 決定使用哪個 texture：衛星影像 > 山影圖 > 無
+    const textureMode = terrainSettings.textureMode;
+    const isSatelliteMode = textureMode === 'satellite' && !!activeTerrain?.satelliteTexture;
+
+    // Build texture URLs
+    const textureUrls = useMemo(() => {
+        if (!activeTerrain) return [];
+        const urls: string[] = [];
+        // Heightmap (always needed)
+        if (activeTerrain.heightmap) {
+            urls.push(`${API_BASE}${activeTerrain.heightmap}`);
+        }
+        // Texture map
+        if (isSatelliteMode && activeTerrain.satelliteTexture) {
+            urls.push(`${API_BASE}${activeTerrain.satelliteTexture}`);
+        } else if (activeTerrain.texture) {
+            urls.push(`${API_BASE}${activeTerrain.texture}`);
+        }
+        return urls;
+    }, [activeTerrain, API_BASE, isSatelliteMode]);
+
     // Load textures if terrain exists
-    // Note: useLoader might suspend, better to handle gracefully or use TextureLoader manually if inside a non-Suspense tree.
-    // Here we assume Suspense is available up tree or we accept the suspend.
-    const [heightMap, textureMap] = useLoader(THREE.TextureLoader, [
-        activeTerrain?.heightmap ? `${API_BASE}${activeTerrain.heightmap}` : '',
-        activeTerrain?.texture ? `${API_BASE}${activeTerrain.texture}` : ''
-    ].filter(Boolean) as string[]);
+    const textures = useLoader(THREE.TextureLoader, textureUrls.length > 0 ? textureUrls : ['']);
+    const heightMap = textures[0] || null;
+    const textureMap = textures[1] || null;
 
     // Update Uniforms
     useFrame(() => {
@@ -56,6 +74,7 @@ export function TerrainMesh() {
             shaderRef.current.uniforms.uMinZ.value = terrainSettings.minZ;
             shaderRef.current.uniforms.uMaxZ.value = terrainSettings.maxZ;
             shaderRef.current.uniforms.uRamp.value = rampTexture;
+            shaderRef.current.uniforms.uUseColorRamp.value = (textureMode === 'colorRamp') ? 1.0 : 0.0;
         }
     });
 
@@ -69,6 +88,7 @@ export function TerrainMesh() {
         shader.uniforms.uRamp = { value: rampTexture };
         shader.uniforms.uMinZ = { value: terrainSettings.minZ };
         shader.uniforms.uMaxZ = { value: terrainSettings.maxZ };
+        shader.uniforms.uUseColorRamp = { value: (textureMode === 'colorRamp') ? 1.0 : 0.0 };
 
         // Vertex Shader: Pass height to Fragment Shader
         shader.vertexShader = shader.vertexShader.replace(
@@ -87,7 +107,7 @@ export function TerrainMesh() {
             `
         );
 
-        // Fragment Shader: Map height to color
+        // Fragment Shader: Map height to color (only when colorRamp mode)
         shader.fragmentShader = shader.fragmentShader.replace(
             '#include <common>',
             `
@@ -95,6 +115,7 @@ export function TerrainMesh() {
             uniform sampler2D uRamp;
             uniform float uMinZ;
             uniform float uMaxZ;
+            uniform float uUseColorRamp;
             varying float vMyHeight;
             `
         );
@@ -105,11 +126,13 @@ export function TerrainMesh() {
             `
             #include <map_fragment>
             
-            float normHeight = (vMyHeight - uMinZ) / (uMaxZ - uMinZ);
-            normHeight = clamp(normHeight, 0.01, 0.99);
-            
-            vec4 rampColor = texture2D(uRamp, vec2(normHeight, 0.5));
-            diffuseColor *= rampColor;
+            if (uUseColorRamp > 0.5) {
+                float normHeight = (vMyHeight - uMinZ) / (uMaxZ - uMinZ);
+                normHeight = clamp(normHeight, 0.01, 0.99);
+                
+                vec4 rampColor = texture2D(uRamp, vec2(normHeight, 0.5));
+                diffuseColor *= rampColor;
+            }
             `
         );
     };

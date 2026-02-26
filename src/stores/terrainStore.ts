@@ -11,6 +11,7 @@ export interface Terrain {
     path: string;
     heightmap: string;
     texture: string | null;
+    satelliteTexture: string | null;
     minX: number;
     maxX: number;
     minY: number;
@@ -30,7 +31,7 @@ interface TerrainState {
     error: string | null;
 
     fetchTerrains: (projectId: string) => Promise<void>;
-    uploadTerrain: (projectId: string, file: File, name?: string, method?: string) => Promise<void>;
+    uploadTerrain: (projectId: string, file: File, name?: string, method?: string, satellite?: File) => Promise<void>;
     setActiveTerrain: (id: string | null) => void;
     deleteTerrain: (id: string) => Promise<void>;
     getActiveTerrain: () => Terrain | undefined;
@@ -71,7 +72,7 @@ export const useTerrainStore = create<TerrainState>((set, get) => ({
         }
     },
 
-    uploadTerrain: async (projectId: string, file: File, name?: string, method: string = 'linear') => {
+    uploadTerrain: async (projectId: string, file: File, name?: string, method: string = 'linear', satellite?: File) => {
         set({ isLoading: true, error: null });
         try {
             const formData = new FormData();
@@ -79,6 +80,7 @@ export const useTerrainStore = create<TerrainState>((set, get) => ({
             formData.append('projectId', projectId);
             if (name) formData.append('name', name);
             formData.append('method', method);
+            if (satellite) formData.append('satellite', satellite);
 
             const token = useAuthStore.getState().accessToken;
             const response = await axios.post<Terrain>(

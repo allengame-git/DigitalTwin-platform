@@ -6,9 +6,11 @@ Terrain Grid Processor (地形網格處理器)
 1. 高度圖 (Heightmap) - 16-bit PNG 格式
 2. 元數據 (Metadata) - 邊界範圍、最大最小高程
 3. 紋理圖 (Texture) - 山影圖 (Hillshade, 選項)
+4. 衛星影像紋理 (Satellite Texture) - 對齊 DEM 範圍的 JPEG
 
 使用方式:
     python3 terrain_processor.py --input raw_dem.tif --output-dir ./processed --width 2048
+    python3 terrain_processor.py --input raw_dem.tif --output-dir ./processed --width 2048 --satellite satellite.tif
     python3 terrain_processor.py --input points.csv --output-dir ./processed --width 2048 --method linear
 """
 
@@ -159,12 +161,93 @@ def generate_hillshade(data, output_path, az=315, alt=45):
     img = Image.fromarray(shaded, mode='L')
     img.save(output_path)
 
+
+def process_satellite(satellite_path, dem_bounds, dem_crs, target_width, target_height, output_path):
+    """
+    將衛星影像 reproject + resample 到 DEM 的範圍和尺寸
+    輸出為 JPEG 格式（適合前端 Three.js texture）
+    """
+    progress(85, f'處理衛星影像: {os.path.basename(satellite_path)}')
+    
+    # WebGL texture 限制: 最大 4096
+    MAX_TEXTURE_SIZE = 4096
+    if target_width > MAX_TEXTURE_SIZE:
+        scale = MAX_TEXTURE_SIZE / target_width
+        target_width = MAX_TEXTURE_SIZE
+        target_height = int(target_height * scale)
+    if target_height > MAX_TEXTURE_SIZE:
+        scale = MAX_TEXTURE_SIZE / target_height
+        target_height = MAX_TEXTURE_SIZE
+        target_width = int(target_width * scale)
+    
+    with rasterio.open(satellite_path) as src:
+        # 計算目標 transform (對齊 DEM 範圍)
+        dst_transform, dst_width, dst_height = calculate_default_transform(
+            src.crs, dem_crs,
+            target_width, target_height,
+            left=dem_bounds['minX'],
+            bottom=dem_bounds['minY'],
+            right=dem_bounds['maxX'],
+            top=dem_bounds['maxY']
+        )
+        
+        # 判斷波段數 (RGB 或單波段)
+        band_count = min(src.count, 3)  # 最多取 RGB 3 波段
+        
+        progress(88, f'Reprojecting {band_count} bands to {target_width}x{target_height}...')
+        
+        # Reproject 每個波段
+        bands = []
+        for i in range(1, band_count + 1):
+            dst_data = np.zeros((target_height, target_width), dtype=np.uint8)
+            
+            # 讀取原始資料並正規化到 0-255
+            src_data = src.read(i)
+            src_dtype = src_data.dtype
+            
+            # 如果不是 uint8，正規化
+            if src_dtype != np.uint8:
+                valid = src_data[src_data != src.nodata] if src.nodata is not None else src_data
+                if len(valid) > 0:
+                    p2, p98 = np.percentile(valid, [2, 98])
+                    src_data = np.clip((src_data - p2) / (p98 - p2) * 255, 0, 255).astype(np.uint8)
+                else:
+                    src_data = np.zeros_like(src_data, dtype=np.uint8)
+            
+            reproject(
+                source=src_data,
+                destination=dst_data,
+                src_transform=src.transform,
+                src_crs=src.crs,
+                dst_transform=dst_transform,
+                dst_crs=dem_crs,
+                resampling=Resampling.bilinear
+            )
+            bands.append(dst_data)
+        
+        # 組合成 RGB 影像
+        if band_count == 1:
+            # 單波段 → 灰階轉 RGB
+            rgb = np.stack([bands[0], bands[0], bands[0]], axis=-1)
+        elif band_count == 2:
+            rgb = np.stack([bands[0], bands[1], bands[0]], axis=-1)
+        else:
+            rgb = np.stack(bands, axis=-1)
+        
+        progress(92, '儲存衛星影像紋理 (JPEG)...')
+        img = Image.fromarray(rgb, mode='RGB')
+        img.save(output_path, 'JPEG', quality=90)
+        
+        progress(95, f'衛星影像處理完成: {target_width}x{target_height}')
+        return target_width, target_height
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', required=True)
     parser.add_argument('--output-dir', required=True)
     parser.add_argument('--width', type=int, default=2048)
     parser.add_argument('--method', default='linear', choices=['linear', 'nearest', 'cubic'])
+    parser.add_argument('--satellite', default=None, help='Optional satellite imagery TIFF to drape over DEM')
     
     args = parser.parse_args()
     
@@ -203,6 +286,25 @@ def main():
                 'texture': texture_name
             }
         }
+        
+        # 處理衛星影像 (如果有提供)
+        if args.satellite and os.path.exists(args.satellite):
+            satellite_name = f"satellite_{os.path.basename(args.input)}.jpg"
+            satellite_path = os.path.join(args.output_dir, satellite_name)
+            
+            # 取得 DEM 的 CRS
+            dem_crs = None
+            if ext in ['.tif', '.tiff']:
+                with rasterio.open(args.input) as dem_src:
+                    dem_crs = dem_src.crs
+            else:
+                # CSV 沒有 CRS 資訊，預設 TWD97 (EPSG:3826)
+                dem_crs = rasterio.crs.CRS.from_epsg(3826)
+            
+            sat_w, sat_h = process_satellite(
+                args.satellite, bounds, dem_crs, w, h, satellite_path
+            )
+            result['meta']['satellite'] = satellite_name
         
         print(json.dumps(result))
         

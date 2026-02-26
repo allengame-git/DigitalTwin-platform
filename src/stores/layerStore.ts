@@ -30,6 +30,7 @@ export interface TerrainSettings {
     colorRamp: 'rainbow' | 'spectral' | 'terrain' | 'viridis' | 'magma';
     autoRange: boolean;
     reverse: boolean;
+    textureMode: 'satellite' | 'hillshade' | 'colorRamp';
 }
 
 interface LayerState {
@@ -61,7 +62,8 @@ const defaultTerrainSettings: TerrainSettings = {
     maxZ: 1000,
     colorRamp: 'spectral',
     autoRange: true,
-    reverse: false
+    reverse: false,
+    textureMode: 'colorRamp'
 };
 
 export const useLayerStore = create<LayerState & LayerActions>()(

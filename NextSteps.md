@@ -6,7 +6,7 @@
 
 ## 📍 目前狀態
 
-**最後更新**: 2026-02-23 (指北針與相機控制優化)
+**最後更新**: 2026-02-26 (衛星影像 + DEM 3D 地形融合)
 
 ### 已完成功能
 
@@ -52,6 +52,24 @@
   - **Z-axis Elevation**: 支援手動調整航照圖高程 (-500m ~ 100m)，解決圖層穿插問題 (`Impact: High`)
   - **UI 調整**: 將控制項移至獨立行，優化操作體驗
   - **Persistence**: 整合至 `layerStore` 與 LocalStorage 自動儲存
+
+#### 2.5 衛星影像 + DEM 3D 地形融合 (2026-02-26)
+
+- ✅ **衛星影像處理 (`terrain_processor.py`)**
+  - 新增 `process_satellite()` 函數，使用 rasterio 將衛星影像 reproject + resample 至 DEM 範圍
+  - 支援多波段 (RGB) 與單波段影像，自動正規化至 0-255 (2%/98% percentile stretch)
+  - WebGL texture 限制：自動限縮至 4096x4096 以內
+  - 輸出對齊的 JPEG 檔案 (quality=90)
+- ✅ **雙檔上傳 API**
+  - `POST /api/terrain` 支援 `upload.fields` 同時接收 `file` (DEM) 和 `satellite` (衛星影像)
+  - Python 腳本透過 `--satellite` 參數接收衛星影像路徑
+  - DB 儲存 `satelliteTexture` 欄位 (處理後的 JPEG 路徑)
+- ✅ **前端三模式紋理切換**
+  - `TerrainSettings.textureMode`: `'satellite' | 'hillshade' | 'colorRamp'`
+  - `TerrainMesh.tsx`: 動態切換 texture URL，衛星模式跳過 color ramp shader (`uUseColorRamp` uniform)
+  - `TerrainLegendControl.tsx`: 紋理模式按鈕切換 UI (僅有衛星影像時顯示)
+  - `TerrainUploadSection.tsx`: 上傳 modal 新增可選衛星影像檔案選擇，已上傳的 card 顯示「衛星影像」badge
+- ✅ **Prisma Schema**: `Terrain` model 新增 `satelliteTexture String?` 欄位
 
 #### 3. 3D 地質模型 (2026-02-12)
 
@@ -298,8 +316,9 @@ Password: postgres
 | `src/stores/faultPlaneStore.ts` | 斷層面資料 (CRUD, batch import) |
 | `src/stores/uploadStore.ts` | 上傳管理 (航照/地物/地質模型, activeGeologyModelId) |
 | `src/stores/lithologyStore.ts` | 岩性定義 (專案級顏色配置) |
-| `src/stores/layerStore.ts` | 圖層控制 (可見性、透明度) |
+| `src/stores/layerStore.ts` | 圖層控制 (可見性、透明度、textureMode) |
 | `src/stores/viewerStore.ts` | 3D 檢視器 (LOD, Clipping Plane, 背景色) |
+| `src/stores/terrainStore.ts` | 地形資料 (fetch, upload, delete, satelliteTexture) |
 | `src/stores/cameraStore.ts` | 相機控制 (reset trigger, target center, viewPreset, resetTarget) |
 
 ### 前端 - 3D 場景元件
@@ -313,7 +332,7 @@ Password: postgres
 | `src/components/scene/SceneEnvironment.tsx` | 環境設定 (燈光/網格，已移除 fog 和基礎地面) |
 | `src/components/scene/StrikeDipSymbol.tsx` | 位態符號渲染 (圓盤 + 傾向箭頭) |
 | `src/components/scene/StructureLines.tsx` | 斷層面 3D 渲染 |
-| `src/components/scene/TerrainMesh.tsx` | DEM 地形渲染 |
+| `src/components/scene/TerrainMesh.tsx` | DEM 地形渲染 (衛星/山影/色階三模式) |
 | `src/components/scene/GeophysicsPlane.tsx` | 地球物理探查 3D 剖面 |
 
 ### 前端 - Overlay 元件
@@ -333,6 +352,7 @@ Password: postgres
 | `src/components/data/AttitudeUploadSection.tsx` | 位態資料管理 (固定高度表格) |
 | `src/components/data/FaultPlaneUploadSection.tsx` | 斷層面資料管理 |
 | `src/components/data/LithologySection.tsx` | 岩性定義管理 |
+| `src/components/data/TerrainUploadSection.tsx` | DEM + 衛星影像上傳 |
 
 ### 工具函式
 
@@ -341,6 +361,13 @@ Password: postgres
 | `src/utils/coordinates.ts` | TWD97 ↔ Three.js 座標轉換 (含 origin 設定) |
 | `src/utils/lod.ts` | LOD 等級計算 |
 | `src/config/three.ts` | Three.js 全域設定 (FOV, 近遠裁切, 渲染器) |
+
+### 後端 - 地形處理
+
+| 檔案 | 說明 |
+|:---|:---|
+| `server/scripts/terrain_processor.py` | DEM 處理器 (heightmap + hillshade + 衛星影像對齊) |
+| `server/routes/terrain.ts` | Terrain API (雙檔上傳 DEM+satellite) |
 
 ---
 

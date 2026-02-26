@@ -17,6 +17,7 @@ export const TerrainUploadSection: React.FC = () => {
 
     const [isDragging, setIsDragging] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [satelliteFile, setSatelliteFile] = useState<File | null>(null);
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
@@ -60,9 +61,10 @@ export const TerrainUploadSection: React.FC = () => {
         if (!selectedFile || !activeProjectId) return;
 
         try {
-            await uploadTerrain(activeProjectId, selectedFile, formData.name, formData.method);
+            await uploadTerrain(activeProjectId, selectedFile, formData.name, formData.method, satelliteFile || undefined);
             setShowUploadModal(false);
             setSelectedFile(null);
+            setSatelliteFile(null);
             setFormData({ name: '', method: 'linear' });
         } catch (err) {
             alert(err instanceof Error ? err.message : '上傳失敗');
@@ -122,6 +124,9 @@ export const TerrainUploadSection: React.FC = () => {
                                 <div className="dm-file-name">{terrain.name}</div>
                                 <div className="dm-file-meta">
                                     {terrain.width}x{terrain.height} • {((terrain.maxZ - terrain.minZ)).toFixed(1)}m 高差
+                                    {terrain.satelliteTexture && (
+                                        <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '3px', background: '#dbeafe', color: '#1d4ed8', fontSize: '10px', fontWeight: 600 }}>衛星影像</span>
+                                    )}
                                 </div>
                                 <div className="dm-file-actions">
                                     <button
@@ -180,6 +185,39 @@ export const TerrainUploadSection: React.FC = () => {
                                     </select>
                                 </div>
                             )}
+                            {/* 衛星影像 (可選) */}
+                            <div className="dm-form-group">
+                                <label className="dm-form-label">衛星影像 (可選)</label>
+                                <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
+                                    上傳衛星影像 TIFF 以貼合在 DEM 地形上顯示 3D 立體影像
+                                </div>
+                                <input
+                                    type="file"
+                                    accept=".tif,.tiff,.jpg,.jpeg,.png"
+                                    onChange={(e) => {
+                                        if (e.target.files?.[0]) {
+                                            setSatelliteFile(e.target.files[0]);
+                                        }
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '6px',
+                                        fontSize: '12px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        background: '#f9fafb'
+                                    }}
+                                />
+                                {satelliteFile && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                                        <span style={{ fontSize: '11px', color: '#059669' }}>{satelliteFile.name}</span>
+                                        <button
+                                            onClick={() => setSatelliteFile(null)}
+                                            style={{ fontSize: '10px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}
+                                        >移除</button>
+                                    </div>
+                                )}
+                            </div>
                             <div className="dm-modal-footer">
                                 <button className="dm-btn-cancel" onClick={() => setShowUploadModal(false)}>取消</button>
                                 <button className="dm-btn-confirm" onClick={handleSubmit} disabled={isLoading}>

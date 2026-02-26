@@ -262,6 +262,7 @@ model Terrain {
   path         String
   heightmap    String
   texture      String?
+  satelliteTexture String?
   minX         Float
   maxX         Float
   minY         Float

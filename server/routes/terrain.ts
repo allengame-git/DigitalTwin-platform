@@ -28,29 +28,37 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage,
     fileFilter: (_req, file, cb) => {
-        const allowed = ['.tif', '.tiff', '.csv'];
+        const allowed = ['.tif', '.tiff', '.csv', '.jpg', '.jpeg', '.png'];
         const ext = path.extname(file.originalname).toLowerCase();
         if (allowed.includes(ext)) {
             cb(null, true);
         } else {
-            cb(new Error('只支援 .tif, .tiff, .csv 檔案'));
+            cb(new Error('只支援 .tif, .tiff, .csv, .jpg, .png 檔案'));
         }
     },
     limits: { fileSize: 500 * 1024 * 1024 }, // 500MB
 });
 
+const terrainUpload = upload.fields([
+    { name: 'file', maxCount: 1 },
+    { name: 'satellite', maxCount: 1 }
+]);
+
 /**
  * POST /api/terrain
  * 上傳並處理 DEM 檔案
  */
-router.post('/', authenticate, upload.single('file'), async (req: Request, res: Response) => {
+router.post('/', authenticate, terrainUpload, async (req: Request, res: Response) => {
     try {
-        const file = req.file;
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+        const file = files?.file?.[0];
+        const satelliteFile = files?.satellite?.[0];
         const { projectId, name, width = '2048', method = 'linear' } = req.body;
 
         if (!file) return res.status(400).json({ error: '請選擇檔案' });
         if (!projectId) {
             fs.unlinkSync(file.path);
+            if (satelliteFile) fs.unlinkSync(satelliteFile.path);
             return res.status(400).json({ error: '缺少 Project ID' });
         }
 
@@ -61,13 +69,20 @@ router.post('/', authenticate, upload.single('file'), async (req: Request, res: 
         // 優先使用虛擬環境，若不存在則退回系統 python3
         const pythonExecutable = fs.existsSync(venvPython) ? venvPython : 'python3';
 
-        const pythonProcess = spawn(pythonExecutable, [
+        const pythonArgs = [
             pythonScript,
             '--input', file.path,
             '--output-dir', PROCESSED_DIR,
             '--width', width.toString(),
             '--method', method
-        ]);
+        ];
+
+        // 如果有衛星影像，傳遞給 Python 腳本
+        if (satelliteFile) {
+            pythonArgs.push('--satellite', satelliteFile.path);
+        }
+
+        const pythonProcess = spawn(pythonExecutable, pythonArgs);
 
         let outputData = '';
         let errorData = '';
@@ -137,6 +152,7 @@ router.post('/', authenticate, upload.single('file'), async (req: Request, res: 
                         path: `/uploads/terrain/${file.filename}`,
                         heightmap: `/uploads/terrain/processed/${meta.heightmap}`,
                         texture: `/uploads/terrain/processed/${meta.texture}`,
+                        satelliteTexture: meta.satellite ? `/uploads/terrain/processed/${meta.satellite}` : null,
                         minX: meta.minX,
                         maxX: meta.maxX,
                         minY: meta.minY,
@@ -149,6 +165,11 @@ router.post('/', authenticate, upload.single('file'), async (req: Request, res: 
                 });
 
                 res.status(201).json(terrain);
+
+                // 清理衛星影像原始檔 (已處理為 JPEG)
+                if (satelliteFile && fs.existsSync(satelliteFile.path)) {
+                    fs.unlinkSync(satelliteFile.path);
+                }
 
             } catch (err: any) {
                 console.error('[Terrain API Error]:', err);
@@ -197,7 +218,8 @@ router.delete('/:id', authenticate, async (req: Request, res: Response) => {
         const filesToDelete = [
             path.join(__dirname, '..', terrain.path),
             path.join(__dirname, '..', terrain.heightmap),
-            path.join(__dirname, '..', terrain.texture || '')
+            path.join(__dirname, '..', terrain.texture || ''),
+            path.join(__dirname, '..', terrain.satelliteTexture || '')
         ];
 
         for (const f of filesToDelete) {
