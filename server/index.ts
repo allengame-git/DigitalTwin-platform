@@ -25,6 +25,7 @@ import attitudeRoutes from './routes/attitude';
 import terrainRoutes from './routes/terrain';
 import waterLevelRoutes from './routes/water-level';
 import cleanupRoutes from './routes/cleanup';
+import facilityRoutes from './routes/facility';
 import { requestIdMiddleware, requestLogger, errorLogger } from './middleware/errorLogger';
 import path from 'path';
 
@@ -68,6 +69,7 @@ app.use('/api/attitude', attitudeRoutes);
 app.use('/api/terrain', terrainRoutes);
 app.use('/api/water-level', waterLevelRoutes);
 app.use('/api/cleanup', cleanupRoutes);
+app.use('/api/facility', facilityRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
