@@ -75,6 +75,9 @@ router.put('/scenes/:id', authenticate, async (req: Request, res: Response) => {
         const id = req.params.id as string;
         const { name, description, cameraPosition, cameraTarget, coordShiftX, coordShiftY, coordShiftZ, coordRotation, sortOrder } = req.body;
 
+        const existing = await prisma.facilityScene.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: '場景不存在' });
+
         const scene = await prisma.facilityScene.update({
             where: { id },
             data: {
@@ -112,13 +115,23 @@ router.delete('/scenes/:id', authenticate, async (req: Request, res: Response) =
                     }
                 }
             }
-        }) as any;
+        });
 
         if (!scene) return res.status(404).json({ error: '場景不存在' });
 
         const filesToDelete: string[] = [];
 
-        const collectFiles = (s: any) => {
+        const collectFiles = (s: {
+            planImageUrl?: string | null;
+            autoPlanImageUrl?: string | null;
+            terrainCsvUrl?: string | null;
+            terrainHeightmapUrl?: string | null;
+            terrainTextureUrl?: string | null;
+            models?: Array<{
+                id: string;
+                infos?: Array<{ id: string; type: string }>;
+            }>;
+        }) => {
             if (s.planImageUrl) filesToDelete.push(path.join(__dirname, '..', s.planImageUrl));
             if (s.autoPlanImageUrl) filesToDelete.push(path.join(__dirname, '..', s.autoPlanImageUrl));
             if (s.terrainCsvUrl) filesToDelete.push(path.join(__dirname, '..', s.terrainCsvUrl));
@@ -141,13 +154,28 @@ router.delete('/scenes/:id', authenticate, async (req: Request, res: Response) =
             }
         };
 
-        collectFiles(scene);
-        for (const child of scene.childScenes || []) {
-            collectFiles(child);
-        }
+        // Recursively collect all descendant scenes for file cleanup
+        const allSceneIds: string[] = [id];
+        const gatherDescendantIds = async (parentId: string) => {
+            const children = await prisma.facilityScene.findMany({
+                where: { parentSceneId: parentId },
+                include: { models: { include: { infos: true } } }
+            });
+            for (const child of children) {
+                allSceneIds.push(child.id);
+                collectFiles(child);
+                await gatherDescendantIds(child.id);
+            }
+        };
 
-        const planDir = path.join(PLANS_DIR, id);
-        const terrainDir = path.join(TERRAIN_DIR, id);
+        collectFiles(scene);
+        await gatherDescendantIds(id);
+
+        // Cleanup scene-level dirs for all descendants
+        const allSceneDirs = allSceneIds.flatMap(sid => [
+            path.join(PLANS_DIR, sid),
+            path.join(TERRAIN_DIR, sid)
+        ]);
 
         // Cascade delete via Prisma
         await prisma.facilityScene.delete({ where: { id } });
@@ -169,7 +197,7 @@ router.delete('/scenes/:id', authenticate, async (req: Request, res: Response) =
         }
 
         // Cleanup scene-level dirs
-        for (const dir of [planDir, terrainDir]) {
+        for (const dir of allSceneDirs) {
             try {
                 if (fs.existsSync(dir)) {
                     fs.rmSync(dir, { recursive: true, force: true });
