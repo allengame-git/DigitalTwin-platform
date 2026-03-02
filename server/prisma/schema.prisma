@@ -26,7 +26,8 @@ model Project {
   imagery       Imagery[]
   lithologies   ProjectLithology[]
   terrains      Terrain[]
-  waterLevels   WaterLevel[]
+  waterLevels    WaterLevel[]
+  facilityScenes FacilityScene[]
 
   @@map("projects")
 }
@@ -305,4 +306,79 @@ model WaterLevel {
   project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("water_levels")
+}
+
+/// 設施場景資訊類型
+enum FacilityInfoType {
+  TEXT
+  IMAGE
+  DOCUMENT
+  LINK
+}
+
+/// 設施導覽場景 (可巢狀)
+model FacilityScene {
+  id                  String          @id @default(uuid())
+  projectId           String
+  parentSceneId       String?
+  name                String
+  description         String?
+  planImageUrl        String?
+  autoPlanImageUrl    String?
+  cameraPosition      Json?
+  cameraTarget        Json?
+  terrainCsvUrl       String?
+  terrainHeightmapUrl String?
+  terrainTextureUrl   String?
+  terrainTextureMode  String?
+  terrainBounds       Json?
+  coordShiftX         Float           @default(0)
+  coordShiftY         Float           @default(0)
+  coordShiftZ         Float           @default(0)
+  coordRotation       Float           @default(0)
+  sortOrder           Int             @default(0)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  project             Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentScene         FacilityScene?  @relation("SceneHierarchy", fields: [parentSceneId], references: [id], onDelete: Cascade)
+  childScenes         FacilityScene[] @relation("SceneHierarchy")
+  models              FacilityModel[]
+  linkedModels        FacilityModel[] @relation("ModelToChildScene")
+
+  @@map("facility_scenes")
+}
+
+/// 設施 3D 模型
+model FacilityModel {
+  id           String              @id @default(uuid())
+  sceneId      String
+  name         String
+  modelUrl     String
+  fileSize     Int
+  position     Json                @default("{\"x\":0,\"y\":0,\"z\":0}")
+  rotation     Json                @default("{\"x\":0,\"y\":0,\"z\":0}")
+  scale        Json                @default("{\"x\":1,\"y\":1,\"z\":1}")
+  childSceneId String?
+  sortOrder    Int                 @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  scene        FacilityScene       @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  childScene   FacilityScene?      @relation("ModelToChildScene", fields: [childSceneId], references: [id], onDelete: SetNull)
+  infos        FacilityModelInfo[]
+
+  @@map("facility_models")
+}
+
+/// 設施模型資訊 (Rich Content)
+model FacilityModelInfo {
+  id        String           @id @default(uuid())
+  modelId   String
+  type      FacilityInfoType
+  label     String
+  content   String
+  sortOrder Int              @default(0)
+  createdAt DateTime         @default(now())
+  model     FacilityModel    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("facility_model_infos")
 }
