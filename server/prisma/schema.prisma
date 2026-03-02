@@ -345,6 +345,8 @@ model FacilityScene {
   models              FacilityModel[]
   linkedModels        FacilityModel[] @relation("ModelToChildScene")
 
+  @@index([projectId])
+  @@index([parentSceneId])
   @@map("facility_scenes")
 }
 
@@ -366,6 +368,7 @@ model FacilityModel {
   childScene   FacilityScene?      @relation("ModelToChildScene", fields: [childSceneId], references: [id], onDelete: SetNull)
   infos        FacilityModelInfo[]
 
+  @@index([sceneId])
   @@map("facility_models")
 }
 
@@ -380,5 +383,6 @@ model FacilityModelInfo {
   createdAt DateTime         @default(now())
   model     FacilityModel    @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
+  @@index([modelId])
   @@map("facility_model_infos")
 }
