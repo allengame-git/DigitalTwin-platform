@@ -651,6 +651,228 @@ const ModelInfoEditor: React.FC<{ projectId: string }> = ({ projectId }) => {
     );
 };
 
+// ─── Tab 5: ModelManager ──────────────────────────────────────────────────────
+
+interface ModelEditState {
+    name: string;
+    childSceneId: string;
+    posX: string; posY: string; posZ: string;
+    rotX: string; rotY: string; rotZ: string;
+    sclX: string; sclY: string; sclZ: string;
+}
+
+const DEFAULT_EDIT = (m: FacilityModelItem): ModelEditState => ({
+    name: m.name,
+    childSceneId: m.childSceneId ?? '',
+    posX: String(m.position?.x ?? 0), posY: String(m.position?.y ?? 0), posZ: String(m.position?.z ?? 0),
+    rotX: String(m.rotation?.x ?? 0), rotY: String(m.rotation?.y ?? 0), rotZ: String(m.rotation?.z ?? 0),
+    sclX: String(m.scale?.x ?? 1),    sclY: String(m.scale?.y ?? 1),    sclZ: String(m.scale?.z ?? 1),
+});
+
+const ModelManager: React.FC<{ projectId: string }> = ({ projectId }) => {
+    const { scenes, fetchScenes } = useFacilityStore();
+
+    const [sceneId, setSceneId] = useState('');
+    const [models, setModels] = useState<FacilityModelItem[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [editState, setEditState] = useState<Record<string, ModelEditState>>({});
+    const [savingId, setSavingId] = useState<string | null>(null);
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+    useEffect(() => { if (projectId) fetchScenes(projectId); }, [projectId, fetchScenes]);
+
+    useEffect(() => {
+        if (!sceneId) { setModels([]); return; }
+        setIsLoading(true);
+        setError(null);
+        axios.get<FacilityModelItem[]>(`${API_BASE}/api/facility/models`, {
+            params: { sceneId },
+            headers: getAuthHeaders(),
+            withCredentials: true,
+        })
+            .then(r => {
+                const list = Array.isArray(r.data) ? r.data : [];
+                setModels(list);
+                const initEdit: Record<string, ModelEditState> = {};
+                list.forEach(m => { initEdit[m.id] = DEFAULT_EDIT(m); });
+                setEditState(initEdit);
+            })
+            .catch(() => setError('載入模型失敗'))
+            .finally(() => setIsLoading(false));
+    }, [sceneId]);
+
+    const setField = (id: string, field: keyof ModelEditState, value: string) => {
+        setEditState(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+    };
+
+    const handleSave = async (modelId: string) => {
+        const s = editState[modelId];
+        if (!s) return;
+        setSavingId(modelId);
+        setError(null);
+        try {
+            await axios.put(`${API_BASE}/api/facility/models/${modelId}`, {
+                name: s.name.trim(),
+                childSceneId: s.childSceneId || null,
+            }, { headers: getAuthHeaders(), withCredentials: true });
+
+            await axios.put(`${API_BASE}/api/facility/models/${modelId}/transform`, {
+                position: { x: parseFloat(s.posX) || 0, y: parseFloat(s.posY) || 0, z: parseFloat(s.posZ) || 0 },
+                rotation: { x: parseFloat(s.rotX) || 0, y: parseFloat(s.rotY) || 0, z: parseFloat(s.rotZ) || 0 },
+                scale:    { x: parseFloat(s.sclX) || 1, y: parseFloat(s.sclY) || 1, z: parseFloat(s.sclZ) || 1 },
+            }, { headers: getAuthHeaders(), withCredentials: true });
+
+            setModels(prev => prev.map(m => m.id === modelId ? { ...m, name: s.name.trim() } : m));
+            setSuccessMsg('儲存成功');
+            setTimeout(() => setSuccessMsg(null), 2500);
+        } catch (e: any) {
+            setError(e?.response?.data?.error || '儲存失敗');
+        } finally {
+            setSavingId(null);
+        }
+    };
+
+    const handleDelete = async (modelId: string) => {
+        try {
+            await axios.delete(`${API_BASE}/api/facility/models/${modelId}`, {
+                headers: getAuthHeaders(),
+                withCredentials: true,
+            });
+            setModels(prev => prev.filter(m => m.id !== modelId));
+            setDeleteConfirmId(null);
+            if (expandedId === modelId) setExpandedId(null);
+        } catch (e: any) {
+            setError(e?.response?.data?.error || '刪除失敗');
+            setDeleteConfirmId(null);
+        }
+    };
+
+    return (
+        <div>
+            {error && <div className="dm-error" style={{ marginBottom: 8 }}>{error}</div>}
+            {successMsg && <div style={{ color: '#16a34a', background: '#f0fdf4', padding: '8px 12px', borderRadius: 6, marginBottom: 8, fontSize: 13 }}>{successMsg}</div>}
+
+            <div className="dm-form-group">
+                <label className="dm-form-label">場景</label>
+                <SceneSelect scenes={scenes} value={sceneId} onChange={v => { setSceneId(v); setExpandedId(null); }} />
+            </div>
+
+            {isLoading && <div style={{ color: '#64748b', fontSize: 13 }}>載入中...</div>}
+
+            {!isLoading && sceneId && models.length === 0 && (
+                <div className="dm-empty">此場景尚無模型</div>
+            )}
+
+            {models.map(model => {
+                const s = editState[model.id];
+                const isExpanded = expandedId === model.id;
+                const isSaving = savingId === model.id;
+
+                return (
+                    <div key={model.id} className="dm-file-card" style={{ marginBottom: 8, padding: 0, overflow: 'hidden' }}>
+                        <div
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', cursor: 'pointer', background: isExpanded ? '#f0f7ff' : undefined }}
+                            onClick={() => setExpandedId(isExpanded ? null : model.id)}
+                        >
+                            <span style={{ fontWeight: 500, fontSize: 14 }}>{model.name}</span>
+                            <span style={{ fontSize: 12, color: '#64748b' }}>{isExpanded ? '▲' : '▼'}</span>
+                        </div>
+
+                        {isExpanded && s && (
+                            <div style={{ padding: '12px 14px', borderTop: '1px solid #e2e8f0', background: '#fafafa' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                                    <div className="dm-form-group" style={{ margin: 0 }}>
+                                        <label className="dm-form-label">模型名稱</label>
+                                        <input
+                                            className="dm-form-input"
+                                            value={s.name}
+                                            onChange={e => setField(model.id, 'name', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="dm-form-group" style={{ margin: 0 }}>
+                                        <label className="dm-form-label">子場景</label>
+                                        <SceneSelect
+                                            scenes={scenes}
+                                            value={s.childSceneId}
+                                            onChange={v => setField(model.id, 'childSceneId', v)}
+                                            placeholder="（無）"
+                                        />
+                                    </div>
+                                </div>
+
+                                {([
+                                    { label: '位置 Position (m)', fields: ['posX', 'posY', 'posZ'] as const },
+                                    { label: '旋轉 Rotation (deg)', fields: ['rotX', 'rotY', 'rotZ'] as const },
+                                    { label: '縮放 Scale', fields: ['sclX', 'sclY', 'sclZ'] as const },
+                                ] as const).map(({ label, fields }) => (
+                                    <div key={label} style={{ marginBottom: 10 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>{label}</div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                                            {(['X', 'Y', 'Z'] as const).map((axis, i) => (
+                                                <div key={axis} className="dm-form-group" style={{ margin: 0 }}>
+                                                    <label className="dm-form-label">{axis}</label>
+                                                    <input
+                                                        className="dm-form-input"
+                                                        type="number"
+                                                        step="0.1"
+                                                        value={s[fields[i]]}
+                                                        onChange={e => setField(model.id, fields[i], e.target.value)}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                                    <button
+                                        className="dm-btn-confirm"
+                                        onClick={() => handleSave(model.id)}
+                                        disabled={isSaving}
+                                    >
+                                        {isSaving ? '儲存中...' : '儲存變更'}
+                                    </button>
+                                    <button
+                                        className="dm-file-btn dm-file-btn-delete"
+                                        onClick={() => setDeleteConfirmId(model.id)}
+                                    >
+                                        刪除模型
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+
+            {deleteConfirmId && (
+                <div className="dm-modal-overlay">
+                    <div className="dm-modal dm-modal-delete">
+                        <div className="dm-modal-header">
+                            <h3 className="dm-modal-title">確認刪除模型</h3>
+                        </div>
+                        <div className="dm-modal-body">
+                            <p>確定刪除「{models.find(m => m.id === deleteConfirmId)?.name}」？此操作無法復原，相關資訊條目也將一併移除。</p>
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+                                <button className="dm-btn-cancel" onClick={() => setDeleteConfirmId(null)}>取消</button>
+                                <button
+                                    style={{ background: '#dc2626', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer' }}
+                                    onClick={() => handleDelete(deleteConfirmId)}
+                                >
+                                    確認刪除
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // ─── Tab 4: TerrainUploader ───────────────────────────────────────────────────
 
 const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
@@ -785,13 +1007,14 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function FacilityUploadSection({ projectId }: { projectId: string }) {
-    const [activeTab, setActiveTab] = useState<'scenes' | 'models' | 'info' | 'terrain'>('scenes');
+    const [activeTab, setActiveTab] = useState<'scenes' | 'models' | 'info' | 'terrain' | 'manager'>('scenes');
 
     const tabs: { key: typeof activeTab; label: string }[] = [
         { key: 'scenes', label: '場景管理' },
         { key: 'models', label: '模型上傳' },
         { key: 'info', label: '模型資訊' },
         { key: 'terrain', label: '場景地形' },
+        { key: 'manager', label: '模型管理' },
     ];
 
     return (
@@ -833,6 +1056,7 @@ export default function FacilityUploadSection({ projectId }: { projectId: string
             {activeTab === 'models' && <ModelUploader projectId={projectId} />}
             {activeTab === 'info' && <ModelInfoEditor projectId={projectId} />}
             {activeTab === 'terrain' && <SceneTerrainUploader projectId={projectId} />}
+            {activeTab === 'manager' && <ModelManager projectId={projectId} />}
         </div>
     );
 }
