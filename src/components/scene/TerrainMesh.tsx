@@ -77,6 +77,15 @@ export function TerrainMesh() {
         );
     }, [activeTerrain?.satelliteTexture, activeTerrain?.texture, API_BASE, isSatelliteMode]);
 
+    // 卸載時 dispose 材質，清除 Three.js shader program 快取
+    // 若不 dispose，舊 program 會留在快取中，下次重新掛載時快取命中
+    // 導致 onBeforeCompile 不被呼叫，shaderRef.current 為 null，色階失效
+    useEffect(() => {
+        return () => {
+            materialRef.current?.dispose();
+        };
+    }, []);
+
     // Update Uniforms
     useFrame(() => {
         if (shaderRef.current) {
@@ -87,8 +96,11 @@ export function TerrainMesh() {
         }
     });
 
-    // If no active terrain or visible is false, return null
-    if (!activeTerrain) return null;
+    // 等 heightmap 載入完成才渲染 mesh
+    // 原因：useLoader 版本透過 Suspense 等待，材質只編譯一次（帶完整 displacementMap）
+    // 若 heightMap=null 時就渲染，材質先以無 displacement 編譯，
+    // 之後 heightMap 設入又觸發重編譯，onBeforeCompile 被呼叫兩次且時機不穩定
+    if (!activeTerrain || !heightMap) return null;
 
     // Custom Shader Logic
     const onBeforeCompile = (shader: any) => {
