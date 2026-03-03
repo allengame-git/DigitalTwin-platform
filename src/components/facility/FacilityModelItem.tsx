@@ -28,6 +28,7 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const transformMode = useFacilityStore(state => state.transformMode);
     const selectModel = useFacilityStore(state => state.selectModel);
     const setHoveredModel = useFacilityStore(state => state.setHoveredModel);
+    const setEditingModel = useFacilityStore(state => state.setEditingModel);
     const enterScene = useFacilityStore(state => state.enterScene);
     const updateModelTransform = useFacilityStore(state => state.updateModelTransform);
 
@@ -103,11 +104,17 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
 
     const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation();
-        selectModel(model.id);
-        if (hasChildScene && model.childSceneId) {
-            enterScene(model.childSceneId);
+        if (editMode) {
+            // 編輯模式：選取模型進行 transform 編輯，不進入子場景
+            selectModel(model.id);
+            setEditingModel(model.id);
+        } else {
+            selectModel(model.id);
+            if (hasChildScene && model.childSceneId) {
+                enterScene(model.childSceneId);
+            }
         }
-    }, [model.id, model.childSceneId, hasChildScene, selectModel, enterScene]);
+    }, [editMode, model.id, model.childSceneId, hasChildScene, selectModel, setEditingModel, enterScene]);
 
     const handlePointerOver = useCallback((e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation();

@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronRight, Box, Layers } from 'lucide-react';
+import { ChevronRight, Box, Layers, Edit3 } from 'lucide-react';
 import { useFacilityStore } from '@/stores/facilityStore';
 import BreadcrumbNav from './BreadcrumbNav';
 import SceneTree from './SceneTree';
@@ -23,6 +23,9 @@ const FacilitySidebar: React.FC = () => {
         currentSceneId,
         scenes,
         isLoading,
+        editMode,
+        setEditMode,
+        setEditingModel,
     } = useFacilityStore();
 
     const currentScene = scenes.find(s => s.id === currentSceneId);
@@ -273,10 +276,56 @@ const FacilitySidebar: React.FC = () => {
                 <PlanView />
             </div>
 
+            {/* 編輯模式切換 */}
+            <div
+                style={{
+                    padding: '10px 16px',
+                    borderTop: '1px solid #e5e7eb',
+                    background: '#f9fafb',
+                    flexShrink: 0,
+                    opacity: isCollapsed ? 0 : 1,
+                    height: isCollapsed ? 0 : 'auto',
+                    overflow: 'hidden',
+                    transition: 'opacity 0.2s ease',
+                }}
+            >
+                <button
+                    onClick={() => {
+                        const next = !editMode;
+                        setEditMode(next);
+                        if (!next) setEditingModel(null);
+                    }}
+                    style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        padding: '7px 0',
+                        borderRadius: 6,
+                        border: editMode ? '1px solid #2563eb' : '1px solid #d1d5db',
+                        background: editMode ? '#2563eb' : 'white',
+                        color: editMode ? 'white' : '#374151',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                    }}
+                >
+                    <Edit3 size={13} />
+                    {editMode ? '退出編輯模式' : '進入編輯模式'}
+                </button>
+                {editMode && (
+                    <p style={{ margin: '6px 0 0', fontSize: 11, color: '#6b7280', textAlign: 'center' }}>
+                        點擊模型以選取並調整位置/旋轉/縮放
+                    </p>
+                )}
+            </div>
+
             {/* Footer */}
             <div
                 style={{
-                    padding: '10px 20px',
+                    padding: '8px 20px',
                     borderTop: '1px solid #e5e7eb',
                     background: '#f9fafb',
                     fontSize: 11,

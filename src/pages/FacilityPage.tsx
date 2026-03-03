@@ -8,13 +8,10 @@ import { useParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore';
 import { useFacilityStore } from '../stores/facilityStore';
 
-// Placeholder components — will be implemented in later tasks
 const FacilityCanvas = React.lazy(() => import('../components/facility/FacilityCanvas'));
 const FacilitySidebar = React.lazy(() => import('../components/facility/FacilitySidebar'));
 const FacilityInfoPanel = React.lazy(() => import('../components/facility/FacilityInfoPanel'));
-const FacilityToolbar = React.lazy(() => import('../components/facility/FacilityToolbar'));
 const TransformInputPanel = React.lazy(() => import('../components/facility/TransformInputPanel'));
-const CoordShiftPanel = React.lazy(() => import('../components/facility/CoordShiftPanel'));
 
 export const FacilityPage: React.FC = () => {
     const { projectCode } = useParams<{ projectCode: string }>();
@@ -51,9 +48,6 @@ export const FacilityPage: React.FC = () => {
                 <FacilitySidebar />
             </React.Suspense>
             <div style={{ flex: 1, position: 'relative' }}>
-                <React.Suspense fallback={null}>
-                    <FacilityToolbar />
-                </React.Suspense>
                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
                     <React.Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666' }}>載入中...</div>}>
                         <FacilityCanvas />
@@ -64,9 +58,6 @@ export const FacilityPage: React.FC = () => {
                 </React.Suspense>
                 <React.Suspense fallback={null}>
                     <TransformInputPanel />
-                </React.Suspense>
-                <React.Suspense fallback={null}>
-                    <CoordShiftPanel />
                 </React.Suspense>
             </div>
         </div>
