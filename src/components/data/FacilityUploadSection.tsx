@@ -817,16 +817,29 @@ const ModelManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                 </div>
 
                                 {([
-                                    { label: '位置 Position (m)', fields: ['posX', 'posY', 'posZ'] as const },
-                                    { label: '旋轉 Rotation (deg)', fields: ['rotX', 'rotY', 'rotZ'] as const },
-                                    { label: '縮放 Scale', fields: ['sclX', 'sclY', 'sclZ'] as const },
-                                ] as const).map(({ label, fields }) => (
+                                    {
+                                        label: '位置 (m)　• 水平面 X-Z，Y 為高程',
+                                        fields: ['posX', 'posY', 'posZ'] as const,
+                                        // Three.js: x=東, y=高程, z=北(TWD97-Y)
+                                        axisLabels: ['X 東', 'Z 高程', 'Y 北'] as const,
+                                    },
+                                    {
+                                        label: '旋轉 (deg)　• Ry 為水平方位旋轉',
+                                        fields: ['rotX', 'rotY', 'rotZ'] as const,
+                                        axisLabels: ['Rx 俯仰', 'Ry 方位', 'Rz 橫滾'] as const,
+                                    },
+                                    {
+                                        label: '縮放 Scale',
+                                        fields: ['sclX', 'sclY', 'sclZ'] as const,
+                                        axisLabels: ['X', 'Y', 'Z'] as const,
+                                    },
+                                ] as const).map(({ label, fields, axisLabels }) => (
                                     <div key={label} style={{ marginBottom: 10 }}>
-                                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>{label}</div>
+                                        <div style={{ fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 4 }}>{label}</div>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                                            {(['X', 'Y', 'Z'] as const).map((axis, i) => (
-                                                <div key={axis} className="dm-form-group" style={{ margin: 0 }}>
-                                                    <label className="dm-form-label">{axis}</label>
+                                            {axisLabels.map((axisLabel, i) => (
+                                                <div key={axisLabel} className="dm-form-group" style={{ margin: 0 }}>
+                                                    <label className="dm-form-label">{axisLabel}</label>
                                                     <input
                                                         className="dm-form-input"
                                                         type="number"

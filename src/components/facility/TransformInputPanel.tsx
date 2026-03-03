@@ -146,7 +146,12 @@ const TransformInputPanel: React.FC = () => {
                                 letterSpacing: '0.05em',
                             }}
                         >
-                            {axis.toUpperCase()}
+                            {transformMode === 'translate'
+                                ? axis === 'x' ? 'X 東' : axis === 'y' ? 'Z 高程' : 'Y 北'
+                                : transformMode === 'rotate'
+                                    ? axis === 'x' ? 'Rx 俯仰' : axis === 'y' ? 'Ry 方位' : 'Rz 橫滾'
+                                    : axis.toUpperCase()
+                            }
                         </label>
                         <input
                             type="number"
@@ -173,8 +178,9 @@ const TransformInputPanel: React.FC = () => {
 
             {/* 提示文字 */}
             <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
-                按 Enter 或失去焦點後套用
-                {transformMode === 'rotate' && '（單位：度）'}
+                {transformMode === 'translate' && '按 Enter 或失去焦點後套用（m）• 水平面 X-Z，Y 為高程'}
+                {transformMode === 'rotate' && '按 Enter 或失去焦點後套用（度）• Ry 為水平方位旋轉'}
+                {transformMode === 'scale' && '按 Enter 或失去焦點後套用'}
             </div>
         </div>
     );
