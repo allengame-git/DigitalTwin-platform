@@ -30,17 +30,15 @@ interface RichContentItem {
     createdAt: string;
 }
 
-interface Vec3 { x: number; y: number; z: number; }
-
 interface FacilityModelItem {
     id: string;
     name: string;
     sceneId: string;
     childSceneId?: string | null;
     glbUrl?: string;
-    position?: Vec3;
-    rotation?: Vec3;
-    scale?: Vec3;
+    position?: { x: number; y: number; z: number };
+    rotation?: { x: number; y: number; z: number };
+    scale?: { x: number; y: number; z: number };
 }
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
