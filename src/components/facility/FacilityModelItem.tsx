@@ -2,7 +2,7 @@
  * FacilityModelItem — 單一 GLB 模型元件
  * 支援 hover 高亮、click 選取、Tooltip、Transform 編輯
  */
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { Html, TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -41,6 +41,12 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
 
     // Clone scene 以避免多個 instance 共用同一 scene
     const clonedScene = gltfScene.clone(true);
+
+    // 計算模型 bbox 頂部，作為名稱標籤的 Y 偏移（local space）
+    const labelOffsetY = useMemo(() => {
+        const bbox = new THREE.Box3().setFromObject(clonedScene);
+        return Number.isFinite(bbox.max.y) ? bbox.max.y + 1 : 3;
+    }, [clonedScene]);
 
     // Hover 高亮：遍歷 scene，對 MeshStandardMaterial 設定 emissive
     useEffect(() => {
@@ -146,23 +152,25 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
             >
                 <primitive object={clonedScene} />
 
-                {isHovered && (
-                    <Html position={[0, 2, 0]} center>
-                        <div
-                            style={{
-                                background: 'rgba(0,0,0,0.7)',
-                                color: 'white',
-                                padding: '4px 8px',
-                                borderRadius: 4,
-                                fontSize: 12,
-                                whiteSpace: 'nowrap',
-                                pointerEvents: 'none',
-                            }}
-                        >
-                            {model.name}
-                        </div>
-                    </Html>
-                )}
+                <Html position={[0, labelOffsetY, 0]} center distanceFactor={80}>
+                    <div
+                        style={{
+                            background: isHovered ? 'rgba(37,99,235,0.92)' : 'rgba(0,0,0,0.65)',
+                            color: 'white',
+                            padding: '3px 8px',
+                            borderRadius: 4,
+                            fontSize: 13,
+                            fontWeight: isHovered ? 600 : 400,
+                            whiteSpace: 'nowrap',
+                            pointerEvents: 'none',
+                            border: isHovered ? '1px solid rgba(147,197,253,0.6)' : '1px solid rgba(255,255,255,0.15)',
+                            transition: 'background 0.15s, font-weight 0.15s',
+                            userSelect: 'none',
+                        }}
+                    >
+                        {model.name}
+                    </div>
+                </Html>
             </group>
 
             {isEditing && groupRef.current && (
