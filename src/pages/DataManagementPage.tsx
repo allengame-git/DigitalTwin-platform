@@ -44,6 +44,7 @@ import { AttitudeUploadSection } from '../components/data/AttitudeUploadSection'
 import { TerrainUploadSection } from '../components/data/TerrainUploadSection';
 import { WaterLevelUploadSection } from '../components/data/WaterLevelUploadSection';
 import LithologySection from '../components/data/LithologySection';
+import FacilityUploadSection from '../components/data/FacilityUploadSection';
 import { useLithologyStore } from '../stores/lithologyStore';
 import { useCameraStore } from '../stores/cameraStore';
 import { twd97ToWorld } from '../utils/coordinates';
@@ -1334,6 +1335,13 @@ export const DataManagementPage: React.FC = () => {
                         )}
                     </section>
                 </div>
+
+                {/* 設施導覽 */}
+                {activeProjectId && (
+                    <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                        <FacilityUploadSection projectId={activeProjectId} />
+                    </div>
+                )}
             </main>
 
             {/* 上傳表單 Modal */}
