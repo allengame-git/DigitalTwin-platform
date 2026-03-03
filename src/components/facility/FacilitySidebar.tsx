@@ -9,6 +9,7 @@ import { ChevronRight, Box, Layers, Map, Loader2 } from 'lucide-react';
 import { useFacilityStore } from '@/stores/facilityStore';
 import BreadcrumbNav from './BreadcrumbNav';
 import SceneTree from './SceneTree';
+import PlanView from './PlanView';
 
 const FacilitySidebar: React.FC = () => {
     const {
@@ -136,6 +137,9 @@ const FacilitySidebar: React.FC = () => {
                         </ul>
                     )}
                 </section>
+
+                {/* 2D 平面圖區塊 */}
+                <PlanView />
             </div>
         </aside>
     );
