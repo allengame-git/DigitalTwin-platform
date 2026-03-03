@@ -1017,10 +1017,21 @@ const ModelManager: React.FC<{ projectId: string }> = ({ projectId }) => {
 
 // ─── Tab 4: TerrainUploader ───────────────────────────────────────────────────
 
+interface GlbQueueItem {
+    id: string;
+    file: File;
+    name: string;
+    status: 'pending' | 'uploading' | 'done' | 'error';
+    progress: number;
+    errorMsg?: string;
+}
+
 const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
     const { scenes, fetchScenes } = useFacilityStore();
 
     const [sceneId, setSceneId] = useState('');
+
+    // ── 地形 CSV / 衛星 ──
     const [csvFile, setCsvFile] = useState<File | null>(null);
     const [satelliteFile, setSatelliteFile] = useState<File | null>(null);
     const [shiftX, setShiftX] = useState('0');
@@ -1029,22 +1040,50 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
     const [rotation, setRotation] = useState('0');
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
-    const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
+    const [terrainError, setTerrainError] = useState<string | null>(null);
+    const [terrainSuccess, setTerrainSuccess] = useState<string | null>(null);
     const csvInputRef = useRef<HTMLInputElement>(null);
     const satInputRef = useRef<HTMLInputElement>(null);
+
+    // ── GLB 批次上傳 ──
+    const [glbQueue, setGlbQueue] = useState<GlbQueueItem[]>([]);
+    const [isGlbUploading, setIsGlbUploading] = useState(false);
+    const [glbIsDragging, setGlbIsDragging] = useState(false);
+    const [glbError, setGlbError] = useState<string | null>(null);
+    const glbInputRef = useRef<HTMLInputElement>(null);
+
+    // ── 場景模型清單 ──
+    const [sceneModels, setSceneModels] = useState<FacilityModelItem[]>([]);
+    const [isLoadingModels, setIsLoadingModels] = useState(false);
+    const [deleteConfirmModelId, setDeleteConfirmModelId] = useState<string | null>(null);
+    const [modelListError, setModelListError] = useState<string | null>(null);
 
     useEffect(() => {
         if (projectId) fetchScenes(projectId);
     }, [projectId, fetchScenes]);
 
-    const handleSubmit = async () => {
-        if (!sceneId) { setError('請選擇場景'); return; }
-        if (!csvFile) { setError('請選擇地形 CSV 檔案'); return; }
+    // 切換場景時載入現有模型
+    useEffect(() => {
+        if (!sceneId) { setSceneModels([]); return; }
+        setIsLoadingModels(true);
+        setModelListError(null);
+        axios.get<FacilityModelItem[]>(`${API_BASE}/api/facility/models`, {
+            params: { sceneId },
+            headers: getAuthHeaders(),
+            withCredentials: true,
+        }).then(r => setSceneModels(Array.isArray(r.data) ? r.data : []))
+          .catch(() => setModelListError('載入模型清單失敗'))
+          .finally(() => setIsLoadingModels(false));
+    }, [sceneId]);
+
+    // ── 地形上傳 ──
+    const handleTerrainSubmit = async () => {
+        if (!sceneId) { setTerrainError('請選擇場景'); return; }
+        if (!csvFile) { setTerrainError('請選擇地形 CSV 檔案'); return; }
 
         setIsUploading(true);
-        setError(null);
-        setSuccess(null);
+        setTerrainError(null);
+        setTerrainSuccess(null);
         setUploadProgress(0);
 
         try {
@@ -1064,84 +1103,387 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
                 },
             });
 
-            setSuccess('地形上傳成功');
+            setTerrainSuccess('地形上傳成功');
             setCsvFile(null);
             setSatelliteFile(null);
             setUploadProgress(0);
         } catch (e: any) {
-            setError(e?.response?.data?.error || '上傳失敗');
+            setTerrainError(e?.response?.data?.error || '上傳失敗');
         } finally {
             setIsUploading(false);
         }
     };
 
+    // ── GLB 多檔加入佇列 ──
+    const addGlbFiles = useCallback((files: FileList | File[]) => {
+        const arr = Array.from(files);
+        const valid: GlbQueueItem[] = [];
+        for (const f of arr) {
+            const ext = f.name.split('.').pop()?.toLowerCase();
+            if (!['glb', 'gltf'].includes(ext || '')) continue;
+            if (f.size > 200 * 1024 * 1024) continue; // 200MB limit
+            valid.push({
+                id: `${f.name}-${f.size}-${Date.now()}-${Math.random()}`,
+                file: f,
+                name: f.name.replace(/\.(glb|gltf)$/i, ''),
+                status: 'pending',
+                progress: 0,
+            });
+        }
+        if (valid.length === 0) {
+            setGlbError('未找到有效的 .glb / .gltf 檔案（每檔上限 200MB）');
+            return;
+        }
+        setGlbError(null);
+        setGlbQueue(prev => [...prev, ...valid]);
+    }, []);
+
+    const removeGlbItem = (id: string) => {
+        setGlbQueue(prev => prev.filter(q => q.id !== id));
+    };
+
+    const updateQueueItem = (id: string, patch: Partial<GlbQueueItem>) => {
+        setGlbQueue(prev => prev.map(q => q.id === id ? { ...q, ...patch } : q));
+    };
+
+    // ── GLB 批次上傳（逐檔序列上傳）──
+    const handleGlbUploadAll = async () => {
+        if (!sceneId) { setGlbError('請先選擇目標場景'); return; }
+        const pending = glbQueue.filter(q => q.status === 'pending' || q.status === 'error');
+        if (pending.length === 0) return;
+
+        setIsGlbUploading(true);
+        setGlbError(null);
+
+        for (const item of pending) {
+            updateQueueItem(item.id, { status: 'uploading', progress: 0, errorMsg: undefined });
+            try {
+                const fd = new FormData();
+                fd.append('file', item.file);
+                fd.append('name', item.name.trim() || item.file.name);
+                fd.append('sceneId', sceneId);
+
+                await axios.post(`${API_BASE}/api/facility/models`, fd, {
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
+                    withCredentials: true,
+                    onUploadProgress: (e) => {
+                        if (e.total) updateQueueItem(item.id, { progress: Math.round((e.loaded / e.total) * 100) });
+                    },
+                });
+
+                updateQueueItem(item.id, { status: 'done', progress: 100 });
+            } catch (e: any) {
+                updateQueueItem(item.id, {
+                    status: 'error',
+                    errorMsg: e?.response?.data?.error || '上傳失敗',
+                });
+            }
+        }
+
+        setIsGlbUploading(false);
+
+        // 重新整理模型清單
+        axios.get<FacilityModelItem[]>(`${API_BASE}/api/facility/models`, {
+            params: { sceneId },
+            headers: getAuthHeaders(),
+            withCredentials: true,
+        }).then(r => setSceneModels(Array.isArray(r.data) ? r.data : [])).catch(() => {});
+    };
+
+    // ── 刪除模型 ──
+    const handleDeleteModel = async (modelId: string) => {
+        try {
+            await axios.delete(`${API_BASE}/api/facility/models/${modelId}`, {
+                headers: getAuthHeaders(),
+                withCredentials: true,
+            });
+            setSceneModels(prev => prev.filter(m => m.id !== modelId));
+            setDeleteConfirmModelId(null);
+        } catch (e: any) {
+            setModelListError(e?.response?.data?.error || '刪除失敗');
+            setDeleteConfirmModelId(null);
+        }
+    };
+
+    const pendingCount = glbQueue.filter(q => q.status === 'pending' || q.status === 'error').length;
+    const doneCount = glbQueue.filter(q => q.status === 'done').length;
+
+    const statusColor: Record<GlbQueueItem['status'], string> = {
+        pending: '#64748b',
+        uploading: '#2563eb',
+        done: '#16a34a',
+        error: '#dc2626',
+    };
+    const statusLabel: Record<GlbQueueItem['status'], string> = {
+        pending: '待上傳',
+        uploading: '上傳中',
+        done: '完成',
+        error: '失敗',
+    };
+
     return (
         <div>
-            {error && <div className="dm-error" style={{ marginBottom: 8 }}>{error}</div>}
-            {success && <div style={{ color: '#16a34a', background: '#f0fdf4', padding: '8px 12px', borderRadius: 6, marginBottom: 8, fontSize: 13 }}>{success}</div>}
-
+            {/* ── 場景選擇 ── */}
             <div className="dm-form-group">
                 <label className="dm-form-label">目標場景 *</label>
-                <SceneSelect scenes={scenes} value={sceneId} onChange={setSceneId} />
+                <SceneSelect scenes={scenes} value={sceneId} onChange={v => { setSceneId(v); setGlbQueue([]); }} />
             </div>
 
-            {/* CSV terrain */}
-            <div className="dm-form-group">
-                <label className="dm-form-label">地形 CSV（x, y, elevation）*</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button className="dm-btn-cancel" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => csvInputRef.current?.click()}>選擇 CSV</button>
-                    {csvFile && <span style={{ fontSize: 12, color: '#059669' }}>{csvFile.name}</span>}
-                </div>
-                <input ref={csvInputRef} type="file" hidden accept=".csv" onChange={e => setCsvFile(e.target.files?.[0] || null)} />
-            </div>
+            {/* ══ 地形資料區塊 ══ */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>地形資料</div>
 
-            {/* Satellite image */}
-            <div className="dm-form-group">
-                <label className="dm-form-label">衛星影像（可選）</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button className="dm-btn-cancel" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => satInputRef.current?.click()}>選擇影像</button>
-                    {satelliteFile && <span style={{ fontSize: 12, color: '#059669' }}>{satelliteFile.name}</span>}
-                    {satelliteFile && <button onClick={() => setSatelliteFile(null)} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>移除</button>}
-                </div>
-                <input ref={satInputRef} type="file" hidden accept=".tif,.tiff,.jpg,.jpeg,.png" onChange={e => setSatelliteFile(e.target.files?.[0] || null)} />
-            </div>
+                {terrainError && <div className="dm-error" style={{ marginBottom: 8 }}>{terrainError}</div>}
+                {terrainSuccess && <div style={{ color: '#16a34a', background: '#f0fdf4', padding: '6px 10px', borderRadius: 6, marginBottom: 8, fontSize: 12 }}>{terrainSuccess}</div>}
 
-            {/* Coordinate offsets */}
-            <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 12 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>座標偏移設定</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {[
-                        { label: 'Shift X', value: shiftX, onChange: setShiftX },
-                        { label: 'Shift Y', value: shiftY, onChange: setShiftY },
-                        { label: 'Shift Z', value: shiftZ, onChange: setShiftZ },
-                        { label: 'Rotation (deg)', value: rotation, onChange: setRotation },
-                    ].map(({ label, value, onChange }) => (
-                        <div key={label} className="dm-form-group" style={{ margin: 0 }}>
-                            <label className="dm-form-label">{label}</label>
-                            <input
-                                className="dm-form-input"
-                                type="number"
-                                value={value}
-                                onChange={e => onChange(e.target.value)}
-                                step="0.1"
-                            />
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {isUploading && (
-                <>
-                    <div className="dm-progress-container">
-                        <div className="dm-progress-bar" style={{ width: `${uploadProgress}%` }} />
+                {/* CSV */}
+                <div className="dm-form-group">
+                    <label className="dm-form-label">地形 CSV（x, y, elevation）*</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button className="dm-btn-cancel" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => csvInputRef.current?.click()}>選擇 CSV</button>
+                        {csvFile ? <span style={{ fontSize: 12, color: '#059669' }}>{csvFile.name}</span> : <span style={{ fontSize: 12, color: '#9ca3af' }}>未選取</span>}
+                        {csvFile && <button onClick={() => setCsvFile(null)} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>移除</button>}
                     </div>
-                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>上傳中 {uploadProgress}%...</div>
-                </>
+                    <input ref={csvInputRef} type="file" hidden accept=".csv" onChange={e => setCsvFile(e.target.files?.[0] || null)} />
+                </div>
+
+                {/* 衛星影像 */}
+                <div className="dm-form-group">
+                    <label className="dm-form-label">衛星影像（可選）</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button className="dm-btn-cancel" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => satInputRef.current?.click()}>選擇影像</button>
+                        {satelliteFile ? <span style={{ fontSize: 12, color: '#059669' }}>{satelliteFile.name}</span> : <span style={{ fontSize: 12, color: '#9ca3af' }}>未選取</span>}
+                        {satelliteFile && <button onClick={() => setSatelliteFile(null)} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>移除</button>}
+                    </div>
+                    <input ref={satInputRef} type="file" hidden accept=".tif,.tiff,.jpg,.jpeg,.png" onChange={e => setSatelliteFile(e.target.files?.[0] || null)} />
+                </div>
+
+                {/* 座標偏移 */}
+                <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>座標偏移設定</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        {[
+                            { label: 'Shift X', value: shiftX, onChange: setShiftX },
+                            { label: 'Shift Y', value: shiftY, onChange: setShiftY },
+                            { label: 'Shift Z', value: shiftZ, onChange: setShiftZ },
+                            { label: 'Rotation (deg)', value: rotation, onChange: setRotation },
+                        ].map(({ label, value, onChange }) => (
+                            <div key={label} className="dm-form-group" style={{ margin: 0 }}>
+                                <label className="dm-form-label">{label}</label>
+                                <input className="dm-form-input" type="number" value={value} onChange={e => onChange(e.target.value)} step="0.1" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {isUploading && (
+                    <>
+                        <div className="dm-progress-container" style={{ marginBottom: 4 }}>
+                            <div className="dm-progress-bar" style={{ width: `${uploadProgress}%` }} />
+                        </div>
+                        <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>上傳中 {uploadProgress}%...</div>
+                    </>
+                )}
+
+                <button className="dm-btn-confirm" onClick={handleTerrainSubmit} disabled={isUploading}>
+                    {isUploading ? '上傳中...' : '上傳地形'}
+                </button>
+            </div>
+
+            {/* ══ GLB / GLTF 模型批次上傳區塊 ══ */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>GLB / GLTF 模型上傳</div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 12 }}>可同時選取多個檔案，依序批次上傳至選取場景</div>
+
+                {glbError && <div className="dm-error" style={{ marginBottom: 8 }}>{glbError}</div>}
+
+                {/* 拖放區 */}
+                <div
+                    className={`dm-upload-zone${glbIsDragging ? ' dragging' : ''}`}
+                    style={{ marginBottom: 10 }}
+                    onDragOver={e => { e.preventDefault(); setGlbIsDragging(true); }}
+                    onDragLeave={() => setGlbIsDragging(false)}
+                    onDrop={e => {
+                        e.preventDefault();
+                        setGlbIsDragging(false);
+                        addGlbFiles(e.dataTransfer.files);
+                    }}
+                    onClick={() => glbInputRef.current?.click()}
+                >
+                    <input
+                        ref={glbInputRef}
+                        type="file"
+                        hidden
+                        multiple
+                        accept=".glb,.gltf"
+                        onChange={e => {
+                            if (e.target.files?.length) addGlbFiles(e.target.files);
+                            e.target.value = '';
+                        }}
+                    />
+                    <div className="dm-upload-icon">📦</div>
+                    <div className="dm-upload-text">拖曳或點擊選取 GLB / GLTF 模型</div>
+                    <div className="dm-upload-hint">支援多選，每檔上限 200 MB</div>
+                </div>
+
+                {/* 佇列清單 */}
+                {glbQueue.length > 0 && (
+                    <div style={{ marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <span style={{ fontSize: 12, color: '#374151', fontWeight: 500 }}>
+                                {glbQueue.length} 個檔案
+                                {doneCount > 0 && <span style={{ color: '#16a34a', marginLeft: 6 }}>（{doneCount} 完成）</span>}
+                            </span>
+                            <button
+                                onClick={() => setGlbQueue(prev => prev.filter(q => q.status !== 'done'))}
+                                style={{ fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}
+                            >
+                                清除已完成
+                            </button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+                            {glbQueue.map(item => (
+                                <div
+                                    key={item.id}
+                                    style={{
+                                        background: 'white',
+                                        border: `1px solid ${item.status === 'done' ? '#bbf7d0' : item.status === 'error' ? '#fecaca' : '#e2e8f0'}`,
+                                        borderRadius: 6,
+                                        padding: '8px 10px',
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                        {/* 名稱可編輯 */}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            {item.status === 'pending' || item.status === 'error' ? (
+                                                <input
+                                                    className="dm-form-input"
+                                                    style={{ fontSize: 12, padding: '3px 6px', marginBottom: 2 }}
+                                                    value={item.name}
+                                                    onChange={e => updateQueueItem(item.id, { name: e.target.value })}
+                                                    placeholder="模型名稱"
+                                                />
+                                            ) : (
+                                                <div style={{ fontSize: 12, fontWeight: 500, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {item.name}
+                                                </div>
+                                            )}
+                                            <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                                                {item.file.name} · {(item.file.size / 1024 / 1024).toFixed(1)} MB
+                                            </div>
+                                        </div>
+
+                                        {/* 狀態標籤 */}
+                                        <span style={{
+                                            fontSize: 10,
+                                            fontWeight: 600,
+                                            color: statusColor[item.status],
+                                            background: item.status === 'done' ? '#f0fdf4' : item.status === 'error' ? '#fef2f2' : item.status === 'uploading' ? '#eff6ff' : '#f8fafc',
+                                            border: `1px solid ${statusColor[item.status]}30`,
+                                            padding: '2px 6px',
+                                            borderRadius: 4,
+                                            flexShrink: 0,
+                                        }}>
+                                            {statusLabel[item.status]}
+                                        </span>
+
+                                        {/* 移除按鈕 */}
+                                        {item.status !== 'uploading' && (
+                                            <button
+                                                onClick={() => removeGlbItem(item.id)}
+                                                style={{ fontSize: 11, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, padding: '2px 4px' }}
+                                            >✕</button>
+                                        )}
+                                    </div>
+
+                                    {/* 進度條 */}
+                                    {item.status === 'uploading' && (
+                                        <div style={{ marginTop: 6, background: '#e2e8f0', borderRadius: 3, height: 4, overflow: 'hidden' }}>
+                                            <div style={{ height: '100%', background: '#2563eb', borderRadius: 3, width: `${item.progress}%`, transition: 'width 0.2s' }} />
+                                        </div>
+                                    )}
+
+                                    {/* 錯誤訊息 */}
+                                    {item.status === 'error' && item.errorMsg && (
+                                        <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{item.errorMsg}</div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* 上傳按鈕 */}
+                {pendingCount > 0 && (
+                    <button
+                        className="dm-btn-confirm"
+                        onClick={handleGlbUploadAll}
+                        disabled={isGlbUploading || !sceneId}
+                        title={!sceneId ? '請先選擇目標場景' : ''}
+                    >
+                        {isGlbUploading ? '上傳中...' : `批次上傳 ${pendingCount} 個模型`}
+                    </button>
+                )}
+            </div>
+
+            {/* ══ 已上傳模型清單 ══ */}
+            {sceneId && (
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
+                        已上傳模型
+                        {!isLoadingModels && <span style={{ fontWeight: 400, color: '#9ca3af', marginLeft: 6 }}>（{sceneModels.length} 個）</span>}
+                    </div>
+
+                    {modelListError && <div className="dm-error" style={{ marginBottom: 8 }}>{modelListError}</div>}
+
+                    {isLoadingModels && <div style={{ fontSize: 12, color: '#9ca3af' }}>載入中...</div>}
+
+                    {!isLoadingModels && sceneModels.length === 0 && (
+                        <div className="dm-empty">此場景尚無模型</div>
+                    )}
+
+                    {!isLoadingModels && sceneModels.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {sceneModels.map(m => (
+                                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'white', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px' }}>
+                                    <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {m.name}
+                                    </span>
+                                    <button
+                                        className="dm-file-btn dm-file-btn-delete"
+                                        style={{ flexShrink: 0 }}
+                                        onClick={() => setDeleteConfirmModelId(m.id)}
+                                    >
+                                        刪除
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             )}
 
-            <button className="dm-btn-confirm" style={{ marginTop: 8 }} onClick={handleSubmit} disabled={isUploading}>
-                {isUploading ? '上傳中...' : '上傳地形'}
-            </button>
+            {/* 刪除確認 modal */}
+            {deleteConfirmModelId && (
+                <div className="dm-modal-overlay">
+                    <div className="dm-modal dm-modal-delete">
+                        <div className="dm-modal-header"><h3 className="dm-modal-title">確認刪除模型</h3></div>
+                        <div className="dm-modal-body">
+                            <p>確定刪除「{sceneModels.find(m => m.id === deleteConfirmModelId)?.name}」？此操作無法復原。</p>
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+                                <button className="dm-btn-cancel" onClick={() => setDeleteConfirmModelId(null)}>取消</button>
+                                <button
+                                    style={{ background: '#dc2626', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer' }}
+                                    onClick={() => handleDeleteModel(deleteConfirmModelId)}
+                                >
+                                    確認刪除
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
