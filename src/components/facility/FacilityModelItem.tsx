@@ -7,6 +7,7 @@ import { useGLTF } from '@react-three/drei';
 import { Html, TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import { useFacilityStore } from '@/stores/facilityStore';
 import type { FacilityModel } from '@/types/facility';
 
@@ -17,8 +18,12 @@ interface FacilityModelItemProps {
     model: FacilityModel;
 }
 
+// module-level reusable vector to avoid per-frame allocation
+const _worldPos = new THREE.Vector3();
+
 export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const groupRef = useRef<THREE.Group>(null);
+    const labelRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const selectedModelId = useFacilityStore(state => state.selectedModelId);
@@ -43,13 +48,26 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     // Clone scene 以避免多個 instance 共用同一 scene（memo 確保 bbox 不重算）
     const clonedScene = useMemo(() => gltfScene.clone(true), [gltfScene]);
 
-    // 計算模型 bbox 頂部作為標籤 Y 偏移（local space，group 的 position+scale 由 R3F 處理）
+    // 計算標籤 Y 偏移（local space）
+    // bbox.max.y 是 clonedScene 的 local-space 頂部（含 GLTF 內部旋轉）
+    // gap 固定 4 world units，除以 scale.y 換算回 local space
     const labelOffsetY = useMemo(() => {
         clonedScene.updateMatrixWorld(true);
         const bbox = new THREE.Box3().setFromObject(clonedScene);
-        if (bbox.isEmpty() || !Number.isFinite(bbox.max.y)) return 3;
-        return bbox.max.y + 1;
-    }, [clonedScene]);
+        const scaleY = Math.max(Math.abs(model.scale.y), 0.01);
+        if (bbox.isEmpty() || !Number.isFinite(bbox.max.y)) return 4 / scaleY;
+        return bbox.max.y + 4 / scaleY;
+    }, [clonedScene, model.scale.y]);
+
+    // 根據相機距離動態調整字體大小（直接操作 DOM，避免 re-render）
+    useFrame(({ camera }) => {
+        if (!labelRef.current || !groupRef.current) return;
+        groupRef.current.getWorldPosition(_worldPos);
+        const dist = camera.position.distanceTo(_worldPos);
+        // 200 world units 時顯示 13px；近了放大至 20px，遠了縮至 11px
+        const fontSize = Math.max(11, Math.min(20, Math.round(13 * 200 / Math.max(dist, 1))));
+        labelRef.current.style.fontSize = `${fontSize}px`;
+    });
 
     // Hover 高亮：遍歷 scene，對 MeshStandardMaterial 設定 emissive
     useEffect(() => {
@@ -156,19 +174,21 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                 <primitive object={clonedScene} />
 
                 {showLabels && (
-                    <Html position={[0, labelOffsetY, 0]} center distanceFactor={80}>
+                    <Html position={[0, labelOffsetY, 0]} center zIndexRange={[100, 0]}>
                         <div
+                            ref={labelRef}
                             style={{
-                                background: isHovered ? 'rgba(37,99,235,0.92)' : 'rgba(0,0,0,0.65)',
+                                background: isHovered ? 'rgba(37,99,235,0.92)' : 'rgba(0,0,0,0.72)',
                                 color: 'white',
                                 padding: '3px 8px',
                                 borderRadius: 4,
-                                fontSize: 13,
-                                fontWeight: isHovered ? 600 : 400,
+                                fontSize: 13,        // 初始值，useFrame 會動態更新
+                                fontWeight: 500,
                                 whiteSpace: 'nowrap',
                                 pointerEvents: 'none',
-                                border: isHovered ? '1px solid rgba(147,197,253,0.6)' : '1px solid rgba(255,255,255,0.15)',
+                                border: isHovered ? '1px solid rgba(147,197,253,0.7)' : '1px solid rgba(255,255,255,0.25)',
                                 userSelect: 'none',
+                                lineHeight: '1.4',
                             }}
                         >
                             {model.name}
