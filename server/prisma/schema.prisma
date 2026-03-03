@@ -321,6 +321,7 @@ model FacilityScene {
   id                  String          @id @default(uuid())
   projectId           String
   parentSceneId       String?
+  parentModelId       String?         // 此場景隸屬於哪個模型（子場景時使用）
   name                String
   description         String?
   planImageUrl        String?
@@ -342,31 +343,31 @@ model FacilityScene {
   project             Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   parentScene         FacilityScene?  @relation("SceneHierarchy", fields: [parentSceneId], references: [id], onDelete: Cascade)
   childScenes         FacilityScene[] @relation("SceneHierarchy")
-  models              FacilityModel[]
-  linkedModels        FacilityModel[] @relation("ModelToChildScene")
+  parentModel         FacilityModel?  @relation("ModelChildScenes", fields: [parentModelId], references: [id], onDelete: SetNull)
+  models              FacilityModel[] @relation("SceneModels")
 
   @@index([projectId])
   @@index([parentSceneId])
+  @@index([parentModelId])
   @@map("facility_scenes")
 }
 
 /// 設施 3D 模型
 model FacilityModel {
-  id           String              @id @default(uuid())
-  sceneId      String
-  name         String
-  modelUrl     String
-  fileSize     Int
-  position     Json                @default("{\"x\":0,\"y\":0,\"z\":0}")
-  rotation     Json                @default("{\"x\":0,\"y\":0,\"z\":0}")
-  scale        Json                @default("{\"x\":1,\"y\":1,\"z\":1}")
-  childSceneId String?
-  sortOrder    Int                 @default(0)
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  scene        FacilityScene       @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-  childScene   FacilityScene?      @relation("ModelToChildScene", fields: [childSceneId], references: [id], onDelete: SetNull)
-  infos        FacilityModelInfo[]
+  id          String              @id @default(uuid())
+  sceneId     String
+  name        String
+  modelUrl    String
+  fileSize    Int
+  position    Json                @default("{\"x\":0,\"y\":0,\"z\":0}")
+  rotation    Json                @default("{\"x\":0,\"y\":0,\"z\":0}")
+  scale       Json                @default("{\"x\":1,\"y\":1,\"z\":1}")
+  sortOrder   Int                 @default(0)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  scene       FacilityScene       @relation("SceneModels", fields: [sceneId], references: [id], onDelete: Cascade)
+  childScenes FacilityScene[]     @relation("ModelChildScenes")
+  infos       FacilityModelInfo[]
 
   @@index([sceneId])
   @@map("facility_models")

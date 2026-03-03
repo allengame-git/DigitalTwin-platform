@@ -35,7 +35,7 @@ router.get('/scenes', async (req: Request, res: Response) => {
             include: {
                 models: {
                     orderBy: { sortOrder: 'asc' },
-                    select: { id: true, name: true, childSceneId: true }
+                    select: { id: true, name: true }
                 }
             }
         });
@@ -50,7 +50,7 @@ router.get('/scenes', async (req: Request, res: Response) => {
 // POST /scenes
 router.post('/scenes', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId, parentSceneId, name, description, sortOrder } = req.body;
+        const { projectId, parentSceneId, parentModelId, name, description, sortOrder } = req.body;
         if (!projectId || !name) {
             return res.status(400).json({ error: 'projectId 和 name 為必填' });
         }
@@ -59,6 +59,7 @@ router.post('/scenes', authenticate, async (req: Request, res: Response) => {
             data: {
                 projectId,
                 parentSceneId: parentSceneId || null,
+                parentModelId: parentModelId || null,
                 name,
                 description: description || null,
                 sortOrder: sortOrder ?? 0,
@@ -76,7 +77,7 @@ router.post('/scenes', authenticate, async (req: Request, res: Response) => {
 router.put('/scenes/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        const { name, description, cameraPosition, cameraTarget, coordShiftX, coordShiftY, coordShiftZ, coordRotation, sortOrder } = req.body;
+        const { name, description, cameraPosition, cameraTarget, coordShiftX, coordShiftY, coordShiftZ, coordRotation, sortOrder, parentModelId } = req.body;
 
         const existing = await prisma.facilityScene.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ error: '場景不存在' });
@@ -93,6 +94,7 @@ router.put('/scenes/:id', authenticate, async (req: Request, res: Response) => {
                 ...(coordShiftZ !== undefined && { coordShiftZ }),
                 ...(coordRotation !== undefined && { coordRotation }),
                 ...(sortOrder !== undefined && { sortOrder }),
+                ...('parentModelId' in req.body && { parentModelId: parentModelId || null }),
             }
         });
 
@@ -250,7 +252,6 @@ router.get('/models', async (req: Request, res: Response) => {
             orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
             include: {
                 infos: { orderBy: { sortOrder: 'asc' } },
-                childScene: { select: { id: true, name: true } },
             },
         });
 
@@ -266,7 +267,7 @@ router.post('/models', authenticate, modelUpload.single('file'), async (req: Req
     let modelDir: string | undefined;
     try {
         const file = req.file;
-        const { sceneId, name, childSceneId, sortOrder } = req.body;
+        const { sceneId, name, sortOrder } = req.body;
 
         if (!file) return res.status(400).json({ error: '請選擇模型檔案' });
         if (!sceneId || !name) {
@@ -278,14 +279,6 @@ router.post('/models', authenticate, modelUpload.single('file'), async (req: Req
         if (!scene) {
             fs.unlinkSync(file.path);
             return res.status(404).json({ error: '場景不存在' });
-        }
-
-        if (childSceneId) {
-            const childScene = await prisma.facilityScene.findUnique({ where: { id: childSceneId } });
-            if (!childScene) {
-                fs.unlinkSync(file.path);
-                return res.status(404).json({ error: '指定的子場景不存在' });
-            }
         }
 
         // Move to a modelId-named subdirectory
@@ -307,11 +300,9 @@ router.post('/models', authenticate, modelUpload.single('file'), async (req: Req
                 name,
                 modelUrl,
                 fileSize: file.size,
-                childSceneId: childSceneId || null,
                 sortOrder: sortOrder ? parseInt(sortOrder) : 0,
             },
             include: {
-                childScene: { select: { id: true, name: true } },
                 infos: true,
             },
         });
@@ -331,7 +322,7 @@ router.post('/models', authenticate, modelUpload.single('file'), async (req: Req
 router.put('/models/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        const { name, childSceneId, sortOrder } = req.body;
+        const { name, sortOrder } = req.body;
 
         const existing = await prisma.facilityModel.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ error: '模型不存在' });
@@ -340,11 +331,9 @@ router.put('/models/:id', authenticate, async (req: Request, res: Response) => {
             where: { id },
             data: {
                 ...(name !== undefined && { name }),
-                ...(childSceneId !== undefined && { childSceneId: childSceneId || null }),
                 ...(sortOrder !== undefined && { sortOrder }),
             },
             include: {
-                childScene: { select: { id: true, name: true } },
                 infos: { orderBy: { sortOrder: 'asc' } },
             },
         });

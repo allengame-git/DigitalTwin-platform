@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { X, ChevronRight, Edit3, Download, ExternalLink } from 'lucide-react'
+import { X, Edit3, Download, ExternalLink } from 'lucide-react'
 import { useFacilityStore } from '@/stores/facilityStore'
 import type { FacilityModelInfo } from '@/types/facility'
 
@@ -9,7 +9,6 @@ export default function FacilityInfoPanel() {
   const editMode = useFacilityStore(state => state.editMode)
   const selectModel = useFacilityStore(state => state.selectModel)
   const setEditingModel = useFacilityStore(state => state.setEditingModel)
-  const enterScene = useFacilityStore(state => state.enterScene)
 
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
@@ -58,24 +57,14 @@ export default function FacilityInfoPanel() {
             </div>
 
             {/* Actions */}
-            {(selectedModel.childSceneId || editMode) && (
+            {editMode && (
               <div className="flex gap-2 p-3 border-b border-gray-700">
-                {selectedModel.childSceneId && (
-                  <button
-                    onClick={() => enterScene(selectedModel.childSceneId!)}
-                    className="flex-1 flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-500 text-white text-sm py-2 px-3 rounded"
-                  >
-                    進入內部 <ChevronRight size={14} />
-                  </button>
-                )}
-                {editMode && (
-                  <button
-                    onClick={() => setEditingModel(selectedModel.id)}
-                    className="flex items-center gap-1 bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-3 rounded"
-                  >
-                    <Edit3 size={14} /> 編輯
-                  </button>
-                )}
+                <button
+                  onClick={() => setEditingModel(selectedModel.id)}
+                  className="flex items-center gap-1 bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-3 rounded"
+                >
+                  <Edit3 size={14} /> 編輯
+                </button>
               </div>
             )}
 

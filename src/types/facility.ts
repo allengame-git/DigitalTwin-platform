@@ -7,6 +7,7 @@ export interface FacilityScene {
     id: string;
     projectId: string;
     parentSceneId: string | null;
+    parentModelId: string | null;
     name: string;
     description: string | null;
     planImageUrl: string | null;
@@ -35,7 +36,6 @@ export interface FacilityScene {
 export interface FacilityModelSummary {
     id: string;
     name: string;
-    childSceneId: string | null;
 }
 
 export interface FacilityModel {
@@ -47,8 +47,6 @@ export interface FacilityModel {
     position: { x: number; y: number; z: number };
     rotation: { x: number; y: number; z: number };
     scale: { x: number; y: number; z: number };
-    childSceneId: string | null;
-    childScene: { id: string; name: string } | null;
     sortOrder: number;
     createdAt: string;
     updatedAt: string;

@@ -44,8 +44,6 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const isSelected = selectedModelId === model.id;
     const isHovered = hoveredModelId === model.id;
     const isEditing = editMode && editingModelId === model.id;
-    const hasChildScene = model.childSceneId !== null;
-
     // useGLTF 載入模型
     const { scene: gltfScene } = useGLTF(model.modelUrl);
 

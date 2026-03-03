@@ -105,7 +105,7 @@ export default function PlanView() {
                                         onMouseLeave={() => setHoveredMarkerId(null)}
                                         title={model.name}
                                     >
-                                        {model.childSceneId ? (
+                                        {scenes.some(s => s.parentModelId === model.id) ? (
                                             <DoorOpen
                                                 size={iconSize}
                                                 className={

@@ -38,7 +38,7 @@ interface FacilityState {
 
     // Scene actions
     fetchScenes: (projectId: string) => Promise<void>;
-    createScene: (data: { projectId: string; parentSceneId?: string; name: string; description?: string }) => Promise<FacilityScene>;
+    createScene: (data: { projectId: string; parentSceneId?: string; parentModelId?: string; name: string; description?: string }) => Promise<FacilityScene>;
     updateScene: (id: string, data: Partial<Pick<FacilityScene, 'name' | 'description' | 'cameraPosition' | 'cameraTarget' | 'coordShiftX' | 'coordShiftY' | 'coordShiftZ' | 'coordRotation' | 'sortOrder'>>) => Promise<void>;
     deleteScene: (id: string) => Promise<void>;
 
@@ -55,7 +55,7 @@ interface FacilityState {
     selectModel: (modelId: string | null) => void;
     setHoveredModel: (modelId: string | null) => void;
     updateModelTransform: (modelId: string, transform: Transform) => Promise<void>;
-    updateModelMeta: (modelId: string, data: { name?: string; childSceneId?: string | null }) => Promise<void>;
+    updateModelMeta: (modelId: string, data: { name?: string }) => Promise<void>;
 
     // Edit mode
     setEditMode: (enabled: boolean) => void;
