@@ -21,6 +21,7 @@ export function FacilityCameraController() {
     const flyToModelId = useFacilityStore(state => state.flyToModelId);
     const models = useFacilityStore(state => state.models);
     const clearFlyTo = useFacilityStore(state => state.clearFlyTo);
+    const modelBboxCenters = useFacilityStore(state => state.modelBboxCenters);
 
     // 場景切換時飛到場景預設相機位置
     useEffect(() => {
@@ -46,11 +47,11 @@ export function FacilityCameraController() {
         if (!model) return;
 
         const ctrl = controls as any;
-        const targetTo = new THREE.Vector3(
-            model.position.x,
-            model.position.y,
-            model.position.z,
-        );
+        // 優先使用 FacilityModelItem 回報的 world-space bbox 中心
+        const bboxCenter = modelBboxCenters[flyToModelId];
+        const targetTo = bboxCenter
+            ? new THREE.Vector3(bboxCenter.x, bboxCenter.y, bboxCenter.z)
+            : new THREE.Vector3(model.position.x, model.position.y, model.position.z);
         // 固定視角：從模型正上方偏後方觀看，距離依 scale 調整
         const dist = Math.max(200, Math.max(model.scale.x, model.scale.y, model.scale.z) * 50);
         const camTo = targetTo.clone().add(new THREE.Vector3(0, dist * 0.6, dist));
@@ -65,7 +66,7 @@ export function FacilityCameraController() {
         };
 
         clearFlyTo();
-    }, [flyToModelId, models, controls, camera, clearFlyTo]);
+    }, [flyToModelId, models, controls, camera, clearFlyTo, modelBboxCenters]);
 
     useFrame(() => {
         const fly = flyRef.current;

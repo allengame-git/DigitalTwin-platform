@@ -39,6 +39,7 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const enterScene = useFacilityStore(state => state.enterScene);
     const updateModelTransform = useFacilityStore(state => state.updateModelTransform);
     const showLabels = useFacilityStore(state => state.showLabels);
+    const setModelBboxCenter = useFacilityStore(state => state.setModelBboxCenter);
 
     const isSelected = selectedModelId === model.id;
     const isHovered = hoveredModelId === model.id;
@@ -57,19 +58,30 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
         clonedScene.updateMatrixWorld(true);
         const bbox = new THREE.Box3().setFromObject(clonedScene);
         if (bbox.isEmpty() || !Number.isFinite(bbox.max.y)) {
-            return { cx: 0, cz: 0, maxY: 0 };
+            return { cx: 0, cy: 0, cz: 0, maxY: 0 };
         }
         return {
             cx: (bbox.min.x + bbox.max.x) / 2,
+            cy: (bbox.min.y + bbox.max.y) / 2,
             cz: (bbox.min.z + bbox.max.z) / 2,
             maxY: bbox.max.y,
         };
     }, [clonedScene]);
 
+    const bboxCenterReported = useRef(false);
+
     // 每幀：用 localToWorld 把 bbox 頂點轉成 world space → 設定 labelGroup 位置
     // 標籤 group 在 model group 外面，不受 model scale 影響
     useFrame(({ camera }) => {
         if (!labelGroupRef.current || !groupRef.current) return;
+
+        // 第一幀：把 bbox 視覺中心的 world-space 座標存進 store（供 fly-to 使用）
+        if (!bboxCenterReported.current) {
+            const centerLocal = new THREE.Vector3(bboxInfo.cx, bboxInfo.cy, bboxInfo.cz);
+            groupRef.current.localToWorld(centerLocal);
+            setModelBboxCenter(model.id, { x: centerLocal.x, y: centerLocal.y, z: centerLocal.z });
+            bboxCenterReported.current = true;
+        }
 
         // local → world（含 model scale / rotation / translation）
         _topLocal.set(bboxInfo.cx, bboxInfo.maxY, bboxInfo.cz);

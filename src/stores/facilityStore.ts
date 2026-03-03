@@ -68,6 +68,10 @@ interface FacilityState {
     // Camera
     flyToModel: (modelId: string) => void;
     clearFlyTo: () => void;
+
+    // Bbox centers (world-space, reported by FacilityModelItem on first frame)
+    modelBboxCenters: Record<string, { x: number; y: number; z: number }>;
+    setModelBboxCenter: (modelId: string, center: { x: number; y: number; z: number }) => void;
 }
 
 export const useFacilityStore = create<FacilityState>((set, get) => ({
@@ -82,6 +86,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     transformMode: 'translate',
     showLabels: true,
     flyToModelId: null,
+    modelBboxCenters: {},
     isLoading: false,
     error: null,
 
@@ -257,4 +262,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     // ===== Camera =====
     flyToModel: (modelId) => set({ flyToModelId: modelId }),
     clearFlyTo: () => set({ flyToModelId: null }),
+    setModelBboxCenter: (modelId, center) => set(state => ({
+        modelBboxCenters: { ...state.modelBboxCenters, [modelId]: center },
+    })),
 }));
