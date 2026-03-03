@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { Building2 } from 'lucide-react';
 import { LayerPanel } from '../overlay/LayerPanel';
 import { ClippingTool } from '../overlay/ClippingTool';
 import { usePerformanceStore } from '../../stores/performanceStore';
@@ -82,7 +83,7 @@ export const GeologySidebar: React.FC = () => {
                     transition: 'all 0.2s ease',
                 }}
             >
-                <div style={{ marginBottom: '8px' }}>
+                <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Link
                         to={projectCode ? `/project/${projectCode}` : '/'}
                         style={{
@@ -97,6 +98,30 @@ export const GeologySidebar: React.FC = () => {
                     >
                         ← 回到{projectCode ? '專案' : ''}儀表板
                     </Link>
+                    {projectCode && (
+                        <Link
+                            to={`/project/${projectCode}/facility`}
+                            style={{
+                                textDecoration: 'none',
+                                color: '#3b82f6',
+                                fontSize: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontWeight: 500,
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                border: '1px solid #bfdbfe',
+                                background: '#eff6ff',
+                                transition: 'all 0.15s',
+                                whiteSpace: 'nowrap',
+                            }}
+                            title="前往設施導覽模組"
+                        >
+                            <Building2 size={13} />
+                            設施導覽
+                        </Link>
+                    )}
                 </div>
                 <h1 style={{ margin: 0, fontSize: '18px', color: '#111827', fontWeight: 700 }}>
                     地質資料展示
