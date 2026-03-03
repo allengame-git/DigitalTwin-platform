@@ -52,7 +52,7 @@ export function FacilityCameraController() {
             model.position.z,
         );
         // 固定視角：從模型正上方偏後方觀看，距離依 scale 調整
-        const dist = Math.max(80, Math.max(model.scale.x, model.scale.y, model.scale.z) * 30);
+        const dist = Math.max(200, Math.max(model.scale.x, model.scale.y, model.scale.z) * 50);
         const camTo = targetTo.clone().add(new THREE.Vector3(0, dist * 0.6, dist));
 
         flyRef.current = {
