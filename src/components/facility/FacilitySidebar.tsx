@@ -34,31 +34,26 @@ const FacilitySidebar: React.FC = () => {
     const currentScene = scenes.find(s => s.id === currentSceneId);
 
     return (
-        <aside
+        // 外層 wrapper 負責寬度動畫；按鈕放在這裡，不受 aside overflow:hidden 裁切
+        <div
             style={{
+                position: 'relative',
                 width: isCollapsed ? 50 : 280,
                 minWidth: isCollapsed ? 50 : 280,
                 height: '100%',
-                background: 'white',
-                borderRight: '1px solid #e5e7eb',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                boxShadow: '2px 0 12px rgba(0,0,0,0.05)',
+                flexShrink: 0,
                 zIndex: 50,
                 transition: 'width 0.3s ease',
-                position: 'relative',
             }}
         >
-            {/* 收合按鈕 */}
+            {/* 收合按鈕：在 aside 外，不受 overflow:hidden 影響 */}
             <button
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 title={isCollapsed ? '展開側邊欄' : '收合側邊欄'}
                 style={{
                     position: 'absolute',
                     top: 12,
-                    right: isCollapsed ? '50%' : -15,
-                    transform: isCollapsed ? 'translateX(50%)' : 'none',
+                    right: -15,
                     width: 30,
                     height: 30,
                     borderRadius: '50%',
@@ -77,6 +72,19 @@ const FacilitySidebar: React.FC = () => {
             >
                 {isCollapsed ? '›' : '‹'}
             </button>
+
+        <aside
+            style={{
+                width: '100%',
+                height: '100%',
+                background: 'white',
+                borderRight: '1px solid #e5e7eb',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                boxShadow: '2px 0 12px rgba(0,0,0,0.05)',
+            }}
+        >
 
             {/* Header */}
             <div
@@ -374,6 +382,7 @@ const FacilitySidebar: React.FC = () => {
                 LLRWD DigitalTwin Platform v1.0
             </div>
         </aside>
+        </div>
     );
 };
 
