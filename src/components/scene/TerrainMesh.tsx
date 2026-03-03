@@ -6,13 +6,13 @@
  * Task: T043c (Real DEM Integration)
  */
 
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { useLayerStore } from '../../stores/layerStore';
 import { useViewerStore } from '../../stores/viewerStore';
 import { useTerrainStore } from '../../stores/terrainStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useLoader, useFrame } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import { generateColorRampTexture } from '../../utils/colorRamps';
 
 export function TerrainMesh() {
@@ -46,27 +46,36 @@ export function TerrainMesh() {
     const textureMode = terrainSettings.textureMode;
     const isSatelliteMode = textureMode === 'satellite' && !!activeTerrain?.satelliteTexture;
 
-    // Build texture URLs
-    const textureUrls = useMemo(() => {
-        if (!activeTerrain) return [];
-        const urls: string[] = [];
-        // Heightmap (always needed)
-        if (activeTerrain.heightmap) {
-            urls.push(`${API_BASE}${activeTerrain.heightmap}`);
-        }
-        // Texture map
-        if (isSatelliteMode && activeTerrain.satelliteTexture) {
-            urls.push(`${API_BASE}${activeTerrain.satelliteTexture}`);
-        } else if (activeTerrain.texture) {
-            urls.push(`${API_BASE}${activeTerrain.texture}`);
-        }
-        return urls;
-    }, [activeTerrain, API_BASE, isSatelliteMode]);
+    // Load heightmap with error resilience (no crash on 404)
+    const [heightMap, setHeightMap] = useState<THREE.Texture | null>(null);
+    const [textureMap, setTextureMap] = useState<THREE.Texture | null>(null);
 
-    // Load textures if terrain exists
-    const textures = useLoader(THREE.TextureLoader, textureUrls.length > 0 ? textureUrls : ['']);
-    const heightMap = textures[0] || null;
-    const textureMap = textures[1] || null;
+    useEffect(() => {
+        if (!activeTerrain?.heightmap) { setHeightMap(null); return; }
+        const loader = new THREE.TextureLoader();
+        loader.load(
+            `${API_BASE}${activeTerrain.heightmap}`,
+            (tex) => setHeightMap(tex),
+            undefined,
+            () => { console.warn('[TerrainMesh] heightmap load failed'); setHeightMap(null); }
+        );
+    }, [activeTerrain?.heightmap, API_BASE]);
+
+    useEffect(() => {
+        const url = isSatelliteMode && activeTerrain?.satelliteTexture
+            ? `${API_BASE}${activeTerrain.satelliteTexture}`
+            : activeTerrain?.texture
+            ? `${API_BASE}${activeTerrain.texture}`
+            : null;
+        if (!url) { setTextureMap(null); return; }
+        const loader = new THREE.TextureLoader();
+        loader.load(
+            url,
+            (tex) => setTextureMap(tex),
+            undefined,
+            () => { console.warn('[TerrainMesh] texture load failed:', url); setTextureMap(null); }
+        );
+    }, [activeTerrain?.satelliteTexture, activeTerrain?.texture, API_BASE, isSatelliteMode]);
 
     // Update Uniforms
     useFrame(() => {

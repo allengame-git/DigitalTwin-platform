@@ -289,7 +289,8 @@ def main():
         
         # 處理衛星影像 (如果有提供)
         if args.satellite and os.path.exists(args.satellite):
-            satellite_name = f"satellite_{os.path.basename(args.input)}.jpg"
+            satellite_stem = os.path.splitext(os.path.basename(args.input))[0]
+            satellite_name = f"satellite_{satellite_stem}.jpg"
             satellite_path = os.path.join(args.output_dir, satellite_name)
             
             # 取得 DEM 的 CRS
