@@ -19,7 +19,7 @@ const BreadcrumbNav: React.FC = () => {
 
     if (breadcrumbs.length === 0) {
         return (
-            <div className="flex items-center gap-1 px-3 py-2 text-gray-400 text-xs">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', color: '#9ca3af', fontSize: 12 }}>
                 <Home size={12} />
                 <span>尚未選擇場景</span>
             </div>
@@ -27,20 +27,11 @@ const BreadcrumbNav: React.FC = () => {
     }
 
     const handleClick = (index: number, sceneId: string) => {
-        // 最後一個（當前場景）不可點擊
         if (index === breadcrumbs.length - 1) return;
-
-        // 若點擊根場景，使用 goToRoot
         if (index === 0) {
             goToRoot();
         } else {
-            // 重新進入該場景（enterScene 會重設 stack）
-            // 先跳至 root，再依序進入到目標層級
-            // 簡化做法：直接呼叫 enterScene，但需要正確重設 sceneStack
-            // 使用 store 的 enterScene 並先手動重設狀態
             const targetStack = sceneStack.slice(0, index);
-            // 直接操作：先 goToRoot，再依序 enterScene
-            // 為避免多次 API 呼叫，採用直接設定 store 狀態的方式
             useFacilityStore.setState({
                 currentSceneId: sceneId,
                 sceneStack: targetStack,
@@ -53,31 +44,61 @@ const BreadcrumbNav: React.FC = () => {
     };
 
     return (
-        <nav className="flex items-center gap-0.5 px-3 py-2 flex-wrap" aria-label="場景導覽">
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '6px 12px', flexWrap: 'wrap' }} aria-label="場景導覽">
             <button
                 onClick={() => goToRoot()}
-                className="text-gray-400 hover:text-gray-100 transition-colors p-0.5 rounded"
                 title="回到根場景"
+                style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#9ca3af',
+                    padding: 2,
+                    borderRadius: 3,
+                    display: 'flex',
+                    alignItems: 'center',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#374151')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#9ca3af')}
             >
                 <Home size={12} />
             </button>
             {breadcrumbs.map((scene, index) => (
                 <React.Fragment key={scene.id}>
-                    <ChevronRight size={12} className="text-gray-600 flex-shrink-0" />
+                    <ChevronRight size={12} style={{ color: '#d1d5db', flexShrink: 0 }} />
                     {index === breadcrumbs.length - 1 ? (
-                        // 當前場景：粗體不可點擊
                         <span
-                            className="text-gray-100 text-xs font-semibold truncate max-w-[120px]"
                             title={scene.name}
+                            style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: '#111827',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                maxWidth: 120,
+                            }}
                         >
                             {scene.name}
                         </span>
                     ) : (
-                        // 上層場景：可點擊
                         <button
                             onClick={() => handleClick(index, scene.id)}
-                            className="text-gray-400 hover:text-gray-100 text-xs transition-colors truncate max-w-[100px]"
                             title={scene.name}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: 12,
+                                color: '#6b7280',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                maxWidth: 100,
+                                padding: 0,
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.color = '#111827')}
+                            onMouseLeave={e => (e.currentTarget.style.color = '#6b7280')}
                         >
                             {scene.name}
                         </button>

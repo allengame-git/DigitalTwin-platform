@@ -18,47 +18,51 @@ const SceneTree: React.FC = () => {
 
     if (childScenes.length === 0) {
         return (
-            <div className="flex items-center gap-2 px-3 py-2 text-gray-500 text-xs italic">
-                <Layers size={13} className="flex-shrink-0" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', color: '#9ca3af', fontSize: 12, fontStyle: 'italic' }}>
+                <Layers size={13} style={{ flexShrink: 0 }} />
                 <span>沒有子場景</span>
             </div>
         );
     }
 
     return (
-        <ul className="space-y-0.5">
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {childScenes.map(scene => {
-                // 計算子場景自身有多少孫子場景，作為提示
                 const grandChildCount = scenes.filter(s => s.parentSceneId === scene.id).length;
 
                 return (
                     <li key={scene.id}>
                         <button
                             onClick={() => enterScene(scene.id)}
-                            className="
-                                w-full flex items-center gap-2 px-3 py-2
-                                text-gray-300 hover:text-gray-100
-                                hover:bg-gray-700
-                                rounded-sm transition-colors text-left group
-                            "
                             title={scene.description ?? scene.name}
+                            style={{
+                                width: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '7px 12px',
+                                borderRadius: 4,
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#374151',
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                transition: 'background 0.15s',
+                                fontSize: 12,
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                         >
-                            <FolderOpen
-                                size={14}
-                                className="flex-shrink-0 text-blue-400 group-hover:text-blue-300"
-                            />
-                            <span className="flex-1 text-xs truncate">
+                            <FolderOpen size={14} style={{ flexShrink: 0, color: '#3b82f6' }} />
+                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {scene.name}
                             </span>
                             {grandChildCount > 0 && (
-                                <span className="text-gray-500 text-xs flex-shrink-0">
+                                <span style={{ color: '#9ca3af', fontSize: 11, flexShrink: 0 }}>
                                     {grandChildCount}
                                 </span>
                             )}
-                            <ChevronRight
-                                size={12}
-                                className="flex-shrink-0 text-gray-600 group-hover:text-gray-400"
-                            />
+                            <ChevronRight size={12} style={{ flexShrink: 0, color: '#d1d5db' }} />
                         </button>
                     </li>
                 );
