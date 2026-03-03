@@ -232,9 +232,21 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                         <div className="dm-file-info" style={{ flex: 1 }}>
                             <div className="dm-file-name">{rootScene.name}</div>
                             {rootScene.description && <div className="dm-file-meta">{rootScene.description}</div>}
+                            {/* 平面圖狀態 */}
+                            {(rootScene.planImageUrl || rootScene.autoPlanImageUrl) ? (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, padding: '3px 8px', borderRadius: 4, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                                    <span style={{ fontSize: 11, color: '#15803d', fontWeight: 500 }}>✓ 已有平面圖</span>
+                                    {rootScene.planImageUrl && <span style={{ fontSize: 10, color: '#86efac' }}>（手動上傳）</span>}
+                                    {!rootScene.planImageUrl && rootScene.autoPlanImageUrl && <span style={{ fontSize: 10, color: '#86efac' }}>（自動生成）</span>}
+                                </div>
+                            ) : (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, padding: '3px 8px', borderRadius: 4, background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                                    <span style={{ fontSize: 11, color: '#9ca3af' }}>尚未上傳平面圖</span>
+                                </div>
+                            )}
                             <div className="dm-file-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
                                 <button className="dm-file-btn" onClick={() => { setIsEditingRoot(true); setEditRootForm({ name: rootScene.name, description: rootScene.description || '' }); }}>編輯名稱</button>
-                                <button className="dm-file-btn" onClick={() => { setPlanUploadSceneId(rootScene.id); planInputRef.current?.click(); }} disabled={isPlanUploading}>{isPlanUploading ? '上傳中...' : '上傳平面圖'}</button>
+                                <button className="dm-file-btn" onClick={() => { setPlanUploadSceneId(rootScene.id); planInputRef.current?.click(); }} disabled={isPlanUploading}>{isPlanUploading ? '上傳中...' : (rootScene.planImageUrl || rootScene.autoPlanImageUrl) ? '更換平面圖' : '上傳平面圖'}</button>
                             </div>
                         </div>
                     )}
@@ -303,9 +315,21 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                             )}
                                             {!linkedModel && <div className="dm-file-meta">未關聯模型</div>}
                                             {sub.description && <div className="dm-file-meta">{sub.description}</div>}
+                                            {/* 平面圖狀態 */}
+                                            {(sub.planImageUrl || sub.autoPlanImageUrl) ? (
+                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, padding: '3px 8px', borderRadius: 4, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                                                    <span style={{ fontSize: 11, color: '#15803d', fontWeight: 500 }}>✓ 已有平面圖</span>
+                                                    {sub.planImageUrl && <span style={{ fontSize: 10, color: '#86efac' }}>（手動上傳）</span>}
+                                                    {!sub.planImageUrl && sub.autoPlanImageUrl && <span style={{ fontSize: 10, color: '#86efac' }}>（自動生成）</span>}
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, padding: '3px 8px', borderRadius: 4, background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                                                    <span style={{ fontSize: 11, color: '#9ca3af' }}>尚未上傳平面圖</span>
+                                                </div>
+                                            )}
                                             <div className="dm-file-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
                                                 <button className="dm-file-btn" onClick={() => { setEditingSubId(sub.id); setEditSubForm({ name: sub.name, description: sub.description || '', parentModelId: sub.parentModelId || '' }); }}>編輯</button>
-                                                <button className="dm-file-btn" onClick={() => { setPlanUploadSceneId(sub.id); planInputRef.current?.click(); }} disabled={isPlanUploading}>上傳平面圖</button>
+                                                <button className="dm-file-btn" onClick={() => { setPlanUploadSceneId(sub.id); planInputRef.current?.click(); }} disabled={isPlanUploading}>{(sub.planImageUrl || sub.autoPlanImageUrl) ? '更換平面圖' : '上傳平面圖'}</button>
                                                 <button className="dm-file-btn dm-file-btn-delete" onClick={() => setDeleteConfirmId(sub.id)}>刪除</button>
                                             </div>
                                         </div>
