@@ -681,8 +681,20 @@ const ModelManager: React.FC<{ projectId: string }> = ({ projectId }) => {
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [successMsg, setSuccessMsg] = useState<string | null>(null);
+    const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const pf = (v: string, fallback: number) => {
+        const n = parseFloat(v);
+        return isNaN(n) ? fallback : n;
+    };
 
     useEffect(() => { if (projectId) fetchScenes(projectId); }, [projectId, fetchScenes]);
+
+    useEffect(() => {
+        return () => {
+            if (successTimerRef.current) clearTimeout(successTimerRef.current);
+        };
+    }, []);
 
     useEffect(() => {
         if (!sceneId) { setModels([]); return; }
@@ -720,14 +732,15 @@ const ModelManager: React.FC<{ projectId: string }> = ({ projectId }) => {
             }, { headers: getAuthHeaders(), withCredentials: true });
 
             await axios.put(`${API_BASE}/api/facility/models/${modelId}/transform`, {
-                position: { x: parseFloat(s.posX) || 0, y: parseFloat(s.posY) || 0, z: parseFloat(s.posZ) || 0 },
-                rotation: { x: parseFloat(s.rotX) || 0, y: parseFloat(s.rotY) || 0, z: parseFloat(s.rotZ) || 0 },
-                scale:    { x: parseFloat(s.sclX) || 1, y: parseFloat(s.sclY) || 1, z: parseFloat(s.sclZ) || 1 },
+                position: { x: pf(s.posX, 0), y: pf(s.posY, 0), z: pf(s.posZ, 0) },
+                rotation: { x: pf(s.rotX, 0), y: pf(s.rotY, 0), z: pf(s.rotZ, 0) },
+                scale:    { x: pf(s.sclX, 1), y: pf(s.sclY, 1), z: pf(s.sclZ, 1) },
             }, { headers: getAuthHeaders(), withCredentials: true });
 
             setModels(prev => prev.map(m => m.id === modelId ? { ...m, name: s.name.trim() } : m));
             setSuccessMsg('儲存成功');
-            setTimeout(() => setSuccessMsg(null), 2500);
+            if (successTimerRef.current) clearTimeout(successTimerRef.current);
+            successTimerRef.current = setTimeout(() => setSuccessMsg(null), 2500);
         } catch (e: any) {
             setError(e?.response?.data?.error || '儲存失敗');
         } finally {
