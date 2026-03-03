@@ -34,6 +34,7 @@ export function FacilityCanvas() {
                 </Suspense>
 
                 <MapControls
+                    makeDefault
                     enableRotate={true}
                     enablePan={true}
                     enableZoom={true}

@@ -29,6 +29,9 @@ interface FacilityState {
     // UI
     showLabels: boolean;
 
+    // Camera fly-to
+    flyToModelId: string | null;
+
     // Async state
     isLoading: boolean;
     error: string | null;
@@ -61,6 +64,10 @@ interface FacilityState {
 
     // UI
     toggleLabels: () => void;
+
+    // Camera
+    flyToModel: (modelId: string) => void;
+    clearFlyTo: () => void;
 }
 
 export const useFacilityStore = create<FacilityState>((set, get) => ({
@@ -74,6 +81,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     editingModelId: null,
     transformMode: 'translate',
     showLabels: true,
+    flyToModelId: null,
     isLoading: false,
     error: null,
 
@@ -245,4 +253,8 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
 
     // ===== UI =====
     toggleLabels: () => set(state => ({ showLabels: !state.showLabels })),
+
+    // ===== Camera =====
+    flyToModel: (modelId) => set({ flyToModelId: modelId }),
+    clearFlyTo: () => set({ flyToModelId: null }),
 }));

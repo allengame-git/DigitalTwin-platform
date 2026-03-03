@@ -28,6 +28,7 @@ const FacilitySidebar: React.FC = () => {
         setEditingModel,
         showLabels,
         toggleLabels,
+        flyToModel,
     } = useFacilityStore();
 
     const currentScene = scenes.find(s => s.id === currentSceneId);
@@ -217,7 +218,10 @@ const FacilitySidebar: React.FC = () => {
                                     return (
                                         <li key={model.id}>
                                             <button
-                                                onClick={() => selectModel(isSelected ? null : model.id)}
+                                                onClick={() => {
+                                                    selectModel(isSelected ? null : model.id);
+                                                    if (!isSelected) flyToModel(model.id);
+                                                }}
                                                 title={model.name}
                                                 style={{
                                                     width: '100%',

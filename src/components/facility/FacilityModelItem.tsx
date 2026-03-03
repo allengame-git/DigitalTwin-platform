@@ -40,6 +40,7 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const updateModelTransform = useFacilityStore(state => state.updateModelTransform);
     const showLabels = useFacilityStore(state => state.showLabels);
 
+    const isSelected = selectedModelId === model.id;
     const isHovered = hoveredModelId === model.id;
     const isEditing = editMode && editingModelId === model.id;
     const hasChildScene = model.childSceneId !== null;
@@ -86,30 +87,33 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
         }
     });
 
-    // Hover 高亮：遍歷 scene，對 MeshStandardMaterial 設定 emissive
+    // 高亮：hover=黃色，selected=藍色，兩者同時以 hover 優先
     useEffect(() => {
+        const emissiveColor = isHovered ? '#ffaa00' : isSelected ? '#2255ff' : '#000000';
+        const emissiveIntensity = isHovered ? 0.3 : isSelected ? 0.25 : 0;
+
         clonedScene.traverse((node) => {
             if ((node as THREE.Mesh).isMesh) {
                 const mesh = node as THREE.Mesh;
                 if (Array.isArray(mesh.material)) {
                     mesh.material = mesh.material.map(mat => {
                         if (mat instanceof THREE.MeshStandardMaterial) {
-                            const clonedMat = mat.clone();
-                            clonedMat.emissive.set(isHovered ? '#ffaa00' : '#000000');
-                            clonedMat.emissiveIntensity = isHovered ? 0.3 : 0;
-                            return clonedMat;
+                            const m = mat.clone();
+                            m.emissive.set(emissiveColor);
+                            m.emissiveIntensity = emissiveIntensity;
+                            return m;
                         }
                         return mat;
                     });
                 } else if (mesh.material instanceof THREE.MeshStandardMaterial) {
-                    const clonedMat = (mesh.material as THREE.MeshStandardMaterial).clone();
-                    clonedMat.emissive.set(isHovered ? '#ffaa00' : '#000000');
-                    clonedMat.emissiveIntensity = isHovered ? 0.3 : 0;
-                    mesh.material = clonedMat;
+                    const m = (mesh.material as THREE.MeshStandardMaterial).clone();
+                    m.emissive.set(emissiveColor);
+                    m.emissiveIntensity = emissiveIntensity;
+                    mesh.material = m;
                 }
             }
         });
-    }, [isHovered, clonedScene]);
+    }, [isHovered, isSelected, clonedScene]);
 
     // TransformControls onChange：debounce 更新後端
     const handleTransformChange = useCallback(() => {
