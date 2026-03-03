@@ -28,6 +28,7 @@ interface FacilityState {
 
     // UI
     showLabels: boolean;
+    showPlanView: boolean;
 
     // Camera fly-to
     flyToModelId: string | null;
@@ -64,6 +65,7 @@ interface FacilityState {
 
     // UI
     toggleLabels: () => void;
+    togglePlanView: () => void;
 
     // Camera
     flyToModel: (modelId: string) => void;
@@ -85,6 +87,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     editingModelId: null,
     transformMode: 'translate',
     showLabels: true,
+    showPlanView: false,
     flyToModelId: null,
     modelBboxCenters: {},
     isLoading: false,
@@ -258,6 +261,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
 
     // ===== UI =====
     toggleLabels: () => set(state => ({ showLabels: !state.showLabels })),
+    togglePlanView: () => set(state => ({ showPlanView: !state.showPlanView })),
 
     // ===== Camera =====
     flyToModel: (modelId) => set({ flyToModelId: modelId }),

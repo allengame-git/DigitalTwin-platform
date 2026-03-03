@@ -12,6 +12,7 @@ const FacilityCanvas = React.lazy(() => import('../components/facility/FacilityC
 const FacilitySidebar = React.lazy(() => import('../components/facility/FacilitySidebar'));
 const FacilityInfoPanel = React.lazy(() => import('../components/facility/FacilityInfoPanel'));
 const TransformInputPanel = React.lazy(() => import('../components/facility/TransformInputPanel'));
+const PlanViewFloating = React.lazy(() => import('../components/facility/PlanViewFloating'));
 
 export const FacilityPage: React.FC = () => {
     const { projectCode } = useParams<{ projectCode: string }>();
@@ -58,6 +59,9 @@ export const FacilityPage: React.FC = () => {
                 </React.Suspense>
                 <React.Suspense fallback={null}>
                     <TransformInputPanel />
+                </React.Suspense>
+                <React.Suspense fallback={null}>
+                    <PlanViewFloating />
                 </React.Suspense>
             </div>
         </div>

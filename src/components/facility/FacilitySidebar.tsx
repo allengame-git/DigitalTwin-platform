@@ -6,10 +6,9 @@
 
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronRight, Box, DoorOpen, Edit3, Tag } from 'lucide-react';
+import { ChevronRight, Box, DoorOpen, Edit3, Tag, Map } from 'lucide-react';
 import { useFacilityStore } from '@/stores/facilityStore';
 import BreadcrumbNav from './BreadcrumbNav';
-import PlanView from './PlanView';
 
 const FacilitySidebar: React.FC = () => {
     const [isCollapsed, setIsCollapsed] = React.useState(false);
@@ -27,6 +26,8 @@ const FacilitySidebar: React.FC = () => {
         setEditingModel,
         showLabels,
         toggleLabels,
+        showPlanView,
+        togglePlanView,
         flyToModel,
         enterScene,
     } = useFacilityStore();
@@ -37,6 +38,7 @@ const FacilitySidebar: React.FC = () => {
         : [];
 
     const currentScene = scenes.find(s => s.id === currentSceneId);
+    const hasPlanImage = !!(currentScene?.planImageUrl || currentScene?.autoPlanImageUrl);
 
     return (
         // 外層 wrapper 負責寬度動畫；按鈕放在這裡，不受 aside overflow:hidden 裁切
@@ -321,8 +323,6 @@ const FacilitySidebar: React.FC = () => {
                     )}
                 </section>
 
-                {/* 2D 平面圖 */}
-                <PlanView />
             </div>
 
             {/* 工具列：標籤開關 + 編輯模式 */}
@@ -338,6 +338,34 @@ const FacilitySidebar: React.FC = () => {
                     transition: 'opacity 0.2s ease',
                 }}
             >
+                {/* 平面圖按鈕（有平面圖才顯示） */}
+                {hasPlanImage && (
+                    <button
+                        onClick={togglePlanView}
+                        title={showPlanView ? '關閉平面圖' : '開啟平面圖'}
+                        style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            padding: '6px 0',
+                            borderRadius: 6,
+                            border: showPlanView ? '1px solid #0ea5e9' : '1px solid #d1d5db',
+                            background: showPlanView ? '#0c2a4a' : 'white',
+                            color: showPlanView ? '#38bdf8' : '#6b7280',
+                            fontSize: 12,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            marginBottom: 6,
+                        }}
+                    >
+                        <Map size={12} />
+                        {showPlanView ? '平面圖顯示中' : '顯示平面圖'}
+                    </button>
+                )}
+
                 {/* 標籤顯示開關 */}
                 <button
                     onClick={toggleLabels}
