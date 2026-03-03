@@ -51,19 +51,19 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     // Clone scene 以避免多個 instance 共用同一 scene（memo 確保 bbox 不重算）
     const clonedScene = useMemo(() => gltfScene.clone(true), [gltfScene]);
 
-    // 計算 bbox 在 group local space 的頂部中心（cx, maxY, cz）
-    // 只算一次，useFrame 每幀用 localToWorld 轉換成 world space
+    // 計算 bbox 中心與頂部（clonedScene 隔離空間）
+    // cx/cy/cz 用於方案 C：primitive 反向偏移，讓 group origin = 視覺中心
+    // 套用偏移後，group local space 的模型頂部 = maxY - cy，水平中心 = (0,0)
     const bboxInfo = useMemo(() => {
         clonedScene.updateMatrixWorld(true);
         const bbox = new THREE.Box3().setFromObject(clonedScene);
         if (bbox.isEmpty() || !Number.isFinite(bbox.max.y)) {
-            return { cx: 0, maxY: 0, cz: 0 };
+            return { cx: 0, cy: 0, cz: 0, topY: 0 };
         }
-        return {
-            cx: (bbox.min.x + bbox.max.x) / 2,
-            maxY: bbox.max.y,
-            cz: (bbox.min.z + bbox.max.z) / 2,
-        };
+        const cx = (bbox.min.x + bbox.max.x) / 2;
+        const cy = (bbox.min.y + bbox.max.y) / 2;
+        const cz = (bbox.min.z + bbox.max.z) / 2;
+        return { cx, cy, cz, topY: bbox.max.y - cy };   // topY = 偏移後的頂部高度
     }, [clonedScene]);
 
     // 每幀：用 localToWorld 把 bbox 頂點轉成 world space → 設定 labelGroup 位置
@@ -72,7 +72,8 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
         if (!labelGroupRef.current || !groupRef.current) return;
 
         // local → world（含 model scale / rotation / translation）
-        _topLocal.set(bboxInfo.cx, bboxInfo.maxY, bboxInfo.cz);
+        // 偏移後 group local space：水平中心=(0,0)，頂部=topY
+        _topLocal.set(0, bboxInfo.topY, 0);
         groupRef.current.localToWorld(_topLocal);   // 就地修改
 
         // 固定 20 world units above model top（Y 方向）
@@ -193,7 +194,11 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                 onPointerOver={handlePointerOver}
                 onPointerOut={handlePointerOut}
             >
-                <primitive object={clonedScene} />
+                {/* 方案 C：反向偏移讓幾何中心對齊 group origin，TransformControls 因此出現在視覺中心 */}
+                <primitive
+                    object={clonedScene}
+                    position={[-bboxInfo.cx, -bboxInfo.cy, -bboxInfo.cz]}
+                />
             </group>
 
             {/* 標籤 group：在模型 group 外，位置由 useFrame + localToWorld 設定
