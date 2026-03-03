@@ -2,7 +2,9 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { randomUUID } from 'crypto';
 import prisma from '../lib/prisma';
+import { FacilityInfoType } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -260,6 +262,7 @@ router.get('/models', async (req: Request, res: Response) => {
 
 // POST /models — upload GLB
 router.post('/models', authenticate, modelUpload.single('file'), async (req: Request, res: Response) => {
+    let modelDir: string | undefined;
     try {
         const file = req.file;
         const { sceneId, name, childSceneId, sortOrder } = req.body;
@@ -276,10 +279,17 @@ router.post('/models', authenticate, modelUpload.single('file'), async (req: Req
             return res.status(404).json({ error: '場景不存在' });
         }
 
+        if (childSceneId) {
+            const childScene = await prisma.facilityScene.findUnique({ where: { id: childSceneId } });
+            if (!childScene) {
+                fs.unlinkSync(file.path);
+                return res.status(404).json({ error: '指定的子場景不存在' });
+            }
+        }
+
         // Move to a modelId-named subdirectory
-        const { randomUUID } = require('crypto');
         const modelId: string = randomUUID();
-        const modelDir = path.join(MODELS_DIR, modelId);
+        modelDir = path.join(MODELS_DIR, modelId);
         fs.mkdirSync(modelDir, { recursive: true });
 
         const ext = path.extname(file.originalname).toLowerCase();
@@ -307,6 +317,10 @@ router.post('/models', authenticate, modelUpload.single('file'), async (req: Req
 
         res.status(201).json(model);
     } catch (error) {
+        // cleanup orphaned model directory if file was already moved
+        if (modelDir && fs.existsSync(modelDir)) {
+            try { fs.rmSync(modelDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+        }
         console.error('[Facility] Upload model error:', error);
         res.status(500).json({ error: '上傳模型失敗' });
     }
@@ -433,6 +447,7 @@ router.get('/models/:id/info', async (req: Request, res: Response) => {
 
 // POST /models/:id/info
 router.post('/models/:id/info', authenticate, infoUpload.single('file'), async (req: Request, res: Response) => {
+    let infoDir: string | undefined;
     try {
         const modelId = req.params.id as string;
         const { type, label, content, sortOrder } = req.body;
@@ -443,6 +458,11 @@ router.post('/models/:id/info', authenticate, infoUpload.single('file'), async (
             return res.status(400).json({ error: 'type 和 label 為必填' });
         }
 
+        if (!Object.values(FacilityInfoType).includes(type as FacilityInfoType)) {
+            if (file) fs.unlinkSync(file.path);
+            return res.status(400).json({ error: '無效的 type，必須是 TEXT、IMAGE、DOCUMENT 或 LINK' });
+        }
+
         const model = await prisma.facilityModel.findUnique({ where: { id: modelId } });
         if (!model) {
             if (file) fs.unlinkSync(file.path);
@@ -450,9 +470,8 @@ router.post('/models/:id/info', authenticate, infoUpload.single('file'), async (
         }
 
         if ((type === 'IMAGE' || type === 'DOCUMENT') && file) {
-            const { randomUUID } = require('crypto');
             const infoId: string = randomUUID();
-            const infoDir = path.join(INFO_DIR, infoId);
+            infoDir = path.join(INFO_DIR, infoId);
             fs.mkdirSync(infoDir, { recursive: true });
 
             const destPath = path.join(infoDir, file.originalname);
@@ -464,7 +483,7 @@ router.post('/models/:id/info', authenticate, infoUpload.single('file'), async (
                 data: {
                     id: infoId,
                     modelId,
-                    type: type as any,
+                    type: type as FacilityInfoType,
                     label,
                     content: finalContent,
                     sortOrder: sortOrder ? parseInt(sortOrder) : 0,
@@ -478,7 +497,7 @@ router.post('/models/:id/info', authenticate, infoUpload.single('file'), async (
         const info = await prisma.facilityModelInfo.create({
             data: {
                 modelId,
-                type: type as any,
+                type: type as FacilityInfoType,
                 label,
                 content: content || '',
                 sortOrder: sortOrder ? parseInt(sortOrder) : 0,
@@ -487,6 +506,10 @@ router.post('/models/:id/info', authenticate, infoUpload.single('file'), async (
 
         res.status(201).json(info);
     } catch (error) {
+        // cleanup orphaned info directory if file was already moved but DB write failed
+        if (infoDir && fs.existsSync(infoDir)) {
+            try { fs.rmSync(infoDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+        }
         console.error('[Facility] Create info error:', error);
         res.status(500).json({ error: '新增資訊失敗' });
     }
@@ -512,6 +535,7 @@ router.put('/info/:id', authenticate, async (req: Request, res: Response) => {
 
         res.json(info);
     } catch (error) {
+        console.error('[Facility] Update info error:', error);
         res.status(500).json({ error: '更新資訊失敗' });
     }
 });
@@ -534,6 +558,7 @@ router.delete('/info/:id', authenticate, async (req: Request, res: Response) => 
         await prisma.facilityModelInfo.delete({ where: { id } });
         res.json({ success: true });
     } catch (error) {
+        console.error('[Facility] Delete info error:', error);
         res.status(500).json({ error: '刪除資訊失敗' });
     }
 });
@@ -564,16 +589,24 @@ router.post('/scenes/:id/plan-image', authenticate, planUpload.single('file'), a
     try {
         const id = req.params.id as string;
         const file = req.file;
+
+        const scene = await prisma.facilityScene.findUnique({ where: { id } });
+        if (!scene) {
+            if (req.file) fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: '場景不存在' });
+        }
+
         if (!file) return res.status(400).json({ error: '請選擇圖片' });
 
         const planImageUrl = `/uploads/facility/plans/${id}/plan.png`;
-        const scene = await prisma.facilityScene.update({
+        const updatedScene = await prisma.facilityScene.update({
             where: { id },
             data: { planImageUrl },
         });
 
-        res.json(scene);
+        res.json(updatedScene);
     } catch (error) {
+        console.error('[Facility] Upload plan image error:', error);
         res.status(500).json({ error: '上傳平面圖失敗' });
     }
 });
