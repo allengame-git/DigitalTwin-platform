@@ -1,11 +1,11 @@
 /**
- * PlanViewFloating — 科技感浮動平面圖視窗
- * 拖曳移動、模型標記覆蓋層
+ * PlanViewFloating — 浮動平面圖視窗
+ * 淺色風格、四周霧化邊緣、畫面置中 70%
  * @module components/facility/PlanViewFloating
  */
 
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { X, MapPin, DoorOpen, Maximize2, Minimize2, Map } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { X, MapPin, DoorOpen, Map } from 'lucide-react';
 import { useFacilityStore } from '@/stores/facilityStore';
 import type { FacilityModel } from '@/types/facility';
 
@@ -17,69 +17,29 @@ function resolveUrl(url: string | null): string | null {
     return `${API_BASE}${url}`;
 }
 
-// Corner bracket SVG
-function CornerBracket({ pos }: { pos: 'tl' | 'tr' | 'bl' | 'br' }) {
-    const size = 14;
-    const thick = 2;
-    const color = '#00d4ff';
-    const style: React.CSSProperties = {
-        position: 'absolute',
-        width: size,
-        height: size,
-        ...(pos === 'tl' ? { top: 0, left: 0 } : {}),
-        ...(pos === 'tr' ? { top: 0, right: 0 } : {}),
-        ...(pos === 'bl' ? { bottom: 0, left: 0 } : {}),
-        ...(pos === 'br' ? { bottom: 0, right: 0 } : {}),
-    };
-    const lines: React.CSSProperties[] = pos === 'tl' ? [
-        { top: 0, left: 0, width: size, height: thick },
-        { top: 0, left: 0, width: thick, height: size },
-    ] : pos === 'tr' ? [
-        { top: 0, right: 0, width: size, height: thick },
-        { top: 0, right: 0, width: thick, height: size },
-    ] : pos === 'bl' ? [
-        { bottom: 0, left: 0, width: size, height: thick },
-        { bottom: 0, left: 0, width: thick, height: size },
-    ] : [
-        { bottom: 0, right: 0, width: size, height: thick },
-        { bottom: 0, right: 0, width: thick, height: size },
-    ];
-    return (
-        <div style={style}>
-            {lines.map((l, i) => (
-                <div key={i} style={{ position: 'absolute', background: color, ...l }} />
-            ))}
-        </div>
-    );
-}
-
 export default function PlanViewFloating() {
-    const scenes = useFacilityStore(state => state.scenes);
-    const currentSceneId = useFacilityStore(state => state.currentSceneId);
-    const models = useFacilityStore(state => state.models);
-    const selectedModelId = useFacilityStore(state => state.selectedModelId);
-    const selectModel = useFacilityStore(state => state.selectModel);
-    const flyToModel = useFacilityStore(state => state.flyToModel);
-    const showPlanView = useFacilityStore(state => state.showPlanView);
-    const togglePlanView = useFacilityStore(state => state.togglePlanView);
+    const scenes        = useFacilityStore(s => s.scenes);
+    const currentSceneId = useFacilityStore(s => s.currentSceneId);
+    const models        = useFacilityStore(s => s.models);
+    const selectedModelId = useFacilityStore(s => s.selectedModelId);
+    const selectModel   = useFacilityStore(s => s.selectModel);
+    const flyToModel    = useFacilityStore(s => s.flyToModel);
+    const showPlanView  = useFacilityStore(s => s.showPlanView);
+    const togglePlanView = useFacilityStore(s => s.togglePlanView);
 
-    const [expanded, setExpanded] = useState(false); // false = 標準, true = 展開
-    const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
+    const [hoveredId, setHoveredId]     = useState<string | null>(null);
     const [tooltipModel, setTooltipModel] = useState<FacilityModel | null>(null);
-
-    // 拖曳狀態
-    const [pos, setPos] = useState({ x: 24, y: 24 });
-    const dragging = useRef(false);
-    const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 });
 
     const currentScene = useMemo(
         () => scenes.find(s => s.id === currentSceneId) ?? null,
         [scenes, currentSceneId]
     );
 
-    const planImage = resolveUrl(currentScene?.planImageUrl ?? currentScene?.autoPlanImageUrl ?? null);
+    const planImage = resolveUrl(
+        currentScene?.planImageUrl ?? currentScene?.autoPlanImageUrl ?? null
+    );
 
-    // 計算 bounds
+    // 計算座標 bounds → 標記百分比位置
     const bounds = useMemo(() => {
         if (currentScene?.terrainBounds) {
             const b = currentScene.terrainBounds;
@@ -101,170 +61,82 @@ export default function PlanViewFloating() {
         const rangeZ = bounds.maxZ - bounds.minZ;
         const x = rangeX === 0 ? 50 : ((model.position.x - bounds.minX) / rangeX) * 100;
         const y = rangeZ === 0 ? 50 : (1 - (model.position.z - bounds.minZ) / rangeZ) * 100;
-        return { x: Math.max(2, Math.min(98, x)), y: Math.max(2, Math.min(98, y)) };
+        return { x: Math.max(3, Math.min(97, x)), y: Math.max(3, Math.min(97, y)) };
     }, [bounds]);
-
-    // 拖曳處理
-    const onMouseDown = useCallback((e: React.MouseEvent) => {
-        if ((e.target as HTMLElement).closest('[data-no-drag]')) return;
-        dragging.current = true;
-        dragStart.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y };
-        e.preventDefault();
-    }, [pos]);
-
-    useEffect(() => {
-        const onMove = (e: MouseEvent) => {
-            if (!dragging.current) return;
-            const dx = e.clientX - dragStart.current.mx;
-            const dy = e.clientY - dragStart.current.my;
-            setPos({
-                x: Math.max(0, dragStart.current.px + dx),
-                y: Math.max(0, dragStart.current.py + dy),
-            });
-        };
-        const onUp = () => { dragging.current = false; };
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
-        return () => {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-        };
-    }, []);
 
     if (!showPlanView || !planImage) return null;
 
-    const panelW = expanded ? 520 : 320;
-    const imgH = expanded ? 400 : 240;
-
     return (
-        <div
-            style={{
-                position: 'absolute',
-                left: pos.x,
-                top: pos.y,
-                width: panelW,
-                zIndex: 200,
-                userSelect: 'none',
-                fontFamily: '"JetBrains Mono", "Consolas", monospace',
-                filter: 'drop-shadow(0 0 20px rgba(0,180,255,0.15))',
-            }}
-        >
-            {/* 外框 */}
+        <>
+            {/* 半透明遮罩（點擊可關閉） */}
+            <div
+                onClick={togglePlanView}
+                style={{
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 190,
+                    background: 'rgba(255,255,255,0.08)',
+                    backdropFilter: 'blur(1px)',
+                }}
+            />
+
+            {/* 主面板：置中，70% */}
             <div
                 style={{
-                    background: 'rgba(6, 12, 22, 0.95)',
-                    border: '1px solid rgba(0, 180, 255, 0.35)',
-                    borderRadius: 2,
-                    overflow: 'visible',
-                    backdropFilter: 'blur(12px)',
-                    position: 'relative',
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 200,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    pointerEvents: 'none',
                 }}
             >
-                {/* 四角裝飾 */}
-                <CornerBracket pos="tl" />
-                <CornerBracket pos="tr" />
-                <CornerBracket pos="bl" />
-                <CornerBracket pos="br" />
-
-                {/* 標題列 */}
                 <div
-                    onMouseDown={onMouseDown}
                     style={{
+                        width: '70%',
+                        height: '70%',
+                        pointerEvents: 'auto',
+                        position: 'relative',
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '8px 12px',
-                        borderBottom: '1px solid rgba(0, 180, 255, 0.2)',
-                        cursor: 'grab',
-                        background: 'rgba(0, 180, 255, 0.04)',
+                        flexDirection: 'column',
                     }}
                 >
-                    {/* 狀態指示燈 */}
-                    <div style={{
-                        width: 6, height: 6, borderRadius: '50%',
-                        background: '#00d4ff',
-                        boxShadow: '0 0 6px #00d4ff',
-                        flexShrink: 0,
-                    }} />
-
-                    <Map size={12} style={{ color: '#00d4ff', flexShrink: 0 }} />
-
-                    <span style={{
-                        flex: 1,
-                        fontSize: 11,
-                        color: '#7dd3fc',
-                        letterSpacing: '0.15em',
-                        textTransform: 'uppercase',
-                        fontWeight: 600,
-                    }}>
-                        FLOOR PLAN
-                    </span>
-
-                    <span style={{
-                        fontSize: 10,
-                        color: 'rgba(0,180,255,0.4)',
-                        letterSpacing: '0.05em',
-                    }}>
-                        {currentScene?.name ?? '—'}
-                    </span>
-
-                    {/* 展開/縮小 */}
-                    <button
-                        data-no-drag="1"
-                        onClick={() => setExpanded(e => !e)}
-                        title={expanded ? '縮小' : '展開'}
+                    {/* 霧化容器：四周 mask 漸層消退 */}
+                    <div
                         style={{
-                            background: 'none', border: 'none', cursor: 'pointer',
-                            color: 'rgba(0,180,255,0.5)', padding: '2px 4px',
-                            display: 'flex', alignItems: 'center',
-                            transition: 'color 0.15s',
+                            flex: 1,
+                            position: 'relative',
+                            overflow: 'hidden',
+                            borderRadius: 16,
+                            background: 'rgba(255,255,255,0.82)',
+                            backdropFilter: 'blur(24px) saturate(1.4)',
+                            WebkitBackdropFilter: 'blur(24px) saturate(1.4)',
+                            boxShadow: `
+                                0 32px 80px rgba(0,0,0,0.12),
+                                0 8px 24px rgba(0,0,0,0.08),
+                                inset 0 1px 0 rgba(255,255,255,0.9)
+                            `,
+                            // 四周霧化遮罩：中央清晰，邊緣消退
+                            WebkitMaskImage: `radial-gradient(
+                                ellipse 88% 88% at 50% 50%,
+                                black 52%,
+                                rgba(0,0,0,0.85) 62%,
+                                rgba(0,0,0,0.5) 74%,
+                                rgba(0,0,0,0.15) 86%,
+                                transparent 100%
+                            )`,
+                            maskImage: `radial-gradient(
+                                ellipse 88% 88% at 50% 50%,
+                                black 52%,
+                                rgba(0,0,0,0.85) 62%,
+                                rgba(0,0,0,0.5) 74%,
+                                rgba(0,0,0,0.15) 86%,
+                                transparent 100%
+                            )`,
                         }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#00d4ff')}
-                        onMouseLeave={e => (e.currentTarget.style.color = 'rgba(0,180,255,0.5)')}
                     >
-                        {expanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
-                    </button>
-
-                    {/* 關閉 */}
-                    <button
-                        data-no-drag="1"
-                        onClick={togglePlanView}
-                        title="關閉平面圖"
-                        style={{
-                            background: 'none', border: 'none', cursor: 'pointer',
-                            color: 'rgba(255,80,80,0.5)', padding: '2px 4px',
-                            display: 'flex', alignItems: 'center',
-                            transition: 'color 0.15s',
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#ff5050')}
-                        onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,80,80,0.5)')}
-                    >
-                        <X size={12} />
-                    </button>
-                </div>
-
-                {/* 平面圖區域 */}
-                <div style={{ padding: '8px', position: 'relative' }}>
-                    {/* 網格背景 */}
-                    <div style={{
-                        position: 'absolute', inset: 8,
-                        backgroundImage: `
-                            linear-gradient(rgba(0,180,255,0.04) 1px, transparent 1px),
-                            linear-gradient(90deg, rgba(0,180,255,0.04) 1px, transparent 1px)
-                        `,
-                        backgroundSize: '20px 20px',
-                        pointerEvents: 'none',
-                    }} />
-
-                    {/* 圖片 + 標記 */}
-                    <div style={{
-                        position: 'relative',
-                        width: '100%',
-                        height: imgH,
-                        overflow: 'hidden',
-                        border: '1px solid rgba(0,180,255,0.15)',
-                        borderRadius: 1,
-                    }}>
+                        {/* 圖片 */}
                         <img
                             src={planImage}
                             alt="平面圖"
@@ -273,47 +145,29 @@ export default function PlanViewFloating() {
                                 height: '100%',
                                 objectFit: 'contain',
                                 display: 'block',
-                                background: 'rgba(0,8,20,0.8)',
-                                filter: 'brightness(0.9) contrast(1.05)',
                             }}
                             draggable={false}
                         />
 
-                        {/* scan line 掃描效果 */}
-                        <div style={{
-                            position: 'absolute', inset: 0,
-                            background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px)',
-                            pointerEvents: 'none',
-                        }} />
-
                         {/* 模型標記 */}
                         {bounds && models.map(model => {
-                            const markerPos = getMarkerPos(model);
-                            const isSelected = model.id === selectedModelId;
-                            const isHovered = model.id === hoveredMarkerId;
-                            const hasSubScene = scenes.some(s => s.parentModelId === model.id);
-                            const active = isSelected || isHovered;
+                            const mp = getMarkerPos(model);
+                            const isSel = model.id === selectedModelId;
+                            const isHov = model.id === hoveredId;
+                            const hasSub = scenes.some(s => s.parentModelId === model.id);
+                            const active = isSel || isHov;
 
                             return (
                                 <button
                                     key={model.id}
-                                    data-no-drag="1"
-                                    onClick={() => {
-                                        selectModel(model.id);
-                                        flyToModel(model.id);
-                                    }}
-                                    onMouseEnter={() => {
-                                        setHoveredMarkerId(model.id);
-                                        setTooltipModel(model);
-                                    }}
-                                    onMouseLeave={() => {
-                                        setHoveredMarkerId(null);
-                                        setTooltipModel(null);
-                                    }}
+                                    onClick={() => { selectModel(model.id); flyToModel(model.id); }}
+                                    onMouseEnter={() => { setHoveredId(model.id); setTooltipModel(model); }}
+                                    onMouseLeave={() => { setHoveredId(null); setTooltipModel(null); }}
+                                    title={model.name}
                                     style={{
                                         position: 'absolute',
-                                        left: `${markerPos.x}%`,
-                                        top: `${markerPos.y}%`,
+                                        left: `${mp.x}%`,
+                                        top: `${mp.y}%`,
                                         transform: 'translate(-50%, -50%)',
                                         background: 'none',
                                         border: 'none',
@@ -322,40 +176,60 @@ export default function PlanViewFloating() {
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        transition: 'transform 0.15s',
+                                        zIndex: 2,
                                     }}
-                                    title={model.name}
                                 >
-                                    {/* 脈衝圓環（選取中） */}
-                                    {isSelected && (
+                                    {/* 選取脈衝環 */}
+                                    {isSel && (
                                         <div style={{
                                             position: 'absolute',
-                                            width: 24, height: 24,
-                                            border: '1px solid rgba(0,212,255,0.6)',
+                                            width: 28, height: 28,
                                             borderRadius: '50%',
-                                            animation: 'facilityPulse 1.5s ease-out infinite',
+                                            border: '1.5px solid rgba(37,99,235,0.5)',
+                                            animation: 'fpulse 1.6s ease-out infinite',
                                         }} />
                                     )}
 
-                                    {hasSubScene ? (
-                                        <DoorOpen
-                                            size={active ? 18 : 14}
-                                            style={{
-                                                color: isSelected ? '#00d4ff' : isHovered ? '#fbbf24' : '#f59e0b',
-                                                filter: active ? 'drop-shadow(0 0 4px currentColor)' : 'none',
-                                                transition: 'all 0.15s',
-                                            }}
-                                        />
-                                    ) : (
-                                        <MapPin
-                                            size={active ? 18 : 14}
-                                            style={{
-                                                color: isSelected ? '#00d4ff' : isHovered ? '#86efac' : '#4ade80',
-                                                filter: active ? 'drop-shadow(0 0 4px currentColor)' : 'none',
-                                                transition: 'all 0.15s',
-                                            }}
-                                        />
-                                    )}
+                                    {/* 標記底圓 */}
+                                    <div style={{
+                                        width: active ? 32 : 26,
+                                        height: active ? 32 : 26,
+                                        borderRadius: '50%',
+                                        background: isSel
+                                            ? 'rgba(37,99,235,0.9)'
+                                            : isHov
+                                                ? 'rgba(37,99,235,0.75)'
+                                                : 'rgba(255,255,255,0.88)',
+                                        border: isSel
+                                            ? '2px solid #1d4ed8'
+                                            : '1.5px solid rgba(37,99,235,0.4)',
+                                        boxShadow: isSel
+                                            ? '0 2px 12px rgba(37,99,235,0.45)'
+                                            : '0 1px 6px rgba(0,0,0,0.12)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'all 0.18s ease',
+                                        position: 'relative',
+                                    }}>
+                                        {hasSub ? (
+                                            <DoorOpen
+                                                size={active ? 15 : 12}
+                                                style={{
+                                                    color: isSel ? 'white' : '#2563eb',
+                                                    transition: 'all 0.18s',
+                                                }}
+                                            />
+                                        ) : (
+                                            <MapPin
+                                                size={active ? 15 : 12}
+                                                style={{
+                                                    color: isSel ? 'white' : '#2563eb',
+                                                    transition: 'all 0.18s',
+                                                }}
+                                            />
+                                        )}
+                                    </div>
                                 </button>
                             );
                         })}
@@ -363,63 +237,122 @@ export default function PlanViewFloating() {
                         {/* Tooltip */}
                         {tooltipModel && (() => {
                             const tp = getMarkerPos(tooltipModel);
-                            const left = tp.x > 60;
+                            const goLeft = tp.x > 65;
                             return (
                                 <div style={{
                                     position: 'absolute',
                                     left: `${tp.x}%`,
                                     top: `${tp.y}%`,
-                                    transform: `translate(${left ? 'calc(-100% - 8px)' : '12px'}, -50%)`,
-                                    background: 'rgba(6,12,22,0.95)',
-                                    border: '1px solid rgba(0,180,255,0.4)',
-                                    padding: '4px 8px',
-                                    borderRadius: 2,
+                                    transform: `translate(${goLeft ? 'calc(-100% - 14px)' : '14px'}, -50%)`,
+                                    background: 'rgba(255,255,255,0.92)',
+                                    border: '1px solid rgba(37,99,235,0.2)',
+                                    padding: '5px 10px',
+                                    borderRadius: 6,
                                     pointerEvents: 'none',
                                     whiteSpace: 'nowrap',
                                     zIndex: 10,
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                    backdropFilter: 'blur(8px)',
                                 }}>
-                                    <div style={{ fontSize: 10, color: '#7dd3fc', letterSpacing: '0.05em' }}>
+                                    <span style={{
+                                        fontSize: 12,
+                                        color: '#1e3a5f',
+                                        fontWeight: 500,
+                                        letterSpacing: '0.02em',
+                                    }}>
                                         {tooltipModel.name}
-                                    </div>
+                                    </span>
                                 </div>
                             );
                         })()}
                     </div>
 
-                    {/* 底部統計列 */}
+                    {/* 標題列：浮在霧化層之上，置中下方 */}
                     <div style={{
+                        position: 'absolute',
+                        top: '7%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 12,
-                        marginTop: 6,
-                        padding: '4px 2px',
+                        gap: 8,
+                        background: 'rgba(255,255,255,0.7)',
+                        backdropFilter: 'blur(16px)',
+                        WebkitBackdropFilter: 'blur(16px)',
+                        border: '1px solid rgba(255,255,255,0.8)',
+                        borderRadius: 24,
+                        padding: '6px 16px',
+                        boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                        pointerEvents: 'auto',
+                        zIndex: 5,
+                        whiteSpace: 'nowrap',
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <div style={{ width: 6, height: 6, background: '#4ade80', borderRadius: '50%', boxShadow: '0 0 4px #4ade80' }} />
-                            <span style={{ fontSize: 10, color: 'rgba(0,180,255,0.5)', letterSpacing: '0.05em' }}>
-                                MODELS {models.length}
+                        <Map size={13} style={{ color: '#2563eb', flexShrink: 0 }} />
+                        <span style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: '#1e3a5f',
+                            letterSpacing: '0.04em',
+                        }}>
+                            {currentScene?.name ?? '平面圖'}
+                        </span>
+                        {models.length > 0 && (
+                            <span style={{
+                                fontSize: 11,
+                                color: '#6b7280',
+                                fontWeight: 400,
+                            }}>
+                                · {models.length} 個模型
                             </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <div style={{ width: 6, height: 6, background: '#f59e0b', borderRadius: '50%', boxShadow: '0 0 4px #f59e0b' }} />
-                            <span style={{ fontSize: 10, color: 'rgba(0,180,255,0.5)', letterSpacing: '0.05em' }}>
-                                SCENES {scenes.filter(s => s.parentModelId !== null).length}
-                            </span>
-                        </div>
-                        <div style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(0,180,255,0.3)', letterSpacing: '0.05em' }}>
-                            DRAG TO MOVE
-                        </div>
+                        )}
                     </div>
+
+                    {/* 關閉按鈕：右上角 */}
+                    <button
+                        onClick={togglePlanView}
+                        title="關閉平面圖"
+                        style={{
+                            position: 'absolute',
+                            top: '7%',
+                            right: '8%',
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            border: '1px solid rgba(255,255,255,0.7)',
+                            background: 'rgba(255,255,255,0.65)',
+                            backdropFilter: 'blur(12px)',
+                            WebkitBackdropFilter: 'blur(12px)',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#374151',
+                            zIndex: 5,
+                            transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => {
+                            e.currentTarget.style.background = 'rgba(239,68,68,0.85)';
+                            e.currentTarget.style.color = 'white';
+                            e.currentTarget.style.borderColor = 'transparent';
+                        }}
+                        onMouseLeave={e => {
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.65)';
+                            e.currentTarget.style.color = '#374151';
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.7)';
+                        }}
+                    >
+                        <X size={14} />
+                    </button>
                 </div>
             </div>
 
-            {/* 脈衝動畫 CSS */}
             <style>{`
-                @keyframes facilityPulse {
-                    0% { transform: scale(1); opacity: 0.8; }
-                    100% { transform: scale(2.5); opacity: 0; }
+                @keyframes fpulse {
+                    0%   { transform: scale(1);   opacity: 0.7; }
+                    100% { transform: scale(2.8); opacity: 0; }
                 }
             `}</style>
-        </div>
+        </>
     );
 }
