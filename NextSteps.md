@@ -6,504 +6,483 @@
 
 ## 📍 目前狀態
 
-**最後更新**: 2026-02-26 (地下水位面 + 衛星影像 DEM 融合)
+**最後更新**: 2026-03-03 (設施導覽模組完成)
+
+**當前分支**: `1-geology-module`
 
 ### 已完成功能
 
-#### 1. 地質模組 (Geology Module)
+#### 1. 地質模組 (Geology Module) — 完整
 
 - ✅ 3D 場景初始化 (React Three Fiber + Three.js)
 - ✅ 800+ 鑽孔 InstancedMesh 高效渲染
 - ✅ LOD (Level of Detail) 自動切換機制
-- ✅ 鑽孔點選互動與詳細資訊面板 (**動態高度優化**)
-- ✅ **Inspector Panel**: 針對鑽孔資料檢視進行 UI 優化，長度可動態延展。
-- ✅ **Borehole Lithology Colors**: 修復 Inspector 中地層顏色未跟隨專案設定的問題。
+- ✅ 鑽孔點選互動與詳細資訊面板 (動態高度優化)
+- ✅ Inspector Panel：地層顏色跟隨專案設定
 - ✅ 圖層控制面板 (開關、透明度)
 - ✅ 剖面切片工具 (Clipping Plane)
 - ✅ 斷層線與位態符號視覺化
 - ✅ 導覽模式 (Guided Tour)
-- ✅ 物理性質圖表更新：顯示 N 值與 RQD
-- ✅ **真實鑽孔資料正式串接**
-  - 取代全域 Mock 資料，改為 project-scoped API 載入
-  - 修正不同專案間資料外洩問題
-  - 更新 Dashboard 與 Sidebar 即時資料統計 (鑽孔數、模型數等)
-- ✅ **地質構造 (斷層面) 完整實作**
-  - Database: `FaultPlane` + `FaultCoordinate` 模型
-  - Backend: 完整 CRUD API 與 CSV 批次匯入
-  - Frontend: `faultPlaneStore` 狀態管理
-  - UI: `FaultPlaneUploadSection` 支援單筆新增、編輯與 CSV 匯入
-  - 3D: `StructureLines.tsx` 整合真實資料與位態渲染
+- ✅ 真實鑽孔資料正式串接 (project-scoped API)
+- ✅ 地質構造 (斷層面) 完整實作 (CRUD + CSV 批次匯入)
 
-#### 2. 地形與著色 (Terrain & Visualization) - 2026-02-12
+#### 2. 地形與著色 (Terrain & Visualization) — 完整
 
-- ✅ **DEM 地形整合**
-  - 支援 GeoTIFF 與 CSV 點雲上傳與處理
-  - 自動生成 16-bit Heightmap 與 Texture
-  - **Clipping Plane 同步**: 自動計算地形與模型邊界，調整 slider 範圍與 TWD97 座標顯示
-- ✅ **Terrain Legend (地形圖例)**
-  - Color Ramp 支援 (Rainbow, Spectral, Viridis...)
-  - 高度反轉 (Reverse) 與 Z-axis 範圍手動/自動設定
-  - **即時渲染**: Custom Shader (`onBeforeCompile`)
-- ✅ **Persistence (設定持久化)**
-  - 瀏覽器自動記憶圖層狀態與圖例設定
-- ✅ **Default View Optimization**
-  - 首次進入僅顯示鑽孔與地形，優化使用者體驗
-- ✅ **航照圖高程控制 (2026-02-12)**
-  - **Z-axis Elevation**: 支援手動調整航照圖高程 (-500m ~ 100m)，解決圖層穿插問題 (`Impact: High`)
-  - **UI 調整**: 將控制項移至獨立行，優化操作體驗
-  - **Persistence**: 整合至 `layerStore` 與 LocalStorage 自動儲存
+- ✅ DEM 地形整合 (GeoTIFF / CSV 點雲 → 16-bit Heightmap)
+- ✅ 衛星影像融合 (reproject/resample 自動對齊)
+- ✅ 三模式紋理切換 (衛星影像 / Hillshade / Color Ramp)
+- ✅ 地形圖例 (Color Ramp, Reverse, Z-range)
+- ✅ 即時渲染：Custom Shader (`onBeforeCompile`)
+- ✅ 航照圖高程控制 (-500m ~ 100m offset)
+- ✅ 設定持久化 (localStorage)
 
-#### 2.5 衛星影像 + DEM 3D 地形融合 (2026-02-26)
+#### 3. 地下水位面 (Water Level Surface) — 完整
 
-- ✅ **衛星影像處理 (`terrain_processor.py`)**
-  - 新增 `process_satellite()` 函數，使用 rasterio 將衛星影像 reproject + resample 至 DEM 範圍
-  - 支援多波段 (RGB) 與單波段影像，自動正規化至 0-255 (2%/98% percentile stretch)
-  - WebGL texture 限制：自動限縮至 4096x4096 以內
-  - 輸出對齊的 JPEG 檔案 (quality=90)
-- ✅ **雙檔上傳 API**
-  - `POST /api/terrain` 支援 `upload.fields` 同時接收 `file` (DEM) 和 `satellite` (衛星影像)
-  - Python 腳本透過 `--satellite` 參數接收衛星影像路徑
-  - DB 儲存 `satelliteTexture` 欄位 (處理後的 JPEG 路徑)
-- ✅ **前端三模式紋理切換**
-  - `TerrainSettings.textureMode`: `'satellite' | 'hillshade' | 'colorRamp'`
-  - `TerrainMesh.tsx`: 動態切換 texture URL，衛星模式跳過 color ramp shader (`uUseColorRamp` uniform)
-  - `TerrainLegendControl.tsx`: 紋理模式按鈕切換 UI (僅有衛星影像時顯示)
-  - `TerrainUploadSection.tsx`: 上傳 modal 新增可選衛星影像檔案選擇，已上傳的 card 顯示「衛星影像」badge
-- ✅ **Prisma Schema**: `Terrain` model 新增 `satelliteTexture String?` 欄位
+- ✅ Python 處理器 (CSV/DAT/TXT → SciPy griddata 插值 → 16-bit heightmap)
+- ✅ 雙模式範圍 (well: user-defined bounds / simulation: auto-detect + 5% padding)
+- ✅ API (POST/GET/DELETE `/api/water-level`)
+- ✅ 3D 渲染：半透明藍色 Displacement Mesh
+- ✅ 圖層控制 + 上傳 UI
 
-#### 2.6 地下水位面 (Water Level Surface) (2026-02-26)
+#### 4. 3D 地質模型 — 完整
 
-- ✅ **Python 處理器 (`water_level_processor.py`)**
-  - 支援 CSV/DAT/TXT 格式讀取，自動辨識 X/Y/Head (水位高程) 欄位
-  - SciPy `griddata` 插值 (linear/nearest/cubic)，輸出 16-bit heightmap PNG
-  - 雙模式範圍決定: `well` (使用者指定 bounds) vs `simulation` (自動偏測 + 5% padding)
-  - 輸出 JSON metadata (網格維度、座標範圍、Z-range、點數)
-- ✅ **API Route (`server/routes/water-level.ts`)**
-  - `POST /api/water-level`: 上傳檔案 + 呼叫 Python 處理 + 存入 DB
-  - `GET /api/water-level`: 取得專案水位面列表
-  - `DELETE /api/water-level/:id`: 刪除水位面 + 清除檔案
-  - 使用共用 `../lib/prisma` singleton instance
-- ✅ **Prisma Schema**: 新增 `WaterLevel` model + `Project.waterLevels` relation
-- ✅ **前端 Store (`waterLevelStore.ts`)**
-  - Zustand store: fetch, upload (with sourceType/method/bounds), delete, setActive
-  - 上傳時自動設定新上傳的水位面為 active
-- ✅ **圖層控制**
-  - `layerStore.ts`: 新增 `waterLevel` LayerType，預設 opacity 0.6
-  - `LayerPanel.tsx`: 新增 💧 icon
-  - **持久化修正**: persist `merge` function 確保新 layer key 不被舊 localStorage 覆蓋
-- ✅ **3D 渲染 (`WaterLevelSurface.tsx`)**
-  - 外層 guard component (return null when no data) + 內層 WaterLevelMesh (useLoader)
-  - PlaneGeometry + displacementMap + 半透明藍色 MeshStandardMaterial
-  - 支援 Clipping Plane、透明度調整、DoubleSide
-- ✅ **上傳 UI (`WaterLevelUploadSection.tsx`)**
-  - Drag-and-drop 上傳區域 (CSV/DAT/TXT)
-  - Modal: 資料類型選擇 (水井觀測/數值模擬)、插值方法、手動範圍 (TWD97)
-  - Card 列表: 顯示名稱、類型 badge、點數、水位範圍、active 狀態
-  - 刪除確認 Modal
-- ✅ **整合**
-  - `GeologyCanvas.tsx`: 加入 `<WaterLevelSurface />` + `fetchWaterLevels`
-  - `DataManagementPage.tsx`: 加入 `<WaterLevelUploadSection />`
-  - `server/index.ts`: 註冊 `/api/water-level` 路由
+- ✅ Tecplot `.dat` 解析 + Solid Body Contour Band Extraction
+- ✅ CSV Voxel → Isosurface Mesh (GLB) via Marching Cubes
+- ✅ 前端 `useGLTF` 載入 + Clipping Plane + 透明度
 
-#### 3. 3D 地質模型 (2026-02-12)
+#### 5. 設施導覽模組 (Facility Navigation) — 2026-03-03 新增，完整
 
-- ✅ **Isosurface Mesh Generation**
-  - CSV Voxel 資料自動轉換為 GLB 格式
-  - Marching Cubes 演算法產生平滑表面
-  - 支援多岩性 (lith_id) 分層著色
-  - TWD97 座標自動轉換為場景座標
-- ✅ **Bounds Storage**: 上傳時自動計算並儲存模型邊界 (Min/Max XYZ)，解決 Clipping Plane 範圍錯誤問題。
-- ✅ **前端 GLB 渲染**
-  - `GeologyTiles.tsx` 使用 `useGLTF` 載入 GLB mesh
-  - 支援 clipping plane 切片
-  - 支援透明度控制
-- ✅ **資料庫 Schema**
-  - `GeologyModel` 新增 `meshUrl`, `meshFormat` 欄位
-  - 轉換狀態追蹤 (`conversionStatus`, `conversionProgress`)
+- ✅ **Prisma Schema**: `FacilityScene` (自我參照巢狀) + `FacilityModel` + `FacilityModelInfo` + `FacilityInfoType` enum
+- ✅ **後端 API** (`server/routes/facility.ts`, 805 行):
+  - 場景 CRUD (含級聯刪除 + 遞迴檔案清理)
+  - 模型 CRUD (multipart GLB 上傳, 100MB 限制)
+  - Rich Content CRUD (TEXT/IMAGE/DOCUMENT/LINK)
+  - 平面圖上傳
+  - 地形上傳 (CSV + 衛星影像 → Python 處理)
+- ✅ **Python 地形** (`server/scripts/facility_terrain_processor.py`): CSV → SciPy griddata → 16-bit heightmap + hillshade
+- ✅ **前端 Store** (`src/stores/facilityStore.ts`): 場景樹、模型管理、sceneStack 導覽歷史、編輯模式
+- ✅ **前端路由**: `/project/:projectCode/facility` → `FacilityPage`
+- ✅ **3D Canvas** (`FacilityCanvas`): R3F Canvas + MapControls + logarithmic depth buffer
+- ✅ **環境** (`FacilityEnvironment`): 三光源 (ambient + directional + hemisphere) + 網格 + fog
+- ✅ **相機控制** (`FacilityCameraController`): 800ms cubic ease-out fly-to 動畫，依場景切換
+- ✅ **模型載入** (`FacilityModels` + `FacilityModelItem`):
+  - `useGLTF` 載入 GLB，clone scene 避免共享衝突
+  - Hover emissive 高亮 (clone material 避免污染)
+  - Click 選取 → InfoPanel；有 childSceneId 則觸發 enterScene
+  - TransformControls 編輯模式 + 500ms debounce 更新後端
+- ✅ **地形** (`FacilityTerrain`): Image+Canvas 解析 16-bit heightmap → PlaneGeometry 頂點置換 + 衛星紋理
+- ✅ **側邊欄** (`FacilitySidebar`): 場景名稱 + BreadcrumbNav + SceneTree + 模型清單 + PlanView
+- ✅ **麵包屑導覽** (`BreadcrumbNav`): sceneStack → 可點擊路徑
+- ✅ **場景樹** (`SceneTree`): 子場景列表 + 圖示 + 子孫計數
+- ✅ **2D 平面圖** (`PlanView`): 圖片 + 模型位置標記 (MapPin / DoorOpen 圖示)
+- ✅ **Rich Content 面板** (`FacilityInfoPanel`): 右側滑入 + TEXT/IMAGE(Lightbox)/DOCUMENT(下載)/LINK + 進入內部按鈕
+- ✅ **工具列** (`FacilityToolbar`): 根場景按鈕 + 編輯模式切換
+- ✅ **Transform 面板** (`TransformInputPanel`): 移動/旋轉/縮放 Tab + XYZ 數值輸入 (R/G/B 色標)
+- ✅ **座標偏移面板** (`CoordShiftPanel`): ShiftX/Y/Z + Rotation 設定 + 套用/重設
+- ✅ **上傳管理** (`FacilityUploadSection`, 835 行): 4 個 Tab (場景管理/模型上傳/資訊編輯/地形上傳)
+- ✅ **導覽連結**: GeologySidebar 新增 Building2 icon 跳轉設施導覽頁面
+- ✅ **TypeScript**: 全模組 0 型別錯誤，共 ~3,900 行新增程式碼
 
-#### 3. 資料管理 (Data Management)
+#### 6. 基礎架構 — 完整
 
-- ✅ 航照圖上傳功能
-- ✅ 地球物理探查資料功能
-- ✅ 3D 地質模型上傳 (CSV → GLB)
-- ✅ 位態 CSV 批次匯入 (含重複檢查)
-- ✅ 斷層面 CSV 批次匯入
-- ✅ **UI 重構 (2026-02-12)**
-  - 全面導入 Lucide Icons 取代 Emoji
-  - 統一按鈕與表單樣式 (SaaS 風格)
-  - **岩性設定 CSV 匯入功能 (2026-02-12)**
-    - 支援批次匯入岩性代碼與顏色定義
-  - 優化 CSS 架構 (集中管理樣式)
-- ✅ **儲存空間管理 (2026-02-23)**
-  - 掃描所有建立時間超過 48 小時，且沒有紀錄在資料庫中的上傳孤兒檔案 (`/api/cleanup/scan`)
-  - 將孤兒檔案移入時間戳記的垃圾桶目錄 (`/api/cleanup/execute`)
-  - 徹底清除垃圾桶檔案 (`/api/cleanup/purge`)
-  - 整合至 `AdminSettingsPage`，提供圖形化管理介面
-
-#### 4. UI/UX
-
-- ✅ **Sidebar 分頁設計**
-  - 圖層頁 (所有使用者): 圖層開關、透明度、地下透視
-  - 設定頁 (admin/engineer): 自動 LOD、背景顏色、圖資管理、資料管理連結
-- ✅ 移除多剖面切割功能 (MultiSectionPanel)
-- ✅ **位態資料表格 (2026-02-10)**: 固定 400px 高度 + Sticky Header
-
-#### 5. 多專案架構 (Multi-Project - 2026-02-07)
-
-- ✅ **資料庫 Schema**: 新增 `Project` model，關聯 GeoModel/Imagery/Geophysics
-- ✅ **API**: 專案 CRUD 介面 (建立、列表、統計、刪除、編輯更新)
-- ✅ **Frontend**:
-  - `ProjectDashboardPage`: 專案專屬入口 (`/project/:code`)
-  - `projectStore`: 全域專案狀態管理
-  - `AppRoutes`: 專案範圍路由 (`/project/:code/*`)
-  - **Dynamic Config**: 支援專案自定義 TWD97 座標原點
-  - **Safeguards**: 專案刪除確認 Modal、Admin 權限刪除防呆
-  - **Cleanup**: 移除全域 `/data` 頁面，強化專案隔離
-  - **Navigation**: 子頁面導覽修正，返回按鈕正確導向專案儀表板
-
-#### 6. 場景環境優化 (2026-02-10)
-
-- ✅ **移除 fog 效果**: 確保所有距離的清晰視覺
-- ✅ **移除冗餘綠色基礎地面**: 避免與 DEM 地形混淆
-- ✅ **重新設計相機重置邏輯 (CameraController.tsx)**:
-  - 策略 1: 使用 `scene.traverse()` 直接掃描所有可見 Mesh 的真實邊界 (最準確)
-  - 策略 2 (Fallback): 依序從 uploadStore → boreholeStore → attitudeStore 取邊界
-  - 排除環境物件 (Grid、大型平面 > 5000m)
-  - 根據 viewport aspect ratio 動態計算最佳觀看距離
-  - 60 度俯視角度，確保模型清晰可見
-- ✅ **修復 GeologyCanvas 未載入地質模型 Bug**:
-  - `GeologyCanvas.tsx` 新增 `fetchGeologyModels()` 呼叫
-  - 之前進入地質展示頁面時 `uploadStore.geologyModels` 永遠是空的
-  - 導致 `GeologyTiles` 無法顯示 GLB mesh、Camera Reset 判斷 `hasModel: false`
-
-#### 8. 指北針與相機控制 (2026-02-23)
-
-- ✅ **動態指北針 (`NorthArrow`)**
-  - `NorthArrowCalculator`: 在 R3F Canvas 內每幀計算相機方位角
-  - `NorthArrowOverlay`: HTML 羅盤顯示，結合專案 `northAngle` 偏移
-  - 支援專案設定的真北方位角偏移 (`projectStore.northAngle`)
-- ✅ **快速視角切換** (Top / +X / +Y / 預設)
-  - UI 按鈕在 `GeologySidebar.tsx`
-  - `cameraStore.setViewPreset()` 觸發切換
-  - `CameraController.getViewAngles()` 計算各視角的球坐標偏移
-- ✅ **重置範圍過濾** (全部 / 僅地質模型 / 僅鑽孔)
-  - `cameraStore.resetTarget` 控制過濾範圍
-  - `CameraController.computeBounds()` 依 scene traverse + store fallback
-- ✅ **Gimbal Lock 修正**
-  - `CameraController.applyCamera()`: TOP 視角手動設定 `camera.up` 朝北，避免 `lookAt` 在正上方時產生錯誤方向
-  - `NorthArrowCalculator`: 當 forward 向量投影到 xz 平面接近零時，fallback 改用 camera up 向量計算方位角
-  - 非 TOP 視角時恢復預設 `camera.up = (0,1,0)`
-
-#### 9. 3D 地質模型高精度渲染管線 (2026-02-24)
-
-- ✅ **Tecplot `.dat` 解析支援**
-  - 在 `geology_mesh_builder.py` 實作直接讀取 Tecplot FETetrahedron ASCII 格式
-  - 自動解析 Node 座標與 Elements (四面體) 連接關係，並將岩性 (lith_id) 儲存於 node data 內
-- ✅ **Solid Body Contour Band Extraction (Tecplot-style)**
-  - 取代原先的 voxel grid resample，改以原始 unstructured grid 直接運算
-  - 首先呼叫 `extract_surface()` 取得完整實體外殼 (Solid Body)
-  - 接著套用 VTK `BandedPolyDataContourFilter` 在表面上沿 lith_id 等值線切割三角形
-  - 產出具有 **Sharp Boundary** (精確岩性交界帶) 的高精度渲染圖 (類似 Tecplot 軟體呈現效果)
-  - 將表面按岩性分拆為多個 submesh，減少前端 shader 負擔
-- ✅ **相機控制限制說明 (`GeologyCanvas.tsx`)**
-  - 目前使用 `@react-three/drei` 的 `MapControls`
-  - 為了保持地理資訊系統 (GIS) 的「鳥瞰」隱喻，防止相機穿透地平線，設定了 `maxPolarAngle={Math.PI / 2.1}` (約 85度)
-  - 若未來需要 360 度環繞模型察看底部，可考慮放寬 `maxPolarAngle` 或切換為原本的 `OrbitControls`
-
-#### 10. 基礎架構
-
-- ✅ 身分驗證 (JWT Token + Refresh)
-- ✅ Docker PostgreSQL 資料庫設定
-- ✅ Prisma 7 ORM 整合
-
-### 資料庫連線資訊
-
-```bash
-Container: llrwd-postgres
-Port: 5433
-Database: llrwddb
-User: postgres
-Password: postgres
-```
+- ✅ JWT 認證 (Access Token + Refresh Token + HTTP-only Cookie)
+- ✅ 多專案架構 (project-scoped 路由與資料隔離)
+- ✅ Docker PostgreSQL (port 5433)
+- ✅ Prisma 7 ORM
+- ✅ 儲存空間清理系統 (孤兒檔案掃描 + 垃圾桶)
+- ✅ 動態指北針 + 快速視角切換 + Gimbal Lock 修正
 
 ---
 
-## 🔜 待辦事項 (Next Steps)
+## 🔜 設施導覽模組 — 後續優化任務 (Next Steps)
 
-### 🚨 高優先級 - 立即需要處理
+以下列出設施導覽模組已完成基礎實作後，需要優化或補充的功能項目。分為「建議優先處理」與「未來擴展」兩大類。
 
-#### 1. 地質模型載入完整性驗證 (Ongoing)
+### 🚨 建議優先處理 — 功能完善與 Bug 修復
 
-**背景**: 已修復 `GeologyCanvas` 未呼叫 `fetchGeologyModels()` 的問題，目前模型可正常顯示。需持續觀察邊界計算準確度。
+#### N1. 首次部署驗證與 DB Migration
 
-- [x] **驗證**: 進入地質頁面後，Console 應顯示 `geologyModelsCount: 1` 而非 0
-- [x] **驗證**: Camera Reset 的 log 應顯示 `hasContent: true` 且 `strategy: 'scene-traverse'`
-- [x] **測試**: 確認 NPP3 模型的 GLB mesh 正確顯示在場景中
-- [x] **測試**: 確認 `activeGeologyModelId` 正確設定
+**目的**: 確保設施模組 schema 正確同步到資料庫，且所有 API 可正常運作。
 
-**相關檔案**:
-
-- `src/components/scene/GeologyCanvas.tsx` (L38: `fetchGeologyModels()` 呼叫)
-- `src/components/scene/GeologyTiles.tsx` (L107: `activeGeologyModelId` 檢查)
-- `src/stores/uploadStore.ts` (L406: `fetchGeologyModels` 實作)
-
-#### 2. uploadStore 自動選取 Active Model
-
-**問題**: `fetchGeologyModels()` 載入模型列表後，可能沒有自動設定 `activeGeologyModelId`。需要確認載入後是否自動選取第一個模型。
-
-- [x] **檢查**: `uploadStore.fetchGeologyModels()` 完成後是否自動 `setActiveGeologyModelId`
-- [x] **如果沒有**: 在 `fetchGeologyModels` 完成時，自動將第一個模型設為 active
-- [x] **如果有但失敗**: 檢查 API response 格式是否與預期一致
+**步驟**:
+1. 執行 `cd server && npx prisma db push` 同步 FacilityScene/FacilityModel/FacilityModelInfo 到資料庫
+2. 執行 `cd server && npx prisma generate` 重新產生 Prisma Client
+3. 啟動後端 (`cd server && npm run dev`)，測試以下 API：
+   - `POST /api/facility/scenes` — 建立根場景
+   - `POST /api/facility/models` — 上傳一個 GLB 模型
+   - `GET /api/facility/scenes?projectId=xxx` — 確認回傳
+   - `GET /api/facility/models?sceneId=xxx` — 確認含 `infos` 欄位
+4. 啟動前端 (`npm run dev`)，進入 `/project/:code/facility` 確認頁面載入無白屏
+5. 進入 DataManagementPage 確認「設施導覽」上傳區塊正常顯示
 
 **相關檔案**:
+- `server/prisma/schema.prisma`
+- `server/routes/facility.ts`
+- `src/pages/FacilityPage.tsx`
 
-- `src/stores/uploadStore.ts`
-- `server/routes/geology-model.ts`
+#### N2. 場景切換動畫完善
 
-#### 3. 相機重置精確度優化 & 快速角度切換 (2026-02-23)
+**目的**: 目前 `enterScene` 切換場景時直接跳轉，缺少設計文件中描述的淡出淡入過渡效果。
 
-- [x] **UI**: 新增「重置範圍」下拉選單 (全部 / 僅地質模型 / 僅鑽孔)
-- [x] **UI**: 新增快速切換視角按鈕 (Top 俯視 / +X / +Y / 預設)
-- [x] **CameraController 重構**: 抽取 `computeBounds` (依 resetTarget 過濾) 與 `applyCamera` (依 ViewPreset 角度)
-- [x] **場景標記**: GeologyTiles / BoreholeInstances / TerrainMesh 加上 `userData.layerType` 標記
-- [x] **指北針整合**: NorthArrow 元件整合專案 northAngle 設定，修正 TOP 視角 Gimbal Lock 問題
-- [ ] **Config**: 讓使用者調整重置時的填充率 (目前 0.7x)
+**需實作**:
+1. 在 `FacilityCanvas.tsx` 中加入一個全螢幕遮罩 overlay（`<div>` 在 Canvas 上方）
+2. 切換場景時：
+   - 相機 fly-to 被點擊模型位置 (800ms)
+   - 畫面淡出 (opacity 0, 300ms)
+   - 卸載舊模型、載入新模型
+   - 畫面淡入 (opacity 1, 300ms)
+   - 相機 fly-to 子場景預設視角
+3. `facilityStore` 可能需要新增 `isTransitioning` 狀態
 
 **相關檔案**:
+- `src/components/facility/FacilityCanvas.tsx`
+- `src/components/facility/FacilityCameraController.tsx`
+- `src/stores/facilityStore.ts`
 
-- `src/components/scene/CameraController.tsx`
-- `src/stores/cameraStore.ts`
-- `src/components/layout/GeologySidebar.tsx`
+**設計文件**: `docs/plans/2026-03-02-facility-module-design.md` 第 173-179 行
 
-#### 4. 斷層面功能完善 （這一點可以暫時略過，目前目前功能符合需求）
+#### N3. 自動俯視截圖功能
 
-- [ ] **3D 視覺增強**: 增加斷層名稱標籤 (Html Label) 與傾向指示箭頭
-- [ ] **批次匯入驗證**: 使用實際大量資料測試 CSV 解析與匯入效能
-- [ ] **UI 優化**: 在地質分頁點擊斷層後，側邊欄自動顯示斷層詳細參數
+**目的**: 設計文件中要求支援自動產生場景的 2D 俯視截圖 (autoPlanImageUrl)，目前 FacilityToolbar 的截圖按鈕是 disabled 狀態。
+
+**需實作**:
+1. 截圖邏輯需要在 R3F Canvas 內部執行（需 `useThree` 取得 `gl`）
+2. 建立一個 `useScreenshot` hook，或將截圖功能放在一個 Canvas 內的元件中
+3. 切換到 orthographic camera → 設定俯視角度 → `gl.domElement.toDataURL()` → 上傳 `PUT /api/facility/scenes/:id/auto-plan-image`
+4. FacilityToolbar 的截圖按鈕改為 enabled，點擊時觸發截圖
+
+**相關檔案**:
+- `src/components/facility/FacilityToolbar.tsx` — 截圖按鈕目前是 disabled
+- `src/components/facility/FacilityCanvas.tsx` — 需要在 Canvas 內新增截圖元件
+- `server/routes/facility.ts` — 已有 `PUT /api/facility/scenes/:id/auto-plan-image` 端點
+
+#### N4. 模型 Outline 高亮替代方案
+
+**目的**: 目前使用 emissive 方式做模型 hover 高亮，但效果不夠明顯。設計文件提到可使用 `@react-three/postprocessing` 的 Outline 效果。
+
+**可選方案**:
+- A. 維持 emissive（目前），調高 `emissiveIntensity` 到 0.5
+- B. 使用 `@react-three/postprocessing` 的 `Outline` pass（效果更佳但有 GPU 開銷）
+- C. 使用自訂 shader 的 `outlinePass`
+
+**相關檔案**:
+- `src/components/facility/FacilityModelItem.tsx` — hover 高亮邏輯 (emissive)
+- `src/components/facility/FacilityCanvas.tsx` — 若用 postprocessing 需加 EffectComposer
+
+#### N5. lucide-react 型別宣告修復
+
+**目的**: 目前所有使用 `lucide-react` 的元件都有 `TS7016: Could not find a declaration file for module 'lucide-react'` 警告。雖不影響執行，但會干擾 TypeScript 檢查。
+
+**修復方式**:
+1. 確認 `@types/lucide-react` 是否存在（可能不需要，lucide-react 應自帶型別）
+2. 檢查 `package.json` 中 `lucide-react` 版本，可能需要更新
+3. 或在 `src/types/` 新增 `lucide-react.d.ts` 宣告檔
+
+**影響範圍**: BreadcrumbNav, FacilitySidebar, SceneTree, PlanView, FacilityInfoPanel, FacilityToolbar, TransformInputPanel, CoordShiftPanel, FacilityUploadSection
+
+### 🔧 中優先級 — 功能增強
+
+#### N6. 模型載入錯誤處理
+
+**目的**: 當 GLB 檔案損壞或 URL 失效時，`useGLTF` 會拋出錯誤導致白屏。需要 Error Boundary。
+
+**需實作**:
+1. 在 `FacilityModelItem` 外層包裹 React Error Boundary
+2. 或使用 `useGLTF` 的 `onError` 回呼（如果支援）
+3. 顯示友善的錯誤提示（如紅色佔位方塊 + 模型名稱）
+
+**相關檔案**:
+- `src/components/facility/FacilityModelItem.tsx`
+- `src/components/facility/FacilityModels.tsx`
+
+#### N7. FacilityUploadSection — 上傳後自動刷新
+
+**目的**: 上傳模型或建立場景後，若使用者同時開著 FacilityPage，3D 場景不會自動更新。
+
+**需實作**:
+1. 在 `facilityStore` 中暴露 `refreshCurrentScene()` action
+2. 或使用 polling / WebSocket 偵測資料變更
+3. 簡單方案：在 FacilityPage 加入 `visibilitychange` 事件監聽，tab 切換回來時自動 refetch
+
+#### N8. 大型模型載入進度
+
+**目的**: 大型 GLB (>50MB) 載入時間較長，使用者無法得知載入進度。
+
+**需實作**:
+1. `useGLTF` 自帶進度功能有限，改用 `useLoader(GLTFLoader, url, undefined, onProgress)` 追蹤
+2. 或使用 `@react-three/drei` 的 `useProgress` 搭配 `<Html>` 顯示載入百分比
+
+#### N9. PlanView 標記位置精確度
+
+**目的**: 目前 PlanView 用 `terrainBounds` 或模型 bounding box 計算標記位置，但未考慮 `coordShift`。若地形有偏移，標記位置會不準確。
+
+**需修正**:
+- 在 `getMarkerPosition` 計算中，先將模型 position 減去 coordShift，再映射到圖片百分比
+
+**相關檔案**:
+- `src/components/facility/PlanView.tsx`
+
+#### N10. 地形座標自動對齊
+
+**目的**: 設計文件提到「自動對齊：計算地形與模型 bounding box 中心差值」，目前只有手動 coordShift。
+
+**需實作**:
+1. 在 CoordShiftPanel 新增「自動對齊」按鈕
+2. 計算所有模型的 bounding box 中心
+3. 計算地形的 bounds 中心
+4. 差值自動填入 coordShiftX/Y/Z
+
+**相關檔案**:
+- `src/components/facility/CoordShiftPanel.tsx`
+
+### 🌟 低優先級 — 未來擴展
+
+#### N11. 場景間複製/移動模型
+
+允許使用者將模型從一個場景拖拉到另一個場景，或複製到其他場景。
+
+#### N12. 多人即時狀態同步
+
+使用 WebSocket 實現多使用者同時瀏覽時的游標位置和選取狀態同步。（設計文件已列為 YAGNI，但可視需求開放）
+
+#### N13. 模型格式轉換
+
+支援 OBJ、FBX、STL 等格式上傳並自動轉換為 GLB。（設計文件已列為 YAGNI）
+
+#### N14. LOD 機制
+
+大型場景中，遠距模型用低精度版本替換以提升效能。（設計文件已列為 YAGNI）
+
+---
+
+## 🔜 地質模組 — 後續優化任務
 
 ### 中優先級
 
-#### 5. 資料管理 UX 優化
+#### G1. 岩性系統整合
 
-- [x] **UI**: 上傳進度條 (Progress Bar) 取代 spinner — 使用 XMLHttpRequest 追蹤真實上傳進度
-- [x] **Feature**: 地質模型版本切換 (Version Control) — 已有 activate/deactivate UI
-- [x] **Feature**: 地球物理探查詳細資料 Modal 新增「在 3D 場景中定位」按鈕 — flyTo cameraStore + 導航
-- [x] **UI**: 各個 Upload Section 統一固定表格高度 + Sticky Header (BH/Attitude/FaultPlane 全部完成)
+- [ ] 確認 3D 地質模型渲染使用專案級 `LithologyDefinition` 顏色
+- [ ] 岩性顏色編輯後，3D 場景即時更新
+- [ ] CSV Voxel `lith_id` 與 `LithologyDefinition` ID 對應
 
-#### 6. 岩性系統整合
+#### G2. 斷層面功能完善
 
-- [ ] **驗證**: 確認 3D 地質模型渲染使用專案級的 `LithologyDefinition` 顏色
-- [ ] **UI**: 岩性顏色編輯後，3D 場景即時更新顏色
-- [ ] **Data**: CSV Voxel 中的 `lith_id` 必須與 `LithologyDefinition` 的 ID 對應
+- [ ] 3D 視覺增強：增加斷層名稱標籤 (Html Label) 與傾向指示箭頭
+- [ ] 批次匯入效能測試
+- [ ] UI：點擊斷層後側邊欄自動顯示詳細參數
 
 ### 低優先級
 
-#### 7. 效能優化
+#### G3. 效能優化
 
-- [ ] 大型 GLB 檔案的 LOD 支援
-- [ ] 縮圖 Lazy Loading
-- [ ] `StrikeDipSymbol` InstancedMesh 化 (目前 100 個個別 mesh 物件)
-- [ ] **Terrain LOD**: 針對超大範圍地形實作 Chunk LOD 機制
-- [ ] **Terrain Interaction**: 實作 Raycasting 取得地形上一點的座標與高度
+- [ ] 大型 GLB 的 LOD 支援
+- [ ] `StrikeDipSymbol` InstancedMesh 化（目前 100 個個別 mesh）
+- [ ] Terrain LOD: 超大範圍地形 Chunk LOD
+- [ ] Terrain Interaction: Raycasting 取得地形座標與高度
 
-#### 8. 新模組開發
+#### G4. 地下水位面後續優化
 
-- [ ] 工程設計模組 (Engineering Design - BIM/SketchUp 整合)
-- [ ] 模擬模組 (Simulation - 污染物傳輸、熱圖視覺化)
-- [ ] 情境分析 (Scenario Analysis - 豐水期 vs 枯水期)
+- [ ] 多層水位面：同時顯示不同含水層
+- [ ] 時間序列：時間滑桿動態切換
+- [ ] 等值線 (Contour)
+- [ ] 色階渲染 (Color Ramp) 取代純藍色
+- [ ] 水位標籤：3D 場景顯示觀測井數值
+- [ ] 地形交叉分析：水位面與地形面差異 (地下水埋深)
 
-#### 9. 地下水位面後續優化
+#### G5. 新模組開發
 
-- [ ] **多層水位面**: 支援同時顯示多個水位面 (例如不同含水層)，每個用不同顏色區分
-- [ ] **時間序列**: 支援上傳不同時間點的水位資料，提供時間滑桿動態切換
-- [ ] **等值線 (Contour)**: 在水位面上顯示水位高程等值線
-- [ ] **色階渲染**: 支援 Color Ramp 著色 (類似地形圖例)，取代純藍色
-- [ ] **水位標籤**: 在 3D 場景中顯示各觀測井的水位數值標籤
-- [ ] **地形交叉分析**: 水位面與地形面的差異計算 (地下水埋深)
+- [ ] 工程設計模組 (Engineering Design — BIM/SketchUp 整合)
+- [ ] 模擬模組 (Simulation — 污染物傳輸、熱圖視覺化)
+- [ ] 情境分析 (Scenario Analysis — 豐水期 vs 枯水期)
 
 ---
 
 ## 📁 關鍵檔案位置
 
-### 後端 - API Routes
+### 後端 — API Routes
 
 | 檔案 | 說明 |
 |:---|:---|
+| `server/routes/facility.ts` | **設施導覽 API** (場景/模型/Rich Content/平面圖/地形) |
 | `server/routes/auth.ts` | 認證 API |
 | `server/routes/project.ts` | 專案管理 API |
 | `server/routes/borehole.ts` | 鑽孔 API |
 | `server/routes/attitude.ts` | 位態 API |
 | `server/routes/faultPlane.ts` | 斷層面 API |
-| `server/routes/geology-model.ts` | 地質模型 API (含 CSV→GLB 轉換) |
+| `server/routes/geology-model.ts` | 地質模型 API (含 CSV/Tecplot → GLB 轉換) |
 | `server/routes/upload.ts` | 航照圖 & 地球物理探查 API |
 | `server/routes/lithology.ts` | 岩性定義 API |
-| `server/routes/water-level.ts` | 地下水位面 API (POST/GET/DELETE) |
+| `server/routes/terrain.ts` | DEM 地形 API |
+| `server/routes/water-level.ts` | 地下水位面 API |
+| `server/routes/cleanup.ts` | 儲存空間清理 API |
 
-### 後端 - 服務 & 設定
+### 後端 — Python 處理腳本
 
 | 檔案 | 說明 |
 |:---|:---|
-| `server/services/isosurface-generator.ts` | Marching Cubes 演算法 CSV → GLB |
+| `server/scripts/facility_terrain_processor.py` | **設施地形** CSV → heightmap + hillshade |
+| `server/scripts/geology_mesh_builder.py` | Voxel CSV / Tecplot → GLB |
+| `server/scripts/terrain_processor.py` | DEM + 衛星影像處理 |
+| `server/scripts/water_level_processor.py` | 地下水位插值 |
+
+### 後端 — 服務 & 設定
+
+| 檔案 | 說明 |
+|:---|:---|
 | `server/prisma/schema.prisma` | 資料庫 Schema (所有 Model) |
 | `server/prisma.config.ts` | Prisma 7 設定 (datasource URL) |
 | `server/middleware/auth.ts` | JWT 認證中介件 |
+| `server/lib/prisma.ts` | Prisma Client singleton |
 | `server/.env` | 環境變數 (DATABASE_URL, JWT_SECRET) |
 
-### 前端 - Store
+### 前端 — Store
 
 | 檔案 | 說明 |
 |:---|:---|
-| `src/stores/authStore.ts` | 認證狀態 (JWT Token 管理) |
+| `src/stores/facilityStore.ts` | **設施導覽** (場景樹/模型管理/sceneStack/編輯模式) |
+| `src/stores/authStore.ts` | 認證狀態 (JWT Token) |
 | `src/stores/projectStore.ts` | 專案管理 (active project, TWD97 origin) |
-| `src/stores/boreholeStore.ts` | 鑽孔資料 (fetch, CRUD, batch import) |
-| `src/stores/attitudeStore.ts` | 位態資料 (CRUD, batch import, 重複檢查) |
-| `src/stores/faultPlaneStore.ts` | 斷層面資料 (CRUD, batch import) |
-| `src/stores/uploadStore.ts` | 上傳管理 (航照/地物/地質模型, activeGeologyModelId) |
-| `src/stores/lithologyStore.ts` | 岩性定義 (專案級顏色配置) |
-| `src/stores/layerStore.ts` | 圖層控制 (可見性、透明度、textureMode) |
-| `src/stores/viewerStore.ts` | 3D 檢視器 (LOD, Clipping Plane, 背景色) |
-| `src/stores/terrainStore.ts` | 地形資料 (fetch, upload, delete, satelliteTexture) |
-| `src/stores/waterLevelStore.ts` | 地下水位面 (fetch, upload, delete, active) |
-| `src/stores/cameraStore.ts` | 相機控制 (reset trigger, target center, viewPreset, resetTarget) |
+| `src/stores/boreholeStore.ts` | 鑽孔資料 |
+| `src/stores/attitudeStore.ts` | 位態資料 |
+| `src/stores/faultPlaneStore.ts` | 斷層面資料 |
+| `src/stores/uploadStore.ts` | 上傳管理 (航照/地物/地質模型) |
+| `src/stores/lithologyStore.ts` | 岩性定義 |
+| `src/stores/layerStore.ts` | 圖層控制 (可見性、透明度) |
+| `src/stores/viewerStore.ts` | 3D 檢視器 |
+| `src/stores/terrainStore.ts` | 地形資料 |
+| `src/stores/waterLevelStore.ts` | 地下水位面 |
+| `src/stores/cameraStore.ts` | 相機控制 |
 
-### 前端 - 3D 場景元件
+### 前端 — 設施導覽元件 (`src/components/facility/`)
 
-| 檔案 | 說明 |
-|:---|:---|
-| `src/components/scene/GeologyCanvas.tsx` | 3D Canvas 主容器 (初始化所有 store fetch) |
-| `src/components/scene/CameraController.tsx` | 相機重置邏輯 (Scene Traverse + Fallback) |
-| `src/components/scene/BoreholeInstances.tsx` | 鑽孔 InstancedMesh 渲染 |
-| `src/components/scene/GeologyTiles.tsx` | GLB 地質模型載入 |
-| `src/components/scene/SceneEnvironment.tsx` | 環境設定 (燈光/網格，已移除 fog 和基礎地面) |
-| `src/components/scene/StrikeDipSymbol.tsx` | 位態符號渲染 (圓盤 + 傾向箭頭) |
-| `src/components/scene/StructureLines.tsx` | 斷層面 3D 渲染 |
-| `src/components/scene/TerrainMesh.tsx` | DEM 地形渲染 (衛星/山影/色階三模式) |
-| `src/components/scene/GeophysicsPlane.tsx` | 地球物理探查 3D 剖面 |
-| `src/components/scene/WaterLevelSurface.tsx` | 地下水位面 3D 渲染 (半透明 Displacement Mesh) |
+| 檔案 | 行數 | 說明 |
+|:---|:---|:---|
+| `FacilityCanvas.tsx` | 70 | R3F Canvas 容器 + MapControls + Loading overlay |
+| `FacilityEnvironment.tsx` | 34 | 三光源 + fog + gridHelper |
+| `FacilityCameraController.tsx` | 50 | 800ms cubic ease-out fly-to 動畫 |
+| `FacilityModels.tsx` | 24 | 模型群管理 (map models → FacilityModelItem) |
+| `FacilityModelItem.tsx` | 172 | 單一 GLB: useGLTF + emissive hover + click + TransformControls |
+| `FacilityTerrain.tsx` | 183 | 16-bit heightmap → PlaneGeometry 頂點置換 + 衛星紋理 |
+| `FacilitySidebar.tsx` | 148 | 側邊欄整合 (場景名稱 + 子元件) |
+| `BreadcrumbNav.tsx` | 91 | 麵包屑導覽 (sceneStack → 可點擊路徑) |
+| `SceneTree.tsx` | 70 | 子場景樹狀清單 |
+| `PlanView.tsx` | 140 | 2D 平面圖 + 可點擊模型標記 |
+| `FacilityInfoPanel.tsx` | 144 | 右側滑入 Rich Content 面板 + Lightbox |
+| `FacilityToolbar.tsx` | 148 | 工具列 (根場景/編輯模式/截圖) |
+| `TransformInputPanel.tsx` | 183 | 移動/旋轉/縮放精確數值輸入 |
+| `CoordShiftPanel.tsx` | 288 | 座標偏移設定 (ShiftX/Y/Z + Rotation) |
 
-### 前端 - Overlay 元件
-
-| 檔案 | 說明 |
-|:---|:---|
-| `src/components/overlay/NorthArrow.tsx` | 動態指北針 (Calculator + Overlay + Hook) |
-| `src/components/overlay/LayerPanel.tsx` | 圖層控制面板 |
-| `src/components/overlay/ClippingTool.tsx` | 剖面切片工具 |
-| `src/components/overlay/BoreholeDetail.tsx` | 鑽孔詳細資訊面板 |
-
-### 前端 - 資料管理元件
+### 前端 — 地質 3D 場景元件 (`src/components/scene/`)
 
 | 檔案 | 說明 |
 |:---|:---|
-| `src/components/data/BoreholeUploadSection.tsx` | 鑽孔資料上傳 (含岩性顏色整合) |
-| `src/components/data/AttitudeUploadSection.tsx` | 位態資料管理 (固定高度表格) |
-| `src/components/data/FaultPlaneUploadSection.tsx` | 斷層面資料管理 |
-| `src/components/data/LithologySection.tsx` | 岩性定義管理 |
-| `src/components/data/TerrainUploadSection.tsx` | DEM + 衛星影像上傳 |
-| `src/components/data/WaterLevelUploadSection.tsx` | 地下水位面資料上傳 |
+| `GeologyCanvas.tsx` | 3D Canvas 主容器 |
+| `CameraController.tsx` | 相機重置邏輯 (Scene Traverse + Fallback) |
+| `BoreholeInstances.tsx` | 鑽孔 InstancedMesh |
+| `GeologyTiles.tsx` | GLB 地質模型 |
+| `SceneEnvironment.tsx` | 環境設定 |
+| `TerrainMesh.tsx` | DEM 地形 (三模式紋理) |
+| `WaterLevelSurface.tsx` | 地下水位面 |
+| `StrikeDipSymbol.tsx` | 位態符號 |
+| `StructureLines.tsx` | 斷層面 3D |
+| `GeophysicsPlane.tsx` | 地球物理探查剖面 |
 
-### 工具函式
-
-| 檔案 | 說明 |
-|:---|:---|
-| `src/utils/coordinates.ts` | TWD97 ↔ Three.js 座標轉換 (含 origin 設定) |
-| `src/utils/lod.ts` | LOD 等級計算 |
-| `src/config/three.ts` | Three.js 全域設定 (FOV, 近遠裁切, 渲染器) |
-
-### 後端 - 地形處理
+### 前端 — 資料管理元件 (`src/components/data/`)
 
 | 檔案 | 說明 |
 |:---|:---|
-| `server/scripts/terrain_processor.py` | DEM 處理器 (heightmap + hillshade + 衛星影像對齊) |
-| `server/scripts/water_level_processor.py` | 地下水位插值處理 (CSV/DAT/TXT → 16-bit heightmap) |
-| `server/routes/terrain.ts` | Terrain API (雙檔上傳 DEM+satellite) |
-| `server/routes/water-level.ts` | Water Level API (上傳/列表/刪除) |
+| `FacilityUploadSection.tsx` | **設施上傳管理** (4 Tab, 835 行) |
+| `BoreholeUploadSection.tsx` | 鑽孔資料上傳 |
+| `AttitudeUploadSection.tsx` | 位態資料管理 |
+| `FaultPlaneUploadSection.tsx` | 斷層面資料管理 |
+| `LithologySection.tsx` | 岩性定義管理 |
+| `TerrainUploadSection.tsx` | DEM + 衛星影像上傳 |
+| `WaterLevelUploadSection.tsx` | 地下水位面上傳 |
+
+### 前端 — 型別定義 (`src/types/`)
+
+| 檔案 | 說明 |
+|:---|:---|
+| `facility.ts` | `FacilityScene`, `FacilityModel`, `FacilityModelInfo`, `Transform` |
 
 ---
 
 ## ⚠️ 已知問題
 
-1. **座標轉換已修正**
-   - TWD97_ORIGIN 已同步前後端為 (224000, 2429000)
-   - 專案可自定義原點，覆蓋全域預設值
-
-2. **Prisma 7 變更**
-   - `schema.prisma` 中不再支援 `url = env("DATABASE_URL")`
-   - 需透過 `prisma.config.ts` 的 `datasource.url` 設定
-
-3. **Docker PostgreSQL**
-   - 使用 Port 5433 避免與系統預設 PostgreSQL (5432) 衝突
-   - 每次重新開機需執行 `docker start llrwd-postgres`
-
-4. **GeologyCanvas 載入順序**
-   - `fetchGeologyModels()` 已加入 GeologyCanvas 初始化流程 (2026-02-10 修復)
-   - 需確認 `activeGeologyModelId` 在載入後自動設定
-
-5. **StrikeDipSymbol 效能**
-   - 目前 100 個位態各自建立獨立 mesh 物件
-   - 未來應考慮 InstancedMesh 化以提升效能
+1. **lucide-react 型別宣告**: 所有使用 `lucide-react` 的元件有 `TS7016` 警告（不影響執行）
+2. **設施截圖按鈕 disabled**: FacilityToolbar 的截圖功能尚未實作（需 Canvas 內元件）
+3. **Prisma 7 設定**: `schema.prisma` 的 `datasource` 需透過 `prisma.config.ts` 設定
+4. **Docker PostgreSQL**: 使用 Port 5433，每次重開機需 `docker start llrwd-postgres`
+5. **StrikeDipSymbol 效能**: 100 個位態各自獨立 mesh，未來應 InstancedMesh 化
+6. **設施模型 Suspense**: `useGLTF` 載入失敗時缺少 Error Boundary
 
 ---
 
 ## 🔧 開發指令速查
 
 ```bash
-# 後端
-cd server
-npm run dev                    # 啟動 (nodemon)
-npx prisma db push             # 同步 Schema
-npx prisma generate            # 產生 Client
-npx prisma studio              # 開啟資料庫 GUI
-
 # 前端
-npm run dev                    # 開發伺服器
-npm run build                  # 生產建置
+npm run dev                    # Vite dev server on :5173
+npm run build                  # tsc && vite build
 npx tsc --noEmit               # TypeScript 類型檢查
 
+# 後端
+cd server
+npm run dev                    # nodemon + ts-node on :3001
+npx prisma db push             # 同步 Schema 到 DB
+npx prisma generate            # 產生 Prisma Client
+npx prisma studio              # DB admin GUI
+
 # Docker 資料庫
-docker start llrwd-postgres    # 啟動
+docker start llrwd-postgres    # 啟動 (port 5433)
 docker stop llrwd-postgres     # 停止
-docker logs llrwd-postgres     # 查看 logs
+
+# Python 環境
+source server/venv/bin/activate
+pip install pyvista numpy trimesh rasterio scipy Pillow pandas
 ```
+
+---
+
+## 📚 設計文件參考
+
+| 文件 | 說明 |
+|:---|:---|
+| `docs/plans/2026-03-02-facility-module-design.md` | 設施導覽模組完整設計文件（已核准） |
+| `docs/plans/2026-03-02-facility-module-plan.md` | 設施導覽模組 17 步驟實作計畫 |
+| `CLAUDE.md` | AI Agent 開發指引 |
 
 ---
 
 ## 🔧 Debug 技巧
 
+### 設施導覽頁面白屏
+
+1. 開 Console 檢查是否有 `useGLTF` 載入錯誤
+2. 確認 `facilityStore.scenes` 是否為空（API 回傳問題）
+3. 確認路由 `/project/:code/facility` 是否正確匹配
+4. 檢查 `server/uploads/facility/` 目錄是否存在
+
+### 設施模型不顯示
+
+1. 確認 `facilityStore.models` 有資料
+2. 確認 `modelUrl` 路徑正確且 GLB 檔案存在
+3. 檢查 Network tab 確認 GLB 200 OK
+4. 確認模型 position/scale 是否合理（不是 0,0,0 且 scale 不是 0）
+
+### 設施地形不顯示
+
+1. 確認 `currentScene.terrainHeightmapUrl` 有值
+2. 確認 `currentScene.terrainBounds` 有值且 minZ ≠ maxZ
+3. 確認 heightmap PNG 檔案可正常載入
+4. 檢查 `coordShiftX/Y/Z` 是否讓地形偏移到可見範圍外
+
 ### 3D 地質模型不顯示
 
-1. 檢查 Console 是否有 `🌍 GeologyTiles Debug:` 輸出
-   - 確認 `geologyModelsCount` > 0 (若為 0 表示 fetchGeologyModels 未被呼叫)
-   - 確認 `activeGeologyModelId` 有值
-   - 確認 `meshUrl` 有值
-   - 確認 `conversionStatus` 為 `completed`
-
-2. 檢查 Console 是否有 `📦 GLB Mesh loaded:` 輸出
-   - 確認 `boundingBox` 的 `center` 接近原點 (0, 0, 0)
-   - 如果中心點很遠 (如 262000, 2711000)，表示座標轉換有問題
-
-3. 檢查 Network tab 確認 GLB 檔案成功載入 (200 OK)
-
-4. 模型不可見時：
-   - 檢查圖層面板的 `geology3d` 圖層是否開啟
-   - 點擊 "🎯 重置相機位置" 按鈕
-
-### 相機重置不如預期
-
-1. 檢查 Console 的 `🎯 Camera Reset:` log
-   - `hasContent`: 應為 `true`
-   - `strategy`: 應為 `'scene-traverse'` (如果場景有可見物件)
-   - `maxHorizontal`: 模型的水平最大維度 (若過大可能是 DEM 地形被計入)
-   - `distance`: 相機距離 (應在 50-5000 範圍)
-
-2. 如果 `hasContent: false`:
-   - 確認場景中有載入可見的 mesh 物件
-   - 確認 SceneEnvironment 的 Grid 或其他環境物件未被誤判為資料物件
-
-### 位態/斷層不顯示
-
-1. 確認圖層面板的對應圖層已開啟
-2. 檢查 Console 的 `[StrikeDipSymbol]` log，確認 attitude 數量和座標
-3. 確認 TWD97 座標在合理範圍 (x > 10000, y > 10000)
+1. 檢查 Console 是否有 `geologyModelsCount > 0`
+2. 確認 `activeGeologyModelId` 有值
+3. 確認 `meshUrl` 有值且 `conversionStatus` 為 `completed`
+4. 檢查 GLB 載入 `boundingBox center` 是否接近原點
 
 ---
 
