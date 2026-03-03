@@ -32,6 +32,20 @@ export const TerrainLegendControl: React.FC = () => {
         }
     }, [hasSatellite]);
 
+    // 無衛星影像時，若仍在衛星模式則重置為色階
+    useEffect(() => {
+        if (!hasSatellite && terrainSettings.textureMode === 'satellite') {
+            setTerrainSettings({ textureMode: 'colorRamp' });
+        }
+    }, [hasSatellite, terrainSettings.textureMode]);
+
+    // 可用的紋理模式（無衛星時不顯示衛星選項）
+    const textureModes = [
+        ...(hasSatellite ? [{ value: 'satellite', label: '衛星影像' }] : []),
+        { value: 'hillshade', label: '山影圖' },
+        { value: 'colorRamp', label: '色階' },
+    ];
+
     return (
         <div style={{
             marginTop: '12px',
@@ -61,40 +75,34 @@ export const TerrainLegendControl: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {/* Texture Mode Selector (when satellite texture available) */}
-                {hasSatellite && (
-                    <div>
-                        <label style={{ display: 'block', fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
-                            紋理模式
-                        </label>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                            {[
-                                { value: 'satellite', label: '衛星影像' },
-                                { value: 'hillshade', label: '山影圖' },
-                                { value: 'colorRamp', label: '色階' },
-                            ].map(opt => (
-                                <button
-                                    key={opt.value}
-                                    onClick={() => setTerrainSettings({ textureMode: opt.value as any })}
-                                    style={{
-                                        flex: 1,
-                                        padding: '4px 8px',
-                                        fontSize: '11px',
-                                        border: '1px solid',
-                                        borderColor: terrainSettings.textureMode === opt.value ? '#3b82f6' : '#d1d5db',
-                                        borderRadius: '4px',
-                                        background: terrainSettings.textureMode === opt.value ? '#eff6ff' : 'white',
-                                        color: terrainSettings.textureMode === opt.value ? '#1d4ed8' : '#374151',
-                                        fontWeight: terrainSettings.textureMode === opt.value ? 600 : 400,
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    {opt.label}
-                                </button>
-                            ))}
-                        </div>
+                {/* Texture Mode Selector (always visible) */}
+                <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
+                        紋理模式
+                    </label>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                        {textureModes.map(opt => (
+                            <button
+                                key={opt.value}
+                                onClick={() => setTerrainSettings({ textureMode: opt.value as any })}
+                                style={{
+                                    flex: 1,
+                                    padding: '4px 8px',
+                                    fontSize: '11px',
+                                    border: '1px solid',
+                                    borderColor: terrainSettings.textureMode === opt.value ? '#3b82f6' : '#d1d5db',
+                                    borderRadius: '4px',
+                                    background: terrainSettings.textureMode === opt.value ? '#eff6ff' : 'white',
+                                    color: terrainSettings.textureMode === opt.value ? '#1d4ed8' : '#374151',
+                                    fontWeight: terrainSettings.textureMode === opt.value ? 600 : 400,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
                     </div>
-                )}
+                </div>
 
                 {/* Color Ramp Selector (only in colorRamp mode) */}
                 {terrainSettings.textureMode === 'colorRamp' && (
