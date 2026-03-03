@@ -3,8 +3,9 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
+import { spawn } from 'child_process';
 import prisma from '../lib/prisma';
-import { FacilityInfoType } from '@prisma/client';
+import { FacilityInfoType, Prisma } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -634,6 +635,169 @@ router.put('/scenes/:id/auto-plan-image', authenticate, async (req: Request, res
         res.json(scene);
     } catch (error) {
         res.status(500).json({ error: '儲存自動平面圖失敗' });
+    }
+});
+
+// ===== Scene Terrain =====
+const terrainStorage = multer.diskStorage({
+    destination: (req, _file, cb) => {
+        const sceneId = req.params.id as string;
+        const dir = path.join(TERRAIN_DIR, sceneId);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (file.fieldname === 'satellite') {
+            cb(null, `satellite${ext}`);
+        } else {
+            cb(null, `terrain${ext}`);
+        }
+    },
+});
+
+const facilityTerrainUpload = multer({
+    storage: terrainStorage,
+    limits: { fileSize: 500 * 1024 * 1024 },
+}).fields([
+    { name: 'file', maxCount: 1 },
+    { name: 'satellite', maxCount: 1 },
+]);
+
+// POST /scenes/:id/terrain
+router.post('/scenes/:id/terrain', authenticate, facilityTerrainUpload, async (req: Request, res: Response) => {
+    try {
+        const id = req.params.id as string;
+
+        const existing = await prisma.facilityScene.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: '場景不存在' });
+
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+        const file = files?.file?.[0];
+        const satelliteFile = files?.satellite?.[0];
+
+        if (!file) return res.status(400).json({ error: '請選擇地形 CSV 檔案' });
+
+        const pythonScript = path.join(__dirname, '../scripts/facility_terrain_processor.py');
+        const venvPython = path.join(__dirname, '../scripts/.venv/bin/python3');
+        const pythonExecutable = fs.existsSync(venvPython) ? venvPython : 'python3';
+
+        const outputDir = path.join(TERRAIN_DIR, id);
+
+        const pythonArgs = [
+            pythonScript,
+            '--input', file.path,
+            '--output-dir', outputDir,
+        ];
+
+        if (satelliteFile) {
+            pythonArgs.push('--satellite', satelliteFile.path);
+        }
+
+        const pythonProcess = spawn(pythonExecutable, pythonArgs);
+
+        let outputData = '';
+        let errorData = '';
+
+        pythonProcess.stdout.on('data', (data: Buffer) => {
+            const str = data.toString();
+            outputData += str;
+            // Log progress
+            str.split('\n').forEach((line: string) => {
+                if (line.includes('"progress"')) {
+                    try {
+                        const json = JSON.parse(line.trim());
+                        if (json.progress !== undefined) {
+                            console.log(`[FacilityTerrain] ${json.progress}%: ${json.message}`);
+                        }
+                    } catch (e) { /* skip non-JSON */ }
+                }
+            });
+        });
+
+        pythonProcess.stderr.on('data', (data: Buffer) => {
+            errorData += data.toString();
+            console.error(`[FacilityTerrain] ${data}`);
+        });
+
+        pythonProcess.on('close', async (code: number) => {
+            if (code !== 0) {
+                return res.status(500).json({ error: '地形處理失敗', details: errorData });
+            }
+
+            try {
+                let result: any = null;
+                for (const line of outputData.split('\n')) {
+                    try {
+                        const obj = JSON.parse(line.trim());
+                        if (obj.status === 'completed' || obj.status === 'error') {
+                            result = obj;
+                        }
+                    } catch (e) { /* skip */ }
+                }
+
+                if (!result) throw new Error('Python 腳本未返回有效結果');
+                if (result.status === 'error') throw new Error(result.error || '未知腳本錯誤');
+
+                const meta = result.meta;
+
+                const scene = await prisma.facilityScene.update({
+                    where: { id },
+                    data: {
+                        terrainCsvUrl: `/uploads/facility/terrain/${id}/${path.basename(file.path)}`,
+                        terrainHeightmapUrl: `/uploads/facility/terrain/${id}/${meta.heightmap}`,
+                        terrainTextureUrl: meta.satellite
+                            ? `/uploads/facility/terrain/${id}/${meta.satellite}`
+                            : null,
+                        terrainTextureMode: meta.satellite ? 'satellite' : 'colorRamp',
+                        terrainBounds: {
+                            minX: meta.minX, maxX: meta.maxX,
+                            minY: meta.minY, maxY: meta.maxY,
+                            minZ: meta.minZ, maxZ: meta.maxZ,
+                        },
+                    },
+                });
+
+                res.json(scene);
+            } catch (err: any) {
+                console.error('[FacilityTerrain] Processing error:', err);
+                res.status(500).json({ error: '系統錯誤', details: err.message });
+            }
+        });
+    } catch (error) {
+        console.error('[FacilityTerrain] Upload error:', error);
+        res.status(500).json({ error: '伺服器內部錯誤' });
+    }
+});
+
+// DELETE /scenes/:id/terrain
+router.delete('/scenes/:id/terrain', authenticate, async (req: Request, res: Response) => {
+    try {
+        const id = req.params.id as string;
+
+        const existing = await prisma.facilityScene.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: '場景不存在' });
+
+        const scene = await prisma.facilityScene.update({
+            where: { id },
+            data: {
+                terrainCsvUrl: null,
+                terrainHeightmapUrl: null,
+                terrainTextureUrl: null,
+                terrainTextureMode: null,
+                terrainBounds: Prisma.DbNull,
+            },
+        });
+
+        const terrainDir = path.join(TERRAIN_DIR, id);
+        if (fs.existsSync(terrainDir)) {
+            fs.rmSync(terrainDir, { recursive: true, force: true });
+        }
+
+        res.json(scene);
+    } catch (error) {
+        console.error('[FacilityTerrain] Delete terrain error:', error);
+        res.status(500).json({ error: '刪除地形失敗' });
     }
 });
 
