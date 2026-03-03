@@ -6,9 +6,11 @@ import { FacilityModels } from './FacilityModels';
 import { FacilityTerrain } from './FacilityTerrain';
 import { FacilityCameraController } from './FacilityCameraController';
 import { useFacilityStore } from '../../stores/facilityStore';
+import { ScaleBarCalculator, ScaleBarOverlay, useScaleBar } from '../overlay/ScaleBar';
 
 export function FacilityCanvas() {
     const isLoading = useFacilityStore(state => state.isLoading);
+    const { pixelsPerMeter, handleScaleChange } = useScaleBar();
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -46,7 +48,10 @@ export function FacilityCanvas() {
                 />
 
                 <FacilityCameraController />
+                <ScaleBarCalculator onScaleChange={handleScaleChange} />
             </Canvas>
+
+            <ScaleBarOverlay pixelsPerMeter={pixelsPerMeter} />
 
             {isLoading && (
                 <div style={{
