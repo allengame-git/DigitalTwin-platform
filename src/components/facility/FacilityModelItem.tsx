@@ -48,15 +48,19 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     // Clone scene 以避免多個 instance 共用同一 scene（memo 確保 bbox 不重算）
     const clonedScene = useMemo(() => gltfScene.clone(true), [gltfScene]);
 
-    // 計算標籤 Y 偏移（local space）
-    // bbox.max.y 是 clonedScene 的 local-space 頂部（含 GLTF 內部旋轉）
-    // gap 固定 4 world units，除以 scale.y 換算回 local space
-    const labelOffsetY = useMemo(() => {
+    // 計算標籤 local-space 位置
+    // X/Z 取 bbox 水平中心（確保標籤在模型視覺正上方，不是 group origin 上方）
+    // Y 取 bbox 頂部 + 4 world units（除以 scale.y 換算回 local space）
+    const labelPosition = useMemo<[number, number, number]>(() => {
         clonedScene.updateMatrixWorld(true);
         const bbox = new THREE.Box3().setFromObject(clonedScene);
         const scaleY = Math.max(Math.abs(model.scale.y), 0.01);
-        if (bbox.isEmpty() || !Number.isFinite(bbox.max.y)) return 4 / scaleY;
-        return bbox.max.y + 4 / scaleY;
+        if (bbox.isEmpty() || !Number.isFinite(bbox.max.y)) {
+            return [0, 4 / scaleY, 0];
+        }
+        const cx = (bbox.min.x + bbox.max.x) / 2;
+        const cz = (bbox.min.z + bbox.max.z) / 2;
+        return [cx, bbox.max.y + 4 / scaleY, cz];
     }, [clonedScene, model.scale.y]);
 
     // 根據相機距離動態調整字體大小（直接操作 DOM，避免 re-render）
@@ -174,7 +178,7 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                 <primitive object={clonedScene} />
 
                 {showLabels && (
-                    <Html position={[0, labelOffsetY, 0]} center zIndexRange={[100, 0]}>
+                    <Html position={labelPosition} center zIndexRange={[100, 0]}>
                         <div
                             ref={labelRef}
                             style={{
