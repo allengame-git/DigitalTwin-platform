@@ -179,6 +179,37 @@ export const ProjectDashboardPage: React.FC = () => {
                         </p>
                     </div>
 
+                    {/* 設施導覽 */}
+                    <div
+                        onClick={() => navigate(`/project/${projectCode}/facility`)}
+                        style={{
+                            background: '#fff',
+                            borderRadius: '12px',
+                            padding: '24px',
+                            border: '1px solid #e2e8f0',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                        }}
+                    >
+                        <div style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '12px',
+                            background: '#e0f2fe',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: '16px',
+                            fontSize: '24px'
+                        }}>🏢</div>
+                        <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>
+                            設施導覽
+                        </h3>
+                        <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5 }}>
+                            互動式 3D 設施導覽，支援多層巢狀場景與模型資訊
+                        </p>
+                    </div>
+
                     {/* 工程設計 */}
                     <div
                         onClick={() => navigate(`/project/${projectCode}/engineering`)}
