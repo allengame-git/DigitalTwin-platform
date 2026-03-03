@@ -303,7 +303,7 @@ export const ProjectDashboardPage: React.FC = () => {
                         </p>
                     </div>
 
-                    {/* 資料管理 - Admin/Engineer only */}
+                    {/* 地質資料管理 - Admin/Engineer only */}
                     <RoleBasedUI allowedRoles={['admin', 'engineer']}>
                         <div
                             onClick={() => navigate(`/project/${projectCode}/data`)}
@@ -328,10 +328,43 @@ export const ProjectDashboardPage: React.FC = () => {
                                 fontSize: '24px'
                             }}>📁</div>
                             <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>
-                                資料管理
+                                地質資料管理
                             </h3>
                             <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5 }}>
                                 上傳與管理地質模型、航照圖、探查資料
+                            </p>
+                        </div>
+                    </RoleBasedUI>
+
+                    {/* 設施資料管理 - Admin/Engineer only */}
+                    <RoleBasedUI allowedRoles={['admin', 'engineer']}>
+                        <div
+                            onClick={() => navigate(`/project/${projectCode}/facility-data`)}
+                            style={{
+                                background: '#fff',
+                                borderRadius: '12px',
+                                padding: '24px',
+                                border: '1px solid #e2e8f0',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                            }}
+                        >
+                            <div style={{
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '12px',
+                                background: '#e0e7ff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginBottom: '16px',
+                                fontSize: '24px'
+                            }}>🏗️</div>
+                            <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>
+                                設施資料管理
+                            </h3>
+                            <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5 }}>
+                                上傳與管理 3D 設施模型、場景配置
                             </p>
                         </div>
                     </RoleBasedUI>

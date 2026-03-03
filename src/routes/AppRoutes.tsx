@@ -26,6 +26,7 @@ const SimulationPage = React.lazy(() => import('../pages/PlaceholderPages').then
 const AnnotationsPage = React.lazy(() => import('../pages/AnnotationsPage'));
 const ProjectDashboardPage = React.lazy(() => import('../pages/ProjectDashboardPage'));
 const FacilityPage = React.lazy(() => import('../pages/FacilityPage'));
+const FacilityDataPage = React.lazy(() => import('../pages/FacilityDataPage'));
 
 // Admin pages
 const AdminUsersPage = React.lazy(() => import('../pages/AdminUsersPage'));
@@ -162,6 +163,14 @@ const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute allowedRoles={['admin', 'engineer']}>
                         <DataManagementPage />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: '/project/:projectCode/facility-data',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
+                        <FacilityDataPage />
                     </ProtectedRoute>
                 ),
             },
