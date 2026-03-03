@@ -76,8 +76,8 @@ export const useLayerStore = create<LayerState & LayerActions>()(
             terrainSettings: { ...defaultTerrainSettings },
 
             // Actions
-            toggleLayer: (layerId) => {
-                set(state => ({
+            toggleLayer: (layerId: LayerType) => {
+                set((state: LayerState) => ({
                     layers: {
                         ...state.layers,
                         [layerId]: {
@@ -88,8 +88,8 @@ export const useLayerStore = create<LayerState & LayerActions>()(
                 }));
             },
 
-            setOpacity: (layerId, opacity) => {
-                set(state => ({
+            setOpacity: (layerId: LayerType, opacity: number) => {
+                set((state: LayerState) => ({
                     layers: {
                         ...state.layers,
                         [layerId]: {
@@ -100,8 +100,8 @@ export const useLayerStore = create<LayerState & LayerActions>()(
                 }));
             },
 
-            setLayerZOffset: (layerId, zOffset) => {
-                set(state => ({
+            setLayerZOffset: (layerId: LayerType, zOffset: number) => {
+                set((state: LayerState) => ({
                     layers: {
                         ...state.layers,
                         [layerId]: {
@@ -113,8 +113,8 @@ export const useLayerStore = create<LayerState & LayerActions>()(
             },
 
 
-            setLayerVisible: (layerId, visible) => {
-                set(state => ({
+            setLayerVisible: (layerId: LayerType, visible: boolean) => {
+                set((state: LayerState) => ({
                     layers: {
                         ...state.layers,
                         [layerId]: {
@@ -129,8 +129,8 @@ export const useLayerStore = create<LayerState & LayerActions>()(
                 set({ layers: { ...defaultLayers } });
             },
 
-            setTerrainSettings: (settings) => {
-                set(state => ({
+            setTerrainSettings: (settings: Partial<TerrainSettings>) => {
+                set((state: LayerState) => ({
                     terrainSettings: {
                         ...state.terrainSettings,
                         ...settings
