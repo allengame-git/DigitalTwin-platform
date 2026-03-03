@@ -18,11 +18,13 @@ interface FacilityModelItemProps {
     model: FacilityModel;
 }
 
-// module-level reusable vector to avoid per-frame allocation
+// module-level reusable vectors（同 frame 內循序執行，共用安全）
 const _worldPos = new THREE.Vector3();
+const _topLocal = new THREE.Vector3();
 
 export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const groupRef = useRef<THREE.Group>(null);
+    const labelGroupRef = useRef<THREE.Group>(null);
     const labelRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -48,29 +50,40 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     // Clone scene 以避免多個 instance 共用同一 scene（memo 確保 bbox 不重算）
     const clonedScene = useMemo(() => gltfScene.clone(true), [gltfScene]);
 
-    // 計算標籤 local-space 位置
-    // X/Z 取 bbox 水平中心（確保標籤在模型視覺正上方，不是 group origin 上方）
-    // Y 取 bbox 頂部 + 4 world units（除以 scale.y 換算回 local space）
-    const labelPosition = useMemo<[number, number, number]>(() => {
+    // 計算 bbox 在 group local space 的頂部中心（cx, maxY, cz）
+    // 只算一次，useFrame 每幀用 localToWorld 轉換成 world space
+    const bboxInfo = useMemo(() => {
         clonedScene.updateMatrixWorld(true);
         const bbox = new THREE.Box3().setFromObject(clonedScene);
-        const scaleY = Math.max(Math.abs(model.scale.y), 0.01);
         if (bbox.isEmpty() || !Number.isFinite(bbox.max.y)) {
-            return [0, 4 / scaleY, 0];
+            return { cx: 0, maxY: 0, cz: 0 };
         }
-        const cx = (bbox.min.x + bbox.max.x) / 2;
-        const cz = (bbox.min.z + bbox.max.z) / 2;
-        return [cx, bbox.max.y + 4 / scaleY, cz];
-    }, [clonedScene, model.scale.y]);
+        return {
+            cx: (bbox.min.x + bbox.max.x) / 2,
+            maxY: bbox.max.y,
+            cz: (bbox.min.z + bbox.max.z) / 2,
+        };
+    }, [clonedScene]);
 
-    // 根據相機距離動態調整字體大小（直接操作 DOM，避免 re-render）
+    // 每幀：用 localToWorld 把 bbox 頂點轉成 world space → 設定 labelGroup 位置
+    // 標籤 group 在 model group 外面，不受 model scale 影響
     useFrame(({ camera }) => {
-        if (!labelRef.current || !groupRef.current) return;
-        groupRef.current.getWorldPosition(_worldPos);
-        const dist = camera.position.distanceTo(_worldPos);
-        // 200 world units 時顯示 13px；近了放大至 20px，遠了縮至 11px
-        const fontSize = Math.max(11, Math.min(20, Math.round(13 * 200 / Math.max(dist, 1))));
-        labelRef.current.style.fontSize = `${fontSize}px`;
+        if (!labelGroupRef.current || !groupRef.current) return;
+
+        // local → world（含 model scale / rotation / translation）
+        _topLocal.set(bboxInfo.cx, bboxInfo.maxY, bboxInfo.cz);
+        groupRef.current.localToWorld(_topLocal);   // 就地修改
+
+        // 固定 20 world units above model top（Y 方向）
+        labelGroupRef.current.position.set(_topLocal.x, _topLocal.y + 20, _topLocal.z);
+
+        // 依相機距離動態調整字體
+        if (labelRef.current) {
+            groupRef.current.getWorldPosition(_worldPos);
+            const dist = camera.position.distanceTo(_worldPos);
+            const fontSize = Math.max(11, Math.min(20, Math.round(13 * 200 / Math.max(dist, 1))));
+            labelRef.current.style.fontSize = `${fontSize}px`;
+        }
     });
 
     // Hover 高亮：遍歷 scene，對 MeshStandardMaterial 設定 emissive
@@ -162,6 +175,7 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
 
     return (
         <>
+            {/* 模型 group：含幾何體、互動事件、transform 編輯 */}
             <group
                 ref={groupRef}
                 position={[model.position.x, model.position.y, model.position.z]}
@@ -176,9 +190,13 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                 onPointerOut={handlePointerOut}
             >
                 <primitive object={clonedScene} />
+            </group>
 
-                {showLabels && (
-                    <Html position={labelPosition} center zIndexRange={[100, 0]}>
+            {/* 標籤 group：在模型 group 外，位置由 useFrame + localToWorld 設定
+                不受模型 scale 影響，固定 world-space 高度 */}
+            {showLabels && (
+                <group ref={labelGroupRef}>
+                    <Html center zIndexRange={[100, 0]}>
                         <div
                             ref={labelRef}
                             style={{
@@ -186,7 +204,7 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                                 color: 'white',
                                 padding: '3px 8px',
                                 borderRadius: 4,
-                                fontSize: 13,        // 初始值，useFrame 會動態更新
+                                fontSize: 13,
                                 fontWeight: 500,
                                 whiteSpace: 'nowrap',
                                 pointerEvents: 'none',
@@ -198,8 +216,8 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                             {model.name}
                         </div>
                     </Html>
-                )}
-            </group>
+                </group>
+            )}
 
             {isEditing && groupRef.current && (
                 <TransformControls
