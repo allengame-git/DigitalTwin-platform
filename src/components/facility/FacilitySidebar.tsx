@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronRight, Box, Layers, Edit3 } from 'lucide-react';
+import { ChevronRight, Box, Layers, Edit3, Tag } from 'lucide-react';
 import { useFacilityStore } from '@/stores/facilityStore';
 import BreadcrumbNav from './BreadcrumbNav';
 import SceneTree from './SceneTree';
@@ -26,6 +26,8 @@ const FacilitySidebar: React.FC = () => {
         editMode,
         setEditMode,
         setEditingModel,
+        showLabels,
+        toggleLabels,
     } = useFacilityStore();
 
     const currentScene = scenes.find(s => s.id === currentSceneId);
@@ -276,7 +278,7 @@ const FacilitySidebar: React.FC = () => {
                 <PlanView />
             </div>
 
-            {/* 編輯模式切換 */}
+            {/* 工具列：標籤開關 + 編輯模式 */}
             <div
                 style={{
                     padding: '10px 16px',
@@ -289,6 +291,33 @@ const FacilitySidebar: React.FC = () => {
                     transition: 'opacity 0.2s ease',
                 }}
             >
+                {/* 標籤顯示開關 */}
+                <button
+                    onClick={toggleLabels}
+                    title={showLabels ? '隱藏模型標籤' : '顯示模型標籤'}
+                    style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        padding: '6px 0',
+                        borderRadius: 6,
+                        border: showLabels ? '1px solid #059669' : '1px solid #d1d5db',
+                        background: showLabels ? '#ecfdf5' : 'white',
+                        color: showLabels ? '#065f46' : '#6b7280',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                        marginBottom: 6,
+                    }}
+                >
+                    <Tag size={12} />
+                    {showLabels ? '標籤顯示中' : '標籤已隱藏'}
+                </button>
+
+                {/* 編輯模式 */}
                 <button
                     onClick={() => {
                         const next = !editMode;

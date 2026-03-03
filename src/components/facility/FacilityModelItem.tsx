@@ -31,6 +31,7 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const setEditingModel = useFacilityStore(state => state.setEditingModel);
     const enterScene = useFacilityStore(state => state.enterScene);
     const updateModelTransform = useFacilityStore(state => state.updateModelTransform);
+    const showLabels = useFacilityStore(state => state.showLabels);
 
     const isHovered = hoveredModelId === model.id;
     const isEditing = editMode && editingModelId === model.id;
@@ -39,13 +40,15 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     // useGLTF 載入模型
     const { scene: gltfScene } = useGLTF(model.modelUrl);
 
-    // Clone scene 以避免多個 instance 共用同一 scene
-    const clonedScene = gltfScene.clone(true);
+    // Clone scene 以避免多個 instance 共用同一 scene（memo 確保 bbox 不重算）
+    const clonedScene = useMemo(() => gltfScene.clone(true), [gltfScene]);
 
-    // 計算模型 bbox 頂部，作為名稱標籤的 Y 偏移（local space）
+    // 計算模型 bbox 頂部作為標籤 Y 偏移（local space，group 的 position+scale 由 R3F 處理）
     const labelOffsetY = useMemo(() => {
+        clonedScene.updateMatrixWorld(true);
         const bbox = new THREE.Box3().setFromObject(clonedScene);
-        return Number.isFinite(bbox.max.y) ? bbox.max.y + 1 : 3;
+        if (bbox.isEmpty() || !Number.isFinite(bbox.max.y)) return 3;
+        return bbox.max.y + 1;
     }, [clonedScene]);
 
     // Hover 高亮：遍歷 scene，對 MeshStandardMaterial 設定 emissive
@@ -152,25 +155,26 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
             >
                 <primitive object={clonedScene} />
 
-                <Html position={[0, labelOffsetY, 0]} center distanceFactor={80}>
-                    <div
-                        style={{
-                            background: isHovered ? 'rgba(37,99,235,0.92)' : 'rgba(0,0,0,0.65)',
-                            color: 'white',
-                            padding: '3px 8px',
-                            borderRadius: 4,
-                            fontSize: 13,
-                            fontWeight: isHovered ? 600 : 400,
-                            whiteSpace: 'nowrap',
-                            pointerEvents: 'none',
-                            border: isHovered ? '1px solid rgba(147,197,253,0.6)' : '1px solid rgba(255,255,255,0.15)',
-                            transition: 'background 0.15s, font-weight 0.15s',
-                            userSelect: 'none',
-                        }}
-                    >
-                        {model.name}
-                    </div>
-                </Html>
+                {showLabels && (
+                    <Html position={[0, labelOffsetY, 0]} center distanceFactor={80}>
+                        <div
+                            style={{
+                                background: isHovered ? 'rgba(37,99,235,0.92)' : 'rgba(0,0,0,0.65)',
+                                color: 'white',
+                                padding: '3px 8px',
+                                borderRadius: 4,
+                                fontSize: 13,
+                                fontWeight: isHovered ? 600 : 400,
+                                whiteSpace: 'nowrap',
+                                pointerEvents: 'none',
+                                border: isHovered ? '1px solid rgba(147,197,253,0.6)' : '1px solid rgba(255,255,255,0.15)',
+                                userSelect: 'none',
+                            }}
+                        >
+                            {model.name}
+                        </div>
+                    </Html>
+                )}
             </group>
 
             {isEditing && groupRef.current && (

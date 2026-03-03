@@ -26,6 +26,9 @@ interface FacilityState {
     editingModelId: string | null;
     transformMode: 'translate' | 'rotate' | 'scale';
 
+    // UI
+    showLabels: boolean;
+
     // Async state
     isLoading: boolean;
     error: string | null;
@@ -55,6 +58,9 @@ interface FacilityState {
     setEditMode: (enabled: boolean) => void;
     setEditingModel: (modelId: string | null) => void;
     setTransformMode: (mode: 'translate' | 'rotate' | 'scale') => void;
+
+    // UI
+    toggleLabels: () => void;
 }
 
 export const useFacilityStore = create<FacilityState>((set, get) => ({
@@ -67,6 +73,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     editMode: false,
     editingModelId: null,
     transformMode: 'translate',
+    showLabels: true,
     isLoading: false,
     error: null,
 
@@ -235,4 +242,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     })),
     setEditingModel: (modelId) => set({ editingModelId: modelId }),
     setTransformMode: (mode) => set({ transformMode: mode }),
+
+    // ===== UI =====
+    toggleLabels: () => set(state => ({ showLabels: !state.showLabels })),
 }));
