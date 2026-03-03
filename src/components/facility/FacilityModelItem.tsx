@@ -165,24 +165,19 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation();
         if (editMode) {
-            // 編輯模式：選取模型進行 transform 編輯，不進入子場景
             selectModel(model.id);
             setEditingModel(model.id);
         } else {
+            // 任何情況下都只選取模型；有子場景時由 sidebar 提供進入入口
             selectModel(model.id);
-            if (hasChildScene && model.childSceneId) {
-                enterScene(model.childSceneId);
-            }
         }
-    }, [editMode, model.id, model.childSceneId, hasChildScene, selectModel, setEditingModel, enterScene]);
+    }, [editMode, model.id, selectModel, setEditingModel]);
 
     const handlePointerOver = useCallback((e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation();
         setHoveredModel(model.id);
-        if (hasChildScene) {
-            document.body.style.cursor = 'pointer';
-        }
-    }, [model.id, hasChildScene, setHoveredModel]);
+        document.body.style.cursor = 'pointer';
+    }, [model.id, setHoveredModel]);
 
     const handlePointerOut = useCallback(() => {
         setHoveredModel(null);

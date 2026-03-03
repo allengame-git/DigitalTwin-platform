@@ -6,10 +6,9 @@
 
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronRight, Box, Layers, Edit3, Tag } from 'lucide-react';
+import { ChevronRight, Box, DoorOpen, Edit3, Tag } from 'lucide-react';
 import { useFacilityStore } from '@/stores/facilityStore';
 import BreadcrumbNav from './BreadcrumbNav';
-import SceneTree from './SceneTree';
 import PlanView from './PlanView';
 
 const FacilitySidebar: React.FC = () => {
@@ -29,7 +28,13 @@ const FacilitySidebar: React.FC = () => {
         showLabels,
         toggleLabels,
         flyToModel,
+        enterScene,
     } = useFacilityStore();
+
+    const selectedModel = models.find(m => m.id === selectedModelId) ?? null;
+    const selectedModelChildScene = selectedModel?.childSceneId
+        ? scenes.find(s => s.id === selectedModel.childSceneId) ?? null
+        : null;
 
     const currentScene = scenes.find(s => s.id === currentSceneId);
 
@@ -163,24 +168,51 @@ const FacilitySidebar: React.FC = () => {
                     <BreadcrumbNav />
                 </div>
 
-                {/* 子場景 */}
-                <section style={{ borderBottom: '1px solid #e5e7eb' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px' }}>
-                        <Layers size={13} style={{ color: '#9ca3af', flexShrink: 0 }} />
-                        <span style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: '#9ca3af',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
-                        }}>
-                            子場景
-                        </span>
-                    </div>
-                    <div style={{ padding: '0 4px 4px' }}>
-                        <SceneTree />
-                    </div>
-                </section>
+                {/* 子場景入口：只在選取了有子場景的模型時顯示 */}
+                {selectedModelChildScene && (
+                    <section style={{ borderBottom: '1px solid #e5e7eb' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px' }}>
+                            <DoorOpen size={13} style={{ color: '#3b82f6', flexShrink: 0 }} />
+                            <span style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: '#6b7280',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                            }}>
+                                內部場景
+                            </span>
+                        </div>
+                        <div style={{ padding: '0 8px 8px' }}>
+                            <button
+                                onClick={() => enterScene(selectedModelChildScene.id)}
+                                style={{
+                                    width: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    padding: '8px 12px',
+                                    borderRadius: 6,
+                                    border: '1px solid #bfdbfe',
+                                    background: '#eff6ff',
+                                    color: '#1d4ed8',
+                                    cursor: 'pointer',
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    transition: 'background 0.15s',
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.background = '#dbeafe')}
+                                onMouseLeave={e => (e.currentTarget.style.background = '#eff6ff')}
+                            >
+                                <DoorOpen size={14} style={{ flexShrink: 0 }} />
+                                <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {selectedModelChildScene.name}
+                                </span>
+                                <ChevronRight size={13} style={{ flexShrink: 0 }} />
+                            </button>
+                        </div>
+                    </section>
+                )}
 
                 {/* 模型清單 */}
                 <section style={{ borderBottom: '1px solid #e5e7eb' }}>
