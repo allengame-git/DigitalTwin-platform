@@ -4,7 +4,7 @@
  */
 import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
-import { Html, TransformControls, Line } from '@react-three/drei';
+import { Html, TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useFrame } from '@react-three/fiber';
@@ -205,14 +205,6 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                 不受模型 scale 影響，固定 world-space 高度 */}
             {showLabels && (
                 <group ref={labelGroupRef}>
-                    {/* 指引線：從標籤中心垂直連到模型頂部 */}
-                    <Line
-                        points={[[0, 0, 0], [0, -20, 0]]}
-                        color="white"
-                        lineWidth={1.2}
-                        opacity={0.55}
-                        transparent
-                    />
                     <Html center zIndexRange={[100, 0]}>
                         <div
                             ref={labelRef}
