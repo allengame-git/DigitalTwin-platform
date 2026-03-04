@@ -28,6 +28,7 @@ export interface FacilityScene {
     coordShiftZ: number;
     coordRotation: number;
     sortOrder: number;
+    sceneType: 'lobby' | 'normal';
     createdAt: string;
     updatedAt: string;
     models?: FacilityModelSummary[];

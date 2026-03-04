@@ -40,7 +40,7 @@ interface FacilityState {
     // Scene actions
     fetchScenes: (projectId: string) => Promise<void>;
     createScene: (data: { projectId: string; parentSceneId?: string; parentModelId?: string; name: string; description?: string }) => Promise<FacilityScene>;
-    updateScene: (id: string, data: Partial<Pick<FacilityScene, 'name' | 'description' | 'cameraPosition' | 'cameraTarget' | 'coordShiftX' | 'coordShiftY' | 'coordShiftZ' | 'coordRotation' | 'sortOrder'>>) => Promise<void>;
+    updateScene: (id: string, data: Partial<Pick<FacilityScene, 'name' | 'description' | 'cameraPosition' | 'cameraTarget' | 'coordShiftX' | 'coordShiftY' | 'coordShiftZ' | 'coordRotation' | 'sortOrder' | 'sceneType'>>) => Promise<void>;
     deleteScene: (id: string) => Promise<void>;
 
     // Navigation
@@ -50,6 +50,10 @@ interface FacilityState {
     getCurrentScene: () => FacilityScene | undefined;
     getRootScene: () => FacilityScene | undefined;
     getBreadcrumbs: () => FacilityScene[];
+
+    // Lobby mode
+    isLobbyMode: () => boolean;
+    getChildScenes: (modelId: string) => FacilityScene[];
 
     // Model actions
     fetchModels: (sceneId: string) => Promise<void>;
@@ -200,6 +204,16 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
         const { scenes, sceneStack, currentSceneId } = get();
         const ids = [...sceneStack, currentSceneId].filter(Boolean) as string[];
         return ids.map(id => scenes.find(s => s.id === id)).filter(Boolean) as FacilityScene[];
+    },
+
+    // ===== Lobby Mode =====
+    isLobbyMode: () => {
+        const scene = get().getCurrentScene();
+        return scene?.sceneType === 'lobby';
+    },
+
+    getChildScenes: (modelId: string) => {
+        return get().scenes.filter(s => s.parentModelId === modelId);
     },
 
     // ===== Model Actions =====
