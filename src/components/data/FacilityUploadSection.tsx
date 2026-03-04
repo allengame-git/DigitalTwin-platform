@@ -167,7 +167,6 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
             await updateScene(id, {
                 name: editSubForm.name.trim(),
                 description: editSubForm.description.trim(),
-                // @ts-ignore — updateScene 型別需對應 parentModelId
                 parentModelId: editSubForm.parentModelId || null,
             });
             setEditingSubId(null);

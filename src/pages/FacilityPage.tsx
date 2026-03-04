@@ -18,7 +18,10 @@ const PlanViewFloating = React.lazy(() => import('../components/facility/PlanVie
 export const FacilityPage: React.FC = () => {
     const { projectCode } = useParams<{ projectCode: string }>();
     const { projects, setActiveProject } = useProjectStore();
-    const { fetchScenes, enterScene, scenes, isLobbyMode } = useFacilityStore();
+    const fetchScenes = useFacilityStore(state => state.fetchScenes);
+    const enterScene = useFacilityStore(state => state.enterScene);
+    const scenes = useFacilityStore(state => state.scenes);
+    const isLobby = useFacilityStore(state => state.isLobbyMode)();
 
     // Sync project and fetch scenes
     useEffect(() => {
@@ -78,7 +81,7 @@ export const FacilityPage: React.FC = () => {
 
     return (
         <div style={{ width: '100vw', height: '100vh', display: 'flex', overflow: 'hidden' }}>
-            {!isLobbyMode() && (
+            {!isLobby && (
                 <React.Suspense fallback={null}>
                     <FacilitySidebar />
                 </React.Suspense>
@@ -100,7 +103,7 @@ export const FacilityPage: React.FC = () => {
                 </React.Suspense>
 
                 {/* Lobby mode: back to dashboard */}
-                {isLobbyMode() && (
+                {isLobby && (
                     <div style={{
                         position: 'absolute', top: 16, left: 16, zIndex: 50,
                     }}>
@@ -123,7 +126,7 @@ export const FacilityPage: React.FC = () => {
                 )}
 
                 {/* Screenshot button — bottom-right corner */}
-                {!isLobbyMode() && (
+                {!isLobby && (
                 <div style={{
                     position: 'absolute',
                     bottom: 24,
