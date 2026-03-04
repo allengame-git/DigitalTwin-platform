@@ -359,6 +359,7 @@ model FacilityModel {
   name        String
   modelUrl    String
   fileSize    Int
+  introduction String?
   position    Json                @default("{\"x\":0,\"y\":0,\"z\":0}")
   rotation    Json                @default("{\"x\":0,\"y\":0,\"z\":0}")
   scale       Json                @default("{\"x\":1,\"y\":1,\"z\":1}")

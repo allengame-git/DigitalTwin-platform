@@ -322,7 +322,7 @@ router.post('/models', authenticate, modelUpload.single('file'), async (req: Req
 router.put('/models/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        const { name, sortOrder } = req.body;
+        const { name, sortOrder, introduction } = req.body;
 
         const existing = await prisma.facilityModel.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ error: '模型不存在' });
@@ -332,6 +332,7 @@ router.put('/models/:id', authenticate, async (req: Request, res: Response) => {
             data: {
                 ...(name !== undefined && { name }),
                 ...(sortOrder !== undefined && { sortOrder }),
+                ...(introduction !== undefined && { introduction }),
             },
             include: {
                 infos: { orderBy: { sortOrder: 'asc' } },
