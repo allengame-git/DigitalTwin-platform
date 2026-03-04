@@ -80,7 +80,7 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
 
     // 主場景編輯
     const [isEditingRoot, setIsEditingRoot] = useState(false);
-    const [editRootForm, setEditRootForm] = useState({ name: '', description: '' });
+    const [editRootForm, setEditRootForm] = useState({ name: '', description: '', sceneType: 'normal' as string });
     // 建立主場景
     const [isCreatingRoot, setIsCreatingRoot] = useState(false);
     const [createRootForm, setCreateRootForm] = useState({ name: '', description: '' });
@@ -135,7 +135,7 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
         if (!rootScene || !editRootForm.name.trim()) { setError('場景名稱為必填'); return; }
         setIsSaving(true); setError(null);
         try {
-            await updateScene(rootScene.id, { name: editRootForm.name.trim(), description: editRootForm.description.trim() });
+            await updateScene(rootScene.id, { name: editRootForm.name.trim(), description: editRootForm.description.trim(), sceneType: editRootForm.sceneType as 'lobby' | 'normal' });
             setIsEditingRoot(false);
         } catch (e: any) {
             setError(e?.response?.data?.error || '更新失敗');
@@ -226,6 +226,20 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                 <label className="dm-form-label">描述（可選）</label>
                                 <input className="dm-form-input" value={editRootForm.description} onChange={e => setEditRootForm(f => ({ ...f, description: e.target.value }))} />
                             </div>
+                            {rootScene && !rootScene.parentSceneId && (
+                                <div className="dm-form-group" style={{ marginBottom: 8 }}>
+                                    <label className="dm-form-label">場景類型</label>
+                                    <select
+                                        className="dm-form-input"
+                                        value={editRootForm.sceneType || 'normal'}
+                                        onChange={e => setEditRootForm(f => ({ ...f, sceneType: e.target.value }))}
+                                        style={{ width: '100%', maxWidth: 320, padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 13 }}
+                                    >
+                                        <option value="lobby">導覽場景（全螢幕沉浸，點模型進入子場景）</option>
+                                        <option value="normal">一般場景（含側邊欄，標準互動模式）</option>
+                                    </select>
+                                </div>
+                            )}
                             <div style={{ display: 'flex', gap: 8 }}>
                                 <button className="dm-btn-confirm" style={{ padding: '4px 12px', fontSize: 12 }} onClick={handleEditRootSave} disabled={isSaving}>儲存</button>
                                 <button className="dm-btn-cancel" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => setIsEditingRoot(false)}>取消</button>
@@ -248,7 +262,7 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                 </div>
                             )}
                             <div className="dm-file-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-                                <button className="dm-file-btn" onClick={() => { setIsEditingRoot(true); setEditRootForm({ name: rootScene.name, description: rootScene.description || '' }); }}>編輯名稱</button>
+                                <button className="dm-file-btn" onClick={() => { setIsEditingRoot(true); setEditRootForm({ name: rootScene.name, description: rootScene.description || '', sceneType: rootScene.sceneType || 'normal' }); }}>編輯名稱</button>
                                 <button className="dm-file-btn" onClick={() => { setPlanUploadSceneId(rootScene.id); planInputRef.current?.click(); }} disabled={isPlanUploading}>{isPlanUploading ? '上傳中...' : (rootScene.planImageUrl || rootScene.autoPlanImageUrl) ? '更換平面圖' : '上傳平面圖'}</button>
                             </div>
                         </div>
