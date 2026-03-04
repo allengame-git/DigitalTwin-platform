@@ -44,6 +44,7 @@ export interface FacilityModel {
     name: string;
     modelUrl: string;
     fileSize: number;
+    introduction?: string;
     position: { x: number; y: number; z: number };
     rotation: { x: number; y: number; z: number };
     scale: { x: number; y: number; z: number };

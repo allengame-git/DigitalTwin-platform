@@ -56,7 +56,7 @@ interface FacilityState {
     selectModel: (modelId: string | null) => void;
     setHoveredModel: (modelId: string | null) => void;
     updateModelTransform: (modelId: string, transform: Transform) => Promise<void>;
-    updateModelMeta: (modelId: string, data: { name?: string }) => Promise<void>;
+    updateModelMeta: (modelId: string, data: { name?: string; introduction?: string }) => Promise<void>;
 
     // Edit mode
     setEditMode: (enabled: boolean) => void;
