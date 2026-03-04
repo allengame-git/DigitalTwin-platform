@@ -25,6 +25,7 @@ const _topLocal = new THREE.Vector3();
 export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const groupRef = useRef<THREE.Group>(null);
     const labelGroupRef = useRef<THREE.Group>(null);
+    const enterBtnGroupRef = useRef<THREE.Group>(null);
     const labelRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -40,10 +41,15 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const updateModelTransform = useFacilityStore(state => state.updateModelTransform);
     const showLabels = useFacilityStore(state => state.showLabels);
     const setModelBboxCenter = useFacilityStore(state => state.setModelBboxCenter);
+    const isLobbyMode = useFacilityStore(state => state.isLobbyMode);
+    const getChildScenes = useFacilityStore(state => state.getChildScenes);
 
     const isSelected = selectedModelId === model.id;
     const isHovered = hoveredModelId === model.id;
     const isEditing = editMode && editingModelId === model.id;
+    const isLobby = isLobbyMode();
+    const childScenes = useMemo(() => getChildScenes(model.id), [getChildScenes, model.id]);
+    const hasChildScene = childScenes.length > 0;
     // useGLTF 載入模型
     const { scene: gltfScene } = useGLTF(model.modelUrl);
 
@@ -87,6 +93,10 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
 
         // 固定 20 world units above model top（Y 方向）
         labelGroupRef.current.position.set(_topLocal.x, _topLocal.y + 20, _topLocal.z);
+
+        if (enterBtnGroupRef.current) {
+            enterBtnGroupRef.current.position.set(_topLocal.x, _topLocal.y + 35, _topLocal.z);
+        }
 
         // 依相機距離動態調整字體
         if (labelRef.current) {
@@ -234,6 +244,45 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                             }}
                         >
                             {model.name}
+                        </div>
+                    </Html>
+                </group>
+            )}
+
+            {isLobby && isSelected && hasChildScene && (
+                <group ref={enterBtnGroupRef}>
+                    <Html center zIndexRange={[200, 0]} style={{ pointerEvents: 'auto' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                            {childScenes.map(scene => (
+                                <button
+                                    key={scene.id}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        enterScene(scene.id);
+                                    }}
+                                    style={{
+                                        background: 'rgba(37,99,235,0.92)',
+                                        color: 'white',
+                                        border: '1px solid rgba(147,197,253,0.6)',
+                                        borderRadius: 8,
+                                        padding: '8px 16px',
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        boxShadow: '0 4px 16px rgba(37,99,235,0.3)',
+                                        transition: 'background 0.15s',
+                                    }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(37,99,235,1)')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'rgba(37,99,235,0.92)')}
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                                    進入 {scene.name}
+                                </button>
+                            ))}
                         </div>
                     </Html>
                 </group>
