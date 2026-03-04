@@ -904,8 +904,8 @@ const ModelInfoDashboard: React.FC<{ projectId: string }> = ({ projectId }) => {
                     style={{ width: '100%', maxWidth: 320, padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 13 }}
                 >
                     <option value="">-- 請選擇場景 --</option>
-                    {scenes.filter(s => !s.parentSceneId).map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
+                    {scenes.map(s => (
+                        <option key={s.id} value={s.id}>{(s as any).parentSceneId ? '　└ ' : ''}{s.name}</option>
                     ))}
                 </select>
             </div>
