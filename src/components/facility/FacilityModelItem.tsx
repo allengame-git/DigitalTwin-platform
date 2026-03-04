@@ -4,7 +4,7 @@
  */
 import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
-import { Html, TransformControls } from '@react-three/drei';
+import { Html, TransformControls, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useFrame } from '@react-three/fiber';
@@ -205,19 +205,38 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                 不受模型 scale 影響，固定 world-space 高度 */}
             {showLabels && (
                 <group ref={labelGroupRef}>
+                    {/* 指引線：從標籤中心垂直連到模型頂部 */}
+                    <Line
+                        points={[[0, 0, 0], [0, -20, 0]]}
+                        color="white"
+                        lineWidth={1.2}
+                        opacity={0.55}
+                        transparent
+                    />
                     <Html center zIndexRange={[100, 0]}>
                         <div
                             ref={labelRef}
+                            onClick={() => {
+                                selectModel(model.id);
+                                if (editMode) setEditingModel(model.id);
+                            }}
                             style={{
-                                background: isHovered ? 'rgba(37,99,235,0.92)' : 'rgba(0,0,0,0.72)',
+                                background: isSelected
+                                    ? 'rgba(37,99,235,0.92)'
+                                    : isHovered
+                                        ? 'rgba(37,99,235,0.82)'
+                                        : 'rgba(0,0,0,0.72)',
                                 color: 'white',
                                 padding: '3px 8px',
                                 borderRadius: 4,
                                 fontSize: 13,
                                 fontWeight: 500,
                                 whiteSpace: 'nowrap',
-                                pointerEvents: 'none',
-                                border: isHovered ? '1px solid rgba(147,197,253,0.7)' : '1px solid rgba(255,255,255,0.25)',
+                                pointerEvents: 'auto',
+                                cursor: 'pointer',
+                                border: isSelected || isHovered
+                                    ? '1px solid rgba(147,197,253,0.7)'
+                                    : '1px solid rgba(255,255,255,0.25)',
                                 userSelect: 'none',
                                 lineHeight: '1.4',
                             }}
