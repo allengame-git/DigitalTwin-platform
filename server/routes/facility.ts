@@ -50,7 +50,7 @@ router.get('/scenes', async (req: Request, res: Response) => {
 // POST /scenes
 router.post('/scenes', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId, parentSceneId, parentModelId, name, description, sortOrder } = req.body;
+        const { projectId, parentSceneId, parentModelId, name, description, sortOrder, sceneType } = req.body;
         if (!projectId || !name) {
             return res.status(400).json({ error: 'projectId 和 name 為必填' });
         }
@@ -63,6 +63,7 @@ router.post('/scenes', authenticate, async (req: Request, res: Response) => {
                 name,
                 description: description || null,
                 sortOrder: sortOrder ?? 0,
+                sceneType: sceneType || (parentSceneId ? 'normal' : 'lobby'),
             }
         });
 
@@ -77,7 +78,7 @@ router.post('/scenes', authenticate, async (req: Request, res: Response) => {
 router.put('/scenes/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        const { name, description, cameraPosition, cameraTarget, coordShiftX, coordShiftY, coordShiftZ, coordRotation, sortOrder, parentModelId } = req.body;
+        const { name, description, cameraPosition, cameraTarget, coordShiftX, coordShiftY, coordShiftZ, coordRotation, sortOrder, parentModelId, sceneType } = req.body;
 
         const existing = await prisma.facilityScene.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ error: '場景不存在' });
@@ -95,6 +96,7 @@ router.put('/scenes/:id', authenticate, async (req: Request, res: Response) => {
                 ...(coordRotation !== undefined && { coordRotation }),
                 ...(sortOrder !== undefined && { sortOrder }),
                 ...('parentModelId' in req.body && { parentModelId: parentModelId || null }),
+                ...(sceneType !== undefined && { sceneType }),
             }
         });
 

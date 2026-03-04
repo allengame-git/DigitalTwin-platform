@@ -338,6 +338,7 @@ model FacilityScene {
   coordShiftZ         Float           @default(0)
   coordRotation       Float           @default(0)
   sortOrder           Int             @default(0)
+  sceneType           String          @default("normal")   // "lobby" | "normal"
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
   project             Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
