@@ -16,6 +16,8 @@ export default function FacilityInfoPanel() {
     const editMode = useFacilityStore(state => state.editMode)
     const selectModel = useFacilityStore(state => state.selectModel)
     const setEditingModel = useFacilityStore(state => state.setEditingModel)
+    const isLobbyMode = useFacilityStore(state => state.isLobbyMode)
+    const getChildScenes = useFacilityStore(state => state.getChildScenes)
 
     const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
@@ -40,6 +42,9 @@ export default function FacilityInfoPanel() {
     )
 
     if (!selectedModelId) return null
+
+    // Lobby 模式下，有子場景的模型不顯示 InfoPanel
+    if (isLobbyMode() && selectedModelId && getChildScenes(selectedModelId).length > 0) return null
 
     return (
         <>
