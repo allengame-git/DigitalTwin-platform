@@ -18,7 +18,7 @@ const PlanViewFloating = React.lazy(() => import('../components/facility/PlanVie
 export const FacilityPage: React.FC = () => {
     const { projectCode } = useParams<{ projectCode: string }>();
     const { projects, setActiveProject } = useProjectStore();
-    const { fetchScenes, enterScene, scenes } = useFacilityStore();
+    const { fetchScenes, enterScene, scenes, isLobbyMode } = useFacilityStore();
 
     // Sync project and fetch scenes
     useEffect(() => {
@@ -78,9 +78,11 @@ export const FacilityPage: React.FC = () => {
 
     return (
         <div style={{ width: '100vw', height: '100vh', display: 'flex', overflow: 'hidden' }}>
-            <React.Suspense fallback={null}>
-                <FacilitySidebar />
-            </React.Suspense>
+            {!isLobbyMode() && (
+                <React.Suspense fallback={null}>
+                    <FacilitySidebar />
+                </React.Suspense>
+            )}
             <div style={{ flex: 1, position: 'relative' }}>
                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
                     <React.Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666' }}>載入中...</div>}>
@@ -97,7 +99,31 @@ export const FacilityPage: React.FC = () => {
                     <PlanViewFloating />
                 </React.Suspense>
 
+                {/* Lobby mode: back to dashboard */}
+                {isLobbyMode() && (
+                    <div style={{
+                        position: 'absolute', top: 16, left: 16, zIndex: 50,
+                    }}>
+                        <a href={`/project/${projectCode}`}
+                           style={{
+                               background: 'rgba(255,255,255,0.88)',
+                               border: '1px solid rgba(0,0,0,0.12)',
+                               borderRadius: 8, padding: '7px 14px', fontSize: 13,
+                               color: '#333', cursor: 'pointer',
+                               backdropFilter: 'blur(8px)',
+                               display: 'flex', alignItems: 'center', gap: 6,
+                               boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                               textDecoration: 'none',
+                           }}
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                            返回儀表板
+                        </a>
+                    </div>
+                )}
+
                 {/* Screenshot button — bottom-right corner */}
+                {!isLobbyMode() && (
                 <div style={{
                     position: 'absolute',
                     bottom: 24,
@@ -131,6 +157,7 @@ export const FacilityPage: React.FC = () => {
                         截圖
                     </button>
                 </div>
+                )}
             </div>
         </div>
     );
