@@ -11,6 +11,7 @@ import axios from 'axios';
 import { useAuthStore } from '../../stores/authStore';
 import { useFacilityStore } from '../../stores/facilityStore';
 import type { FacilityScene } from '../../types/facility';
+import { RichTextEditor } from '../common/RichTextEditor';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -36,6 +37,8 @@ interface FacilityModelItem {
     sceneId: string;
     childSceneId?: string | null;
     glbUrl?: string;
+    introduction?: string;
+    infos?: RichContentItem[];
     position?: { x: number; y: number; z: number };
     rotation?: { x: number; y: number; z: number };
     scale?: { x: number; y: number; z: number };
@@ -551,32 +554,327 @@ const ModelUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
     );
 };
 
-// ─── Tab 3: ModelInfoEditor ───────────────────────────────────────────────────
+// ─── Tab 3: ModelInfoDashboard ────────────────────────────────────────────────
 
-const ModelInfoEditor: React.FC<{ projectId: string }> = ({ projectId }) => {
+const INFO_URL_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+function resolveInfoUrl(url: string) {
+    if (url.startsWith('http')) return url;
+    return `${INFO_URL_BASE}${url}`;
+}
+
+interface ModelCardProps {
+    model: FacilityModelItem;
+    onClick: () => void;
+}
+
+function ModelCard({ model, onClick }: ModelCardProps) {
+    const diagrams = (model.infos ?? []).filter(i => i.type === 'IMAGE' || i.type === 'DOCUMENT');
+    const customFields = (model.infos ?? []).filter(i => i.type === 'TEXT' || i.type === 'LINK');
+    const thumbInfo = (model.infos ?? []).find(i => i.type === 'IMAGE');
+    const introText = model.introduction
+        ? model.introduction.replace(/<[^>]+>/g, '').slice(0, 80)
+        : null;
+
+    return (
+        <div
+            onClick={onClick}
+            style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: 12,
+                overflow: 'hidden',
+                cursor: 'pointer',
+                background: '#fff',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                transition: 'box-shadow 0.15s, transform 0.15s',
+                display: 'flex',
+                flexDirection: 'column',
+            }}
+            onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(37,99,235,0.12)';
+                (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)';
+                (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+            }}
+        >
+            <div style={{ height: 120, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                {thumbInfo ? (
+                    <img src={resolveInfoUrl(thumbInfo.content ?? '')} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    </svg>
+                )}
+            </div>
+            <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: '#1e293b' }}>{model.name}</div>
+                <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, flex: 1 }}>
+                    {introText || <span style={{ color: '#94a3b8' }}>尚未填寫介紹</span>}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {diagrams.length > 0 && (
+                        <span style={{ fontSize: 11, background: '#eff6ff', color: '#2563eb', borderRadius: 4, padding: '2px 6px' }}>
+                            圖說 {diagrams.length}
+                        </span>
+                    )}
+                    {customFields.length > 0 && (
+                        <span style={{ fontSize: 11, background: '#f0fdf4', color: '#16a34a', borderRadius: 4, padding: '2px 6px' }}>
+                            欄位 {customFields.length}
+                        </span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+interface ModelInfoModalProps {
+    model: FacilityModelItem;
+    onClose: () => void;
+    onSaved: (updated: FacilityModelItem) => void;
+}
+
+function ModelInfoModal({ model, onClose, onSaved }: ModelInfoModalProps) {
+    const [intro, setIntro] = useState(model.introduction || '');
+    const [isSavingIntro, setIsSavingIntro] = useState(false);
+    const introDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const [diagrams, setDiagrams] = useState<RichContentItem[]>(
+        (model.infos ?? []).filter(i => i.type === 'IMAGE' || i.type === 'DOCUMENT')
+    );
+    const [isDiagramUploading, setIsDiagramUploading] = useState(false);
+    const diagramInputRef = useRef<HTMLInputElement>(null);
+
+    const [customFields, setCustomFields] = useState<RichContentItem[]>(
+        (model.infos ?? []).filter(i => i.type === 'TEXT' || i.type === 'LINK')
+    );
+    const [newFieldLabel, setNewFieldLabel] = useState('');
+    const [newFieldContent, setNewFieldContent] = useState('');
+    const [newFieldType, setNewFieldType] = useState<'TEXT' | 'LINK'>('TEXT');
+    const [isSavingField, setIsSavingField] = useState(false);
+    const [fieldError, setFieldError] = useState<string | null>(null);
+
+    useEffect(() => {
+        setIntro(model.introduction || '');
+        setDiagrams((model.infos ?? []).filter(i => i.type === 'IMAGE' || i.type === 'DOCUMENT'));
+        setCustomFields((model.infos ?? []).filter(i => i.type === 'TEXT' || i.type === 'LINK'));
+    }, [model.id]);
+
+    const saveIntro = async (html: string) => {
+        setIsSavingIntro(true);
+        try {
+            const res = await axios.put<FacilityModelItem>(
+                `${API_BASE}/api/facility/models/${model.id}`,
+                { introduction: html },
+                { headers: getAuthHeaders(), withCredentials: true }
+            );
+            onSaved({ ...res.data, infos: [...diagrams, ...customFields] });
+        } catch (e) {
+            console.error('intro save failed', e);
+        } finally {
+            setIsSavingIntro(false);
+        }
+    };
+
+    const handleIntroChange = (html: string) => {
+        setIntro(html);
+        if (introDebounceRef.current) clearTimeout(introDebounceRef.current);
+        introDebounceRef.current = setTimeout(() => saveIntro(html), 2000);
+    };
+
+    const handleDiagramFiles = async (files: FileList | null) => {
+        if (!files || files.length === 0) return;
+        setIsDiagramUploading(true);
+        for (const file of Array.from(files)) {
+            const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+            const type = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) ? 'IMAGE' : 'DOCUMENT';
+            const fd = new FormData();
+            fd.append('type', type);
+            fd.append('label', file.name);
+            fd.append('file', file);
+            try {
+                const res = await axios.post<RichContentItem>(
+                    `${API_BASE}/api/facility/models/${model.id}/info`,
+                    fd,
+                    { headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' }, withCredentials: true }
+                );
+                setDiagrams(prev => [...prev, res.data]);
+            } catch (e) {
+                console.error('diagram upload failed', e);
+            }
+        }
+        setIsDiagramUploading(false);
+    };
+
+    const handleDeleteDiagram = async (id: string) => {
+        try {
+            await axios.delete(`${API_BASE}/api/facility/info/${id}`, {
+                headers: getAuthHeaders(), withCredentials: true,
+            });
+            setDiagrams(prev => prev.filter(d => d.id !== id));
+        } catch (e) {
+            console.error('delete diagram failed', e);
+        }
+    };
+
+    const handleAddField = async () => {
+        if (!newFieldLabel.trim()) { setFieldError('標籤為必填'); return; }
+        if (!newFieldContent.trim()) { setFieldError('內容為必填'); return; }
+        setIsSavingField(true);
+        setFieldError(null);
+        try {
+            const fd = new FormData();
+            fd.append('type', newFieldType);
+            fd.append('label', newFieldLabel.trim());
+            fd.append('content', newFieldContent.trim());
+            const res = await axios.post<RichContentItem>(
+                `${API_BASE}/api/facility/models/${model.id}/info`,
+                fd,
+                { headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' }, withCredentials: true }
+            );
+            setCustomFields(prev => [...prev, res.data]);
+            setNewFieldLabel('');
+            setNewFieldContent('');
+        } catch (e: any) {
+            setFieldError(e?.response?.data?.error || '新增失敗');
+        } finally {
+            setIsSavingField(false);
+        }
+    };
+
+    const handleDeleteField = async (id: string) => {
+        try {
+            await axios.delete(`${API_BASE}/api/facility/info/${id}`, {
+                headers: getAuthHeaders(), withCredentials: true,
+            });
+            setCustomFields(prev => prev.filter(f => f.id !== id));
+        } catch (e) {
+            console.error('delete field failed', e);
+        }
+    };
+
+    const sectionStyle: React.CSSProperties = {
+        background: '#fff',
+        border: '1px solid #e2e8f0',
+        borderRadius: 12,
+        padding: 20,
+        marginBottom: 20,
+    };
+
+    return (
+        <div
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '24px 16px' }}
+            onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+        >
+            <div style={{ background: '#f8fafc', borderRadius: 16, width: '100%', maxWidth: 800, minHeight: '80vh' }}>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid #e2e8f0', background: '#fff', borderRadius: '16px 16px 0 0', position: 'sticky', top: 0, zIndex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 17, color: '#1e293b' }}>{model.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {isSavingIntro && <span style={{ fontSize: 12, color: '#94a3b8' }}>儲存中...</span>}
+                        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#64748b', fontSize: 20, lineHeight: 1 }}>×</button>
+                    </div>
+                </div>
+
+                {/* Body */}
+                <div style={{ padding: 24 }}>
+                    {/* 設施介紹 */}
+                    <div style={sectionStyle}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>設施介紹</div>
+                        <RichTextEditor value={intro} onChange={handleIntroChange} placeholder="輸入設施介紹文字..." />
+                        <div style={{ textAlign: 'right', marginTop: 8 }}>
+                            <button
+                                onClick={() => { if (introDebounceRef.current) clearTimeout(introDebounceRef.current); saveIntro(intro); }}
+                                disabled={isSavingIntro}
+                                style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 16px', fontSize: 13, cursor: 'pointer', opacity: isSavingIntro ? 0.6 : 1 }}
+                            >
+                                {isSavingIntro ? '儲存中...' : '儲存介紹'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 設施圖說 */}
+                    <div style={sectionStyle}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>設施圖說</div>
+                        <div
+                            onClick={() => diagramInputRef.current?.click()}
+                            onDragOver={e => e.preventDefault()}
+                            onDrop={e => { e.preventDefault(); handleDiagramFiles(e.dataTransfer.files); }}
+                            style={{ border: '2px dashed #cbd5e1', borderRadius: 8, padding: '20px 16px', textAlign: 'center', cursor: 'pointer', marginBottom: 16, color: '#64748b', fontSize: 13, background: '#f8fafc' }}
+                        >
+                            {isDiagramUploading ? '上傳中...' : '點擊或拖曳上傳（JPG/PNG/PDF/CAD/DWG）'}
+                        </div>
+                        <input ref={diagramInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.dwg,.dxf" style={{ display: 'none' }} onChange={e => handleDiagramFiles(e.target.files)} />
+                        {diagrams.length > 0 && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+                                {diagrams.map(d => (
+                                    <div key={d.id} style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+                                        {d.type === 'IMAGE' ? (
+                                            <img src={resolveInfoUrl(d.content ?? '')} alt={d.label} style={{ width: '100%', height: 90, objectFit: 'cover' }} />
+                                        ) : (
+                                            <div style={{ height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', fontSize: 12, color: '#475569', padding: 8, textAlign: 'center' }}>
+                                                {d.label}
+                                            </div>
+                                        )}
+                                        <button
+                                            onClick={() => handleDeleteDiagram(d.id)}
+                                            style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                        >×</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 自訂欄位 */}
+                    <div style={sectionStyle}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>自訂欄位</div>
+                        {customFields.map(f => (
+                            <div key={f.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8, padding: '8px 10px', background: '#f8fafc', borderRadius: 6 }}>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>{f.type === 'LINK' ? '[連結]' : '[文字]'} {f.label}</div>
+                                    {f.type === 'LINK'
+                                        ? <a href={f.content} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#2563eb', wordBreak: 'break-all' }}>{f.content}</a>
+                                        : <div style={{ fontSize: 13, color: '#334155', whiteSpace: 'pre-wrap' }}>{f.content}</div>
+                                    }
+                                </div>
+                                <button onClick={() => handleDeleteField(f.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 16, padding: 2 }}>×</button>
+                            </div>
+                        ))}
+                        <div style={{ borderTop: customFields.length > 0 ? '1px solid #e2e8f0' : 'none', paddingTop: customFields.length > 0 ? 12 : 0, marginTop: customFields.length > 0 ? 4 : 0 }}>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                                <select value={newFieldType} onChange={e => setNewFieldType(e.target.value as 'TEXT' | 'LINK')} style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12, minWidth: 70 }}>
+                                    <option value="TEXT">文字</option>
+                                    <option value="LINK">連結</option>
+                                </select>
+                                <input value={newFieldLabel} onChange={e => setNewFieldLabel(e.target.value)} placeholder="欄位名稱" style={{ flex: 1, padding: '5px 8px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <input value={newFieldContent} onChange={e => setNewFieldContent(e.target.value)} placeholder={newFieldType === 'LINK' ? 'https://...' : '內容'} style={{ flex: 1, padding: '5px 8px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                                <button onClick={handleAddField} disabled={isSavingField} style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 14px', fontSize: 12, cursor: 'pointer' }}>新增</button>
+                            </div>
+                            {fieldError && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>{fieldError}</div>}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+const ModelInfoDashboard: React.FC<{ projectId: string }> = ({ projectId }) => {
     const { scenes, fetchScenes } = useFacilityStore();
-
     const [sceneId, setSceneId] = useState('');
     const [models, setModels] = useState<FacilityModelItem[]>([]);
-    const [modelId, setModelId] = useState('');
-    const [infoItems, setInfoItems] = useState<RichContentItem[]>([]);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
-    const [isLoadingInfo, setIsLoadingInfo] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [selectedModel, setSelectedModel] = useState<FacilityModelItem | null>(null);
 
-    const [newType, setNewType] = useState<'TEXT' | 'IMAGE' | 'DOCUMENT' | 'LINK'>('TEXT');
-    const [newLabel, setNewLabel] = useState('');
-    const [newContent, setNewContent] = useState('');
-    const [newFile, setNewFile] = useState<File | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    useEffect(() => { if (projectId) fetchScenes(projectId); }, [projectId, fetchScenes]);
 
     useEffect(() => {
-        if (projectId) fetchScenes(projectId);
-    }, [projectId, fetchScenes]);
-
-    useEffect(() => {
-        if (!sceneId) { setModels([]); setModelId(''); return; }
+        if (!sceneId) { setModels([]); return; }
         setIsLoadingModels(true);
         axios.get<FacilityModelItem[]>(`${API_BASE}/api/facility/models`, {
             params: { sceneId },
@@ -587,162 +885,45 @@ const ModelInfoEditor: React.FC<{ projectId: string }> = ({ projectId }) => {
           .finally(() => setIsLoadingModels(false));
     }, [sceneId]);
 
-    useEffect(() => {
-        if (!modelId) { setInfoItems([]); return; }
-        setIsLoadingInfo(true);
-        axios.get<RichContentItem[]>(`${API_BASE}/api/facility/models/${modelId}/info`, {
-            headers: getAuthHeaders(),
-            withCredentials: true,
-        }).then(r => setInfoItems(Array.isArray(r.data) ? r.data : []))
-          .catch(() => setInfoItems([]))
-          .finally(() => setIsLoadingInfo(false));
-    }, [modelId]);
-
-    const handleAddInfo = async () => {
-        if (!newLabel.trim()) { setError('標籤為必填'); return; }
-        if (newType === 'TEXT' && !newContent.trim()) { setError('內容為必填'); return; }
-        if ((newType === 'IMAGE' || newType === 'DOCUMENT') && !newFile) { setError('請選擇檔案'); return; }
-        if (newType === 'LINK' && !newContent.trim()) { setError('連結網址為必填'); return; }
-
-        setIsSaving(true);
-        setError(null);
-        try {
-            const fd = new FormData();
-            fd.append('type', newType);
-            fd.append('label', newLabel.trim());
-            if (newType === 'TEXT' || newType === 'LINK') {
-                fd.append('content', newContent.trim());
-            } else if (newFile) {
-                fd.append('file', newFile);
-            }
-
-            const res = await axios.post<RichContentItem>(
-                `${API_BASE}/api/facility/models/${modelId}/info`,
-                fd,
-                {
-                    headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
-                    withCredentials: true,
-                }
-            );
-            setInfoItems(prev => [...prev, res.data]);
-            setNewLabel('');
-            setNewContent('');
-            setNewFile(null);
-            setNewType('TEXT');
-        } catch (e: any) {
-            setError(e?.response?.data?.error || '新增失敗');
-        } finally {
-            setIsSaving(false);
-        }
+    const handleModelSaved = (updated: FacilityModelItem) => {
+        setModels(prev => prev.map(m => m.id === updated.id ? updated : m));
+        setSelectedModel(updated);
     };
-
-    const handleDeleteInfo = async (id: string) => {
-        try {
-            await axios.delete(`${API_BASE}/api/facility/info/${id}`, {
-                headers: getAuthHeaders(),
-                withCredentials: true,
-            });
-            setInfoItems(prev => prev.filter(i => i.id !== id));
-        } catch (e: any) {
-            setError(e?.response?.data?.error || '刪除失敗');
-        }
-    };
-
-    const typeLabel: Record<string, string> = { TEXT: '文字', IMAGE: '圖片', DOCUMENT: '文件', LINK: '連結' };
 
     return (
-        <div>
-            {error && <div className="dm-error" style={{ marginBottom: 8 }}>{error}</div>}
-
-            {/* Scene + model selectors */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                <div className="dm-form-group" style={{ margin: 0 }}>
-                    <label className="dm-form-label">場景</label>
-                    <SceneSelect scenes={scenes} value={sceneId} onChange={v => { setSceneId(v); setModelId(''); }} />
-                </div>
-                <div className="dm-form-group" style={{ margin: 0 }}>
-                    <label className="dm-form-label">模型</label>
-                    <select
-                        className="dm-form-input"
-                        value={modelId}
-                        onChange={e => setModelId(e.target.value)}
-                        disabled={!sceneId || isLoadingModels}
-                    >
-                        <option value="">{isLoadingModels ? '載入中...' : '選擇模型'}</option>
-                        {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                </div>
+        <div style={{ padding: '16px 0' }}>
+            <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 4 }}>選擇場景</label>
+                <select
+                    value={sceneId}
+                    onChange={e => { setSceneId(e.target.value); setSelectedModel(null); }}
+                    style={{ width: '100%', maxWidth: 320, padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 13 }}
+                >
+                    <option value="">-- 請選擇場景 --</option>
+                    {scenes.map(s => (
+                        <option key={s.id} value={s.id}>{(s as any).parentSceneId ? '　└ ' : ''}{s.name}</option>
+                    ))}
+                </select>
             </div>
 
-            {/* Info list */}
-            {modelId && (
-                <>
-                    {isLoadingInfo && <div className="dm-loading">載入中...</div>}
-                    {!isLoadingInfo && infoItems.length === 0 && <div className="dm-empty">尚無 Rich Content 條目</div>}
-                    {infoItems.map(item => (
-                        <div key={item.id} className="dm-file-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <div>
-                                <span style={{ fontSize: 11, background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: 4, marginRight: 8 }}>{typeLabel[item.type]}</span>
-                                <span style={{ fontWeight: 500, fontSize: 13 }}>{item.label}</span>
-                                {item.content && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{item.content.slice(0, 80)}{item.content.length > 80 ? '...' : ''}</div>}
-                                {item.fileUrl && <div style={{ fontSize: 12, color: '#2563eb', marginTop: 2 }}>檔案已上傳</div>}
-                            </div>
-                            <button
-                                className="dm-file-btn dm-file-btn-delete"
-                                style={{ flexShrink: 0 }}
-                                onClick={() => handleDeleteInfo(item.id)}
-                            >刪除</button>
-                        </div>
+            {isLoadingModels && <div style={{ color: '#64748b', fontSize: 13 }}>載入中...</div>}
+            {!isLoadingModels && sceneId && models.length === 0 && (
+                <div style={{ color: '#94a3b8', fontSize: 13 }}>此場景尚無模型</div>
+            )}
+            {!isLoadingModels && models.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+                    {models.map(m => (
+                        <ModelCard key={m.id} model={m} onClick={() => setSelectedModel(m)} />
                     ))}
+                </div>
+            )}
 
-                    {/* Add new info */}
-                    <div style={{ marginTop: 16, padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>新增條目</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                            <div className="dm-form-group" style={{ margin: 0 }}>
-                                <label className="dm-form-label">類型</label>
-                                <select
-                                    className="dm-form-input"
-                                    value={newType}
-                                    onChange={e => setNewType(e.target.value as typeof newType)}
-                                >
-                                    <option value="TEXT">文字</option>
-                                    <option value="IMAGE">圖片</option>
-                                    <option value="DOCUMENT">文件</option>
-                                    <option value="LINK">連結</option>
-                                </select>
-                            </div>
-                            <div className="dm-form-group" style={{ margin: 0 }}>
-                                <label className="dm-form-label">標籤 *</label>
-                                <input className="dm-form-input" value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="例：說明、圖片標題" />
-                            </div>
-                        </div>
-
-                        {(newType === 'TEXT' || newType === 'LINK') && (
-                            <div className="dm-form-group">
-                                <label className="dm-form-label">{newType === 'LINK' ? '網址' : '內容'} *</label>
-                                <input className="dm-form-input" value={newContent} onChange={e => setNewContent(e.target.value)} placeholder={newType === 'LINK' ? 'https://...' : '文字內容'} />
-                            </div>
-                        )}
-                        {(newType === 'IMAGE' || newType === 'DOCUMENT') && (
-                            <div className="dm-form-group">
-                                <label className="dm-form-label">檔案 *</label>
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept={newType === 'IMAGE' ? 'image/*' : '*/*'}
-                                    onChange={e => setNewFile(e.target.files?.[0] || null)}
-                                    style={{ width: '100%', padding: '6px', fontSize: 12, border: '1px solid #d1d5db', borderRadius: 6, background: '#f9fafb' }}
-                                />
-                                {newFile && <div style={{ fontSize: 12, color: '#059669', marginTop: 4 }}>{newFile.name}</div>}
-                            </div>
-                        )}
-
-                        <button className="dm-btn-confirm" onClick={handleAddInfo} disabled={isSaving}>
-                            {isSaving ? '儲存中...' : '新增條目'}
-                        </button>
-                    </div>
-                </>
+            {selectedModel && (
+                <ModelInfoModal
+                    model={selectedModel}
+                    onClose={() => setSelectedModel(null)}
+                    onSaved={handleModelSaved}
+                />
             )}
         </div>
     );
@@ -1562,7 +1743,7 @@ export default function FacilityUploadSection({ projectId }: { projectId: string
             {/* Tab content */}
             {activeTab === 'scenes' && <SceneManager projectId={projectId} />}
             {activeTab === 'models' && <ModelUploader projectId={projectId} />}
-            {activeTab === 'info' && <ModelInfoEditor projectId={projectId} />}
+            {activeTab === 'info' && <ModelInfoDashboard projectId={projectId} />}
             {activeTab === 'terrain' && <SceneTerrainUploader projectId={projectId} />}
             {activeTab === 'manager' && <ModelManager projectId={projectId} />}
         </div>
