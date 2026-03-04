@@ -41,13 +41,16 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const updateModelTransform = useFacilityStore(state => state.updateModelTransform);
     const showLabels = useFacilityStore(state => state.showLabels);
     const setModelBboxCenter = useFacilityStore(state => state.setModelBboxCenter);
-    const isLobbyMode = useFacilityStore(state => state.isLobbyMode);
     const getChildScenes = useFacilityStore(state => state.getChildScenes);
+    const currentSceneType = useFacilityStore(state => {
+        const sid = state.currentSceneId;
+        return sid ? state.scenes.find(s => s.id === sid)?.sceneType : undefined;
+    });
 
     const isSelected = selectedModelId === model.id;
     const isHovered = hoveredModelId === model.id;
     const isEditing = editMode && editingModelId === model.id;
-    const isLobby = isLobbyMode();
+    const isLobby = currentSceneType === 'lobby';
     const childScenes = useMemo(() => getChildScenes(model.id), [getChildScenes, model.id]);
     const hasChildScene = childScenes.length > 0;
     // useGLTF 載入模型

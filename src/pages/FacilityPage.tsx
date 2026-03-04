@@ -21,7 +21,11 @@ export const FacilityPage: React.FC = () => {
     const fetchScenes = useFacilityStore(state => state.fetchScenes);
     const enterScene = useFacilityStore(state => state.enterScene);
     const scenes = useFacilityStore(state => state.scenes);
-    const isLobby = useFacilityStore(state => state.isLobbyMode)();
+    const currentScene = useFacilityStore(state => {
+        const sid = state.currentSceneId;
+        return sid ? state.scenes.find(s => s.id === sid) : null;
+    });
+    const isLobby = currentScene?.sceneType === 'lobby';
 
     // Sync project and fetch scenes
     useEffect(() => {
