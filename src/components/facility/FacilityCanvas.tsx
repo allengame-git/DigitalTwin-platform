@@ -5,6 +5,7 @@ import { FacilityEnvironment } from './FacilityEnvironment';
 import { FacilityModels } from './FacilityModels';
 import { FacilityTerrain } from './FacilityTerrain';
 import { FacilityCameraController } from './FacilityCameraController';
+import { FacilityCaptureHandler } from './FacilityCaptureHandler';
 import { useFacilityStore } from '../../stores/facilityStore';
 import { ScaleBarCalculator, ScaleBarOverlay, useScaleBar } from '../overlay/ScaleBar';
 
@@ -26,6 +27,7 @@ export function FacilityCanvas() {
                     alpha: false,
                     logarithmicDepthBuffer: true,
                     powerPreference: 'high-performance',
+                    preserveDrawingBuffer: true,   // 截圖必要
                 }}
                 shadows
             >
@@ -48,6 +50,7 @@ export function FacilityCanvas() {
                 />
 
                 <FacilityCameraController />
+                <FacilityCaptureHandler />
                 <ScaleBarCalculator onScaleChange={handleScaleChange} />
             </Canvas>
 
