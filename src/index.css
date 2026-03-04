@@ -34,3 +34,20 @@ body {
     background-color: #ffffff;
   }
 }
+
+/* TipTap editor base styles */
+.ProseMirror {
+    outline: none;
+}
+.ProseMirror h2 { font-size: 1.2em; font-weight: 700; margin: 0.5em 0; }
+.ProseMirror h3 { font-size: 1.05em; font-weight: 600; margin: 0.4em 0; }
+.ProseMirror ul { list-style: disc; padding-left: 1.5em; }
+.ProseMirror a { color: #2563eb; text-decoration: underline; }
+.ProseMirror p { margin: 0.25em 0; }
+
+/* RichTextView display styles */
+.rich-text-view h2 { font-size: 1.15em; font-weight: 700; margin: 0.5em 0 0.25em; }
+.rich-text-view h3 { font-size: 1.05em; font-weight: 600; margin: 0.4em 0 0.2em; }
+.rich-text-view ul { list-style: disc; padding-left: 1.4em; }
+.rich-text-view a { color: #2563eb; text-decoration: underline; }
+.rich-text-view p { margin: 0.2em 0; }
