@@ -7,7 +7,7 @@ interface RichTextViewProps {
 }
 
 export function RichTextView({ html, style }: RichTextViewProps) {
-    if (!html || html === '<p></p>') return null;
+    if (!html || /^(<p>(\s|<br[^>]*>)*<\/p>\s*)+$/.test(html)) return null;
     return (
         <div
             className="rich-text-view"

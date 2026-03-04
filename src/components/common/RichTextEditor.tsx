@@ -26,11 +26,12 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     });
 
     // 外部 value 變更時同步（切換模型時）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (editor && value !== editor.getHTML()) {
             editor.commands.setContent(value || '');
         }
-    }, [value, editor]);
+    }, [value]);
 
     if (!editor) return null;
 
