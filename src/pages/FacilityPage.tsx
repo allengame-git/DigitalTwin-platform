@@ -3,11 +3,12 @@
  * @module pages/FacilityPage
  */
 
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore';
 import { useFacilityStore } from '../stores/facilityStore';
 import { facilityCanvasEl } from '../components/facility/FacilityCaptureHandler';
+import type { FacilityScene } from '../types/facility';
 
 const FacilityCanvas = React.lazy(() => import('../components/facility/FacilityCanvas'));
 const FacilitySidebar = React.lazy(() => import('../components/facility/FacilitySidebar'));
@@ -20,12 +21,29 @@ export const FacilityPage: React.FC = () => {
     const { projects, setActiveProject } = useProjectStore();
     const fetchScenes = useFacilityStore(state => state.fetchScenes);
     const enterScene = useFacilityStore(state => state.enterScene);
+    const selectModel = useFacilityStore(state => state.selectModel);
     const scenes = useFacilityStore(state => state.scenes);
+    const selectedModelId = useFacilityStore(state => state.selectedModelId);
     const currentScene = useFacilityStore(state => {
         const sid = state.currentSceneId;
         return sid ? state.scenes.find(s => s.id === sid) : null;
     });
     const isLobby = currentScene?.sceneType === 'lobby';
+
+    // Lobby: 選取模型的子場景清單
+    const lobbyChildScenes = useMemo<FacilityScene[]>(() => {
+        if (!isLobby || !selectedModelId) return [];
+        return scenes.filter(s => s.parentModelId === selectedModelId);
+    }, [isLobby, selectedModelId, scenes]);
+
+    // ESC 取消選取
+    useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') selectModel(null);
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [selectModel]);
 
     // Sync project and fetch scenes
     useEffect(() => {
@@ -105,6 +123,50 @@ export const FacilityPage: React.FC = () => {
                 <React.Suspense fallback={null}>
                     <PlanViewFloating />
                 </React.Suspense>
+
+                {/* Lobby: 「進入」按鈕 — 畫面上方中央 */}
+                {isLobby && lobbyChildScenes.length > 0 && (
+                    <div style={{
+                        position: 'absolute',
+                        top: 24,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        zIndex: 60,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 6,
+                    }}>
+                        {lobbyChildScenes.map(scene => (
+                            <button
+                                key={scene.id}
+                                onClick={() => enterScene(scene.id)}
+                                style={{
+                                    background: 'rgba(37,99,235,0.92)',
+                                    color: 'white',
+                                    border: '1px solid rgba(147,197,253,0.6)',
+                                    borderRadius: 8,
+                                    padding: '8px 20px',
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    whiteSpace: 'nowrap',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    boxShadow: '0 4px 16px rgba(37,99,235,0.3)',
+                                    backdropFilter: 'blur(8px)',
+                                    transition: 'background 0.15s',
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(37,99,235,1)')}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(37,99,235,0.92)')}
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                                進入 {scene.name}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 {/* Lobby mode: back to dashboard */}
                 {isLobby && (

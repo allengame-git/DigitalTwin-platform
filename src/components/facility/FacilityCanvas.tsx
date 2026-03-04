@@ -11,6 +11,7 @@ import { ScaleBarCalculator, ScaleBarOverlay, useScaleBar } from '../overlay/Sca
 
 export function FacilityCanvas() {
     const isLoading = useFacilityStore(state => state.isLoading);
+    const selectModel = useFacilityStore(state => state.selectModel);
     const { pixelsPerMeter, handleScaleChange } = useScaleBar();
 
     return (
@@ -30,6 +31,7 @@ export function FacilityCanvas() {
                     preserveDrawingBuffer: true,   // 截圖必要
                 }}
                 shadows
+                onPointerMissed={() => selectModel(null)}
             >
                 <Suspense fallback={null}>
                     <FacilityEnvironment />
