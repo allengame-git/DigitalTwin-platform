@@ -105,7 +105,18 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
                 headers: getAuthHeaders(),
                 withCredentials: true,
             });
-            set({ scenes: Array.isArray(res.data) ? res.data : [] });
+            set({
+                scenes: Array.isArray(res.data) ? res.data : [],
+                // 切換專案時清空導覽狀態，避免殘留舊專案資料
+                currentSceneId: null,
+                sceneStack: [],
+                models: [],
+                selectedModelId: null,
+                hoveredModelId: null,
+                editingModelId: null,
+                flyToModelId: null,
+                modelBboxCenters: {},
+            });
         } catch (err: any) {
             console.error('[FacilityStore] fetchScenes error:', err);
             set({ error: err.message });
