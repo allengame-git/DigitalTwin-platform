@@ -556,11 +556,9 @@ const ModelUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
 
 // ─── Tab 3: ModelInfoDashboard ────────────────────────────────────────────────
 
-const INFO_URL_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
 function resolveInfoUrl(url: string) {
     if (url.startsWith('http')) return url;
-    return `${INFO_URL_BASE}${url}`;
+    return `${API_BASE}${url}`;
 }
 
 interface ModelCardProps {
@@ -600,8 +598,8 @@ function ModelCard({ model, onClick }: ModelCardProps) {
             }}
         >
             <div style={{ height: 120, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                {thumbInfo ? (
-                    <img src={resolveInfoUrl(thumbInfo.content ?? '')} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {thumbInfo?.content ? (
+                    <img src={resolveInfoUrl(thumbInfo.content)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5">
                         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
@@ -662,6 +660,12 @@ function ModelInfoModal({ model, onClose, onSaved }: ModelInfoModalProps) {
         setCustomFields((model.infos ?? []).filter(i => i.type === 'TEXT' || i.type === 'LINK'));
     }, [model.id]);
 
+    useEffect(() => {
+        return () => {
+            if (introDebounceRef.current) clearTimeout(introDebounceRef.current);
+        };
+    }, []);
+
     const saveIntro = async (html: string) => {
         setIsSavingIntro(true);
         try {
@@ -670,7 +674,7 @@ function ModelInfoModal({ model, onClose, onSaved }: ModelInfoModalProps) {
                 { introduction: html },
                 { headers: getAuthHeaders(), withCredentials: true }
             );
-            onSaved({ ...res.data, infos: [...diagrams, ...customFields] });
+            onSaved(res.data);
         } catch (e) {
             console.error('intro save failed', e);
         } finally {
@@ -900,7 +904,7 @@ const ModelInfoDashboard: React.FC<{ projectId: string }> = ({ projectId }) => {
                     style={{ width: '100%', maxWidth: 320, padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 13 }}
                 >
                     <option value="">-- 請選擇場景 --</option>
-                    {scenes.filter(s => (s as any).parentSceneId === null).map(s => (
+                    {scenes.filter(s => !s.parentSceneId).map(s => (
                         <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                 </select>
