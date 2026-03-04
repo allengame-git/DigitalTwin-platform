@@ -11,10 +11,10 @@ import type { FacilityModel } from '@/types/facility';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-function resolveUrl(url: string | null): string | null {
+function resolveUrl(url: string | null, bust = false): string | null {
     if (!url) return null;
-    if (url.startsWith('http')) return url;
-    return `${API_BASE}${url}`;
+    const base = url.startsWith('http') ? url : `${API_BASE}${url}`;
+    return bust ? `${base}?t=${Date.now()}` : base;
 }
 
 export default function PlanViewFloating() {
@@ -36,7 +36,8 @@ export default function PlanViewFloating() {
     );
 
     const planImage = resolveUrl(
-        currentScene?.planImageUrl ?? currentScene?.autoPlanImageUrl ?? null
+        currentScene?.planImageUrl ?? currentScene?.autoPlanImageUrl ?? null,
+        !currentScene?.planImageUrl && !!currentScene?.autoPlanImageUrl  // auto-plan 加 cache-bust
     );
 
     // 計算座標 bounds → 標記百分比位置
