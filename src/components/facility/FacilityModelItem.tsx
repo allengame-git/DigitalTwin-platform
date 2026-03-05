@@ -59,11 +59,34 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     // Clone scene 以避免多個 instance 共用同一 scene（memo 確保 bbox 不重算）
     const clonedScene = useMemo(() => {
         const clone = gltfScene.clone(true);
-        // 讓 GLB 內每個 mesh 投射並接收陰影
         clone.traverse(node => {
-            if ((node as THREE.Mesh).isMesh) {
-                node.castShadow = true;
-                node.receiveShadow = true;
+            if (!(node as THREE.Mesh).isMesh) return;
+            const mesh = node as THREE.Mesh;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            // MeshBasicMaterial 不參與光照計算，無法接收陰影
+            // 轉換為 MeshStandardMaterial 並保留顏色與貼圖
+            const convertMat = (mat: THREE.Material): THREE.Material => {
+                if (!(mat instanceof THREE.MeshBasicMaterial)) return mat;
+                const std = new THREE.MeshStandardMaterial({
+                    color: mat.color,
+                    map: mat.map,
+                    alphaMap: mat.alphaMap,
+                    transparent: mat.transparent,
+                    opacity: mat.opacity,
+                    side: mat.side,
+                    roughness: 0.8,
+                    metalness: 0.0,
+                });
+                mat.dispose();
+                return std;
+            };
+
+            if (Array.isArray(mesh.material)) {
+                mesh.material = mesh.material.map(convertMat);
+            } else {
+                mesh.material = convertMat(mesh.material);
             }
         });
         return clone;
