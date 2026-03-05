@@ -77,7 +77,7 @@ const TransformInputPanel: React.FC = () => {
         if (transformMode === 'translate') {
             // Three.js +X = West, +Z = South；UI 顯示東/北，需對 X/Z 取反
             const p = editingModel.position ?? DEFAULT_VEC3;
-            setDraft(vec3ToStr({ x: -p.x, y: p.y, z: -p.z }));
+            setDraft(vec3ToStr({ x: p.x, y: p.y, z: -p.z }));
         } else if (transformMode === 'rotate') {
             setDraft(vec3ToStr(editingModel.rotation ?? DEFAULT_VEC3));
         } else {
@@ -97,7 +97,7 @@ const TransformInputPanel: React.FC = () => {
         const transform: Transform = {};
         if (transformMode === 'translate') {
             // UI 東/北 為正 → Three.js X/Z 需取反
-            transform.position = { x: -uiX, y: uiY, z: -uiZ };
+            transform.position = { x: uiX, y: uiY, z: -uiZ };
         } else if (transformMode === 'rotate') {
             transform.rotation = { x: uiX, y: uiY, z: uiZ };
         } else {
