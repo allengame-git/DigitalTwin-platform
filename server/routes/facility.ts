@@ -269,7 +269,7 @@ router.post('/models', authenticate, modelUpload.single('file'), async (req: Req
     let modelDir: string | undefined;
     try {
         const file = req.file;
-        const { sceneId, name, sortOrder } = req.body;
+        const { sceneId, name, sortOrder, modelType } = req.body;
 
         if (!file) return res.status(400).json({ error: '請選擇模型檔案' });
         if (!sceneId || !name) {
@@ -303,6 +303,7 @@ router.post('/models', authenticate, modelUpload.single('file'), async (req: Req
                 modelUrl,
                 fileSize: file.size,
                 sortOrder: sortOrder ? parseInt(sortOrder) : 0,
+                modelType: modelType || 'primary',
             },
             include: {
                 infos: true,
@@ -324,7 +325,7 @@ router.post('/models', authenticate, modelUpload.single('file'), async (req: Req
 router.put('/models/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        const { name, sortOrder, introduction } = req.body;
+        const { name, sortOrder, introduction, modelType } = req.body;
 
         const existing = await prisma.facilityModel.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ error: '模型不存在' });
@@ -335,6 +336,7 @@ router.put('/models/:id', authenticate, async (req: Request, res: Response) => {
                 ...(name !== undefined && { name }),
                 ...(sortOrder !== undefined && { sortOrder }),
                 ...(introduction !== undefined && { introduction }),
+                ...(modelType !== undefined && { modelType }),
             },
             include: {
                 infos: { orderBy: { sortOrder: 'asc' } },

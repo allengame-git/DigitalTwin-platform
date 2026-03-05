@@ -365,6 +365,7 @@ model FacilityModel {
   rotation    Json                @default("{\"x\":0,\"y\":0,\"z\":0}")
   scale       Json                @default("{\"x\":1,\"y\":1,\"z\":1}")
   sortOrder   Int                 @default(0)
+  modelType   String              @default("primary")  // "primary" | "decorative"
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
   scene       FacilityScene       @relation("SceneModels", fields: [sceneId], references: [id], onDelete: Cascade)
