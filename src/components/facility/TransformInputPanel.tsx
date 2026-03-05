@@ -86,7 +86,8 @@ const TransformInputPanel: React.FC = () => {
 
     if (!editMode || !editingModelId || !editingModel) return null;
 
-    const axes: Axis[] = ['x', 'y', 'z'];
+    // 移動模式：東(x) → 北(z) → 高程(y)，地理直覺順序
+    const axes: Axis[] = transformMode === 'translate' ? ['x', 'z', 'y'] : ['x', 'y', 'z'];
 
     return (
         <div style={panel}>
