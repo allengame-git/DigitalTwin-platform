@@ -8,7 +8,7 @@ import { Html, TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useFrame } from '@react-three/fiber';
-import { useFacilityStore } from '@/stores/facilityStore';
+import { useFacilityStore, registerModelGroupRef, unregisterModelGroupRef } from '@/stores/facilityStore';
 import type { FacilityModel, AnimationKeyframe } from '@/types/facility';
 
 const DEG2RAD = Math.PI / 180;
@@ -128,7 +128,8 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     });
 
     // Animation state from store
-    const animations = useFacilityStore(state => state.animations.filter(a => a.modelId === model.id));
+    const allAnimations = useFacilityStore(state => state.animations);
+    const animations = useMemo(() => allAnimations.filter(a => a.modelId === model.id), [allAnimations, model.id]);
     const animationMode = useFacilityStore(state => state.animationMode);
     const playbackState = useFacilityStore(state => state.playbackState);
     const playbackTime = useFacilityStore(state => state.playbackTime);
@@ -197,6 +198,17 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     }, [clonedScene]);
 
     const bboxCenterReported = useRef(false);
+
+    // ── 註冊 groupRef 供 AnimationTimeline 讀取即時 transform ──
+    useEffect(() => {
+        if (groupRef.current) {
+            registerModelGroupRef(model.id, groupRef.current);
+        }
+        return () => { unregisterModelGroupRef(model.id); };
+    }, [model.id]);
+
+    // 動畫編輯中：有選取模型 + 選取動畫 + 非播放中
+    const isAnimEditing = animationMode && isSelected && selectedAnimationId !== null && playbackState !== 'playing';
 
     // ── 播放狀態切換時標記需要重置起始時間 ──
     const needResetStartTime = useRef(false);
@@ -413,9 +425,9 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                     model.rotation.z * DEG2RAD,
                 ]}
                 scale={[model.scale.x, model.scale.y, model.scale.z]}
-                onClick={isDecorative && !editMode ? undefined : handleClick}
-                onPointerOver={isDecorative && !editMode ? undefined : handlePointerOver}
-                onPointerOut={isDecorative && !editMode ? undefined : handlePointerOut}
+                onClick={isDecorative && !editMode && !animationMode ? undefined : handleClick}
+                onPointerOver={isDecorative && !editMode && !animationMode ? undefined : handlePointerOver}
+                onPointerOut={isDecorative && !editMode && !animationMode ? undefined : handlePointerOut}
             >
                 <primitive object={clonedScene} />
             </group>
@@ -459,11 +471,11 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
             )}
 
 
-            {isEditing && groupRef.current && (
+            {(isEditing || isAnimEditing) && groupRef.current && (
                 <TransformControls
                     object={groupRef.current}
                     mode={transformMode}
-                    onChange={handleTransformChange}
+                    onChange={isEditing ? handleTransformChange : undefined}
                 />
             )}
         </>

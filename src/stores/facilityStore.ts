@@ -10,6 +10,18 @@ const getAuthHeaders = () => {
     return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+// ── Model group refs（不放進 Zustand state 以避免不必要的 re-render）──
+// FacilityModelItem mount 時註冊，unmount 時清除
+// AnimationTimeline 用來讀取模型即時 transform
+const _modelGroupRefs = new Map<string, import('three').Group>();
+export const registerModelGroupRef = (modelId: string, ref: import('three').Group) => {
+    _modelGroupRefs.set(modelId, ref);
+};
+export const unregisterModelGroupRef = (modelId: string) => {
+    _modelGroupRefs.delete(modelId);
+};
+export const getModelGroupRef = (modelId: string) => _modelGroupRefs.get(modelId) ?? null;
+
 interface FacilityState {
     // Scene tree
     loadedProjectId: string | null;  // 記錄已載入的專案，避免重複重置

@@ -6,9 +6,57 @@
 
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronRight, Box, DoorOpen, Edit3, Tag, Map, Film } from 'lucide-react';
+import { ChevronRight, Box, DoorOpen, Edit3, Tag, Map, Film, Move, RotateCw, Maximize2, ChevronDown } from 'lucide-react';
 import { useFacilityStore } from '@/stores/facilityStore';
 import BreadcrumbNav from './BreadcrumbNav';
+
+// ── 動畫模式下的 Transform 操控（可摺疊）──
+function AnimTransformSection({ transformMode, setTransformMode }: {
+    transformMode: 'translate' | 'rotate' | 'scale';
+    setTransformMode: (m: 'translate' | 'rotate' | 'scale') => void;
+}) {
+    const [expanded, setExpanded] = React.useState(true);
+    const modes = [
+        { key: 'translate' as const, label: '移動', icon: <Move size={12} /> },
+        { key: 'rotate' as const, label: '旋轉', icon: <RotateCw size={12} /> },
+        { key: 'scale' as const, label: '縮放', icon: <Maximize2 size={12} /> },
+    ];
+    return (
+        <div style={{ marginTop: 6, border: '1px solid #e9d5ff', borderRadius: 6, overflow: 'hidden' }}>
+            <button
+                onClick={() => setExpanded(!expanded)}
+                style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 10px', border: 'none', background: '#faf5ff',
+                    cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#7c3aed',
+                }}
+            >
+                <ChevronDown size={12} style={{ transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
+                Transform 操控
+            </button>
+            {expanded && (
+                <div style={{ display: 'flex', gap: 4, padding: '6px 10px', background: '#fff' }}>
+                    {modes.map(m => (
+                        <button
+                            key={m.key}
+                            onClick={() => setTransformMode(m.key)}
+                            style={{
+                                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                gap: 4, padding: '5px 0', borderRadius: 4, fontSize: 11, fontWeight: 500,
+                                cursor: 'pointer', transition: 'all 0.15s',
+                                border: transformMode === m.key ? '1px solid #7c3aed' : '1px solid #e5e7eb',
+                                background: transformMode === m.key ? '#7c3aed' : '#fff',
+                                color: transformMode === m.key ? '#fff' : '#4b5563',
+                            }}
+                        >
+                            {m.icon} {m.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
 
 const FacilitySidebar: React.FC = () => {
     const [isCollapsed, setIsCollapsed] = React.useState(false);
@@ -26,6 +74,9 @@ const FacilitySidebar: React.FC = () => {
         setEditingModel,
         animationMode,
         setAnimationMode,
+        selectedAnimationId,
+        transformMode,
+        setTransformMode,
         showLabels,
         toggleLabels,
         showPlanView,
@@ -450,6 +501,11 @@ const FacilitySidebar: React.FC = () => {
                     <Film size={13} />
                     {animationMode ? '退出動畫模式' : '進入動畫模式'}
                 </button>
+
+                {/* 動畫模式：Transform 切換（可摺疊） */}
+                {animationMode && selectedModelId && selectedAnimationId && (
+                    <AnimTransformSection transformMode={transformMode} setTransformMode={setTransformMode} />
+                )}
             </div>
 
             {/* Footer */}

@@ -825,7 +825,7 @@ router.delete('/scenes/:id/terrain', authenticate, async (req: Request, res: Res
 router.get('/models/:id/animations', async (req: Request, res: Response) => {
     try {
         const animations = await prisma.facilityAnimation.findMany({
-            where: { modelId: req.params.id },
+            where: { modelId: req.params.id as string },
             orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
         });
         res.json(animations);
@@ -841,7 +841,7 @@ router.post('/models/:id/animations', authenticate, async (req: Request, res: Re
         const { name, type, trigger, loop, duration, easing, gltfClipName, keyframes, sortOrder } = req.body;
         const animation = await prisma.facilityAnimation.create({
             data: {
-                modelId: req.params.id,
+                modelId: req.params.id as string,
                 name: name || '未命名動畫',
                 type: type || 'keyframe',
                 trigger: trigger || 'auto',
@@ -876,7 +876,7 @@ router.put('/animations/:animId', authenticate, async (req: Request, res: Respon
         if (sortOrder !== undefined) data.sortOrder = sortOrder;
 
         const animation = await prisma.facilityAnimation.update({
-            where: { id: req.params.animId },
+            where: { id: req.params.animId as string },
             data,
         });
         res.json(animation);
@@ -889,7 +889,7 @@ router.put('/animations/:animId', authenticate, async (req: Request, res: Respon
 // DELETE /animations/:animId
 router.delete('/animations/:animId', authenticate, async (req: Request, res: Response) => {
     try {
-        await prisma.facilityAnimation.delete({ where: { id: req.params.animId } });
+        await prisma.facilityAnimation.delete({ where: { id: req.params.animId as string } });
         res.json({ success: true });
     } catch (error) {
         console.error('[FacilityAnimation] Delete error:', error);

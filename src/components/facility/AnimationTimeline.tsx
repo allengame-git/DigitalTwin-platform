@@ -3,8 +3,8 @@
  * 底部面板：動畫清單、播放控制、關鍵幀編輯
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Play, Pause, Square, Plus, Trash2, ChevronDown } from 'lucide-react';
-import { useFacilityStore } from '@/stores/facilityStore';
+import { Play, Pause, Square, Plus, Trash2, ChevronDown, RefreshCw } from 'lucide-react';
+import { useFacilityStore, getModelGroupRef } from '@/stores/facilityStore';
 import type { FacilityAnimation, AnimationKeyframe } from '@/types/facility';
 
 const EASING_OPTIONS = [
@@ -162,6 +162,7 @@ export function AnimationTimeline() {
         setPlaybackTime,
         setEditingKeyframeIndex,
         addKeyframe,
+        updateKeyframe,
         deleteKeyframe,
         models,
     } = useFacilityStore();
@@ -193,16 +194,52 @@ export function AnimationTimeline() {
         setShowNewForm(false);
     }, [selectedModelId, newName, createAnimation, selectAnimation]);
 
+    // 從 3D 場景讀取模型即時 transform（優先）或 fallback 到 DB 值
+    const RAD2DEG = 180 / Math.PI;
+    const readLiveTransform = useCallback((): Pick<AnimationKeyframe, 'position' | 'rotation' | 'scale'> | null => {
+        if (!selectedModelId) return null;
+        const group = getModelGroupRef(selectedModelId);
+        if (group) {
+            return {
+                position: { x: group.position.x, y: group.position.y, z: group.position.z },
+                rotation: { x: group.rotation.x * RAD2DEG, y: group.rotation.y * RAD2DEG, z: group.rotation.z * RAD2DEG },
+                scale: { x: group.scale.x, y: group.scale.y, z: group.scale.z },
+            };
+        }
+        // fallback: DB 靜態值
+        if (selectedModel) {
+            return {
+                position: { ...selectedModel.position },
+                rotation: { ...selectedModel.rotation },
+                scale: { ...selectedModel.scale },
+            };
+        }
+        return null;
+    }, [selectedModelId, selectedModel]);
+
     const handleAddKeyframe = useCallback(async () => {
-        if (!selectedAnim || !selectedModel) return;
+        if (!selectedAnim) return;
+        const transform = readLiveTransform();
+        if (!transform) return;
         const kf: AnimationKeyframe = {
             time: playbackTime,
-            position: { ...selectedModel.position },
-            rotation: { ...selectedModel.rotation },
-            scale: { ...selectedModel.scale },
+            ...transform,
         };
         await addKeyframe(selectedAnim.id, kf);
-    }, [selectedAnim, selectedModel, playbackTime, addKeyframe]);
+    }, [selectedAnim, playbackTime, addKeyframe, readLiveTransform]);
+
+    const handleUpdateKeyframe = useCallback(async () => {
+        if (!selectedAnim || editingKeyframeIndex === null) return;
+        const transform = readLiveTransform();
+        if (!transform) return;
+        const existingKf = selectedAnim.keyframes[editingKeyframeIndex];
+        if (!existingKf) return;
+        const kf: AnimationKeyframe = {
+            time: existingKf.time,
+            ...transform,
+        };
+        await updateKeyframe(selectedAnim.id, editingKeyframeIndex, kf);
+    }, [selectedAnim, editingKeyframeIndex, updateKeyframe, readLiveTransform]);
 
     const handleDeleteKeyframe = useCallback(async () => {
         if (!selectedAnim || editingKeyframeIndex === null) return;
@@ -223,11 +260,16 @@ export function AnimationTimeline() {
         setPlaybackTime(0);
     }, [setPlaybackState, setPlaybackTime]);
 
+    const modelAnimations = useMemo(() =>
+        animations.filter(a => a.modelId === selectedModelId),
+    [animations, selectedModelId]);
+
     if (!selectedModelId) {
         return (
             <div style={panelStyle}>
-                <div style={{ padding: '16px 20px', color: '#94a3b8', fontSize: 13, textAlign: 'center' }}>
-                    選取模型以管理動畫
+                <div style={{ padding: '24px 20px', color: '#64748b', fontSize: 14, textAlign: 'center' }}>
+                    <div style={{ marginBottom: 4, fontWeight: 600 }}>動畫模式</div>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>點擊場景中的模型以管理其動畫</div>
                 </div>
             </div>
         );
@@ -280,12 +322,13 @@ export function AnimationTimeline() {
                     borderRight: '1px solid #e2e8f0',
                     overflowY: 'auto',
                 }}>
-                    {animations.filter(a => a.modelId === selectedModelId).length === 0 && (
-                        <div style={{ padding: '12px 16px', fontSize: 12, color: '#94a3b8' }}>
-                            尚無動畫
+                    {modelAnimations.length === 0 && (
+                        <div style={{ padding: '16px 12px', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
+                            <div>尚無動畫</div>
+                            <div style={{ fontSize: 10, marginTop: 4 }}>點擊上方 + 新增</div>
                         </div>
                     )}
-                    {animations.filter(a => a.modelId === selectedModelId).map(anim => (
+                    {modelAnimations.map(anim => (
                         <div
                             key={anim.id}
                             onClick={() => selectAnimation(anim.id)}
@@ -417,9 +460,14 @@ export function AnimationTimeline() {
                                     <Plus size={12} /> 新增關鍵幀
                                 </button>
                                 {editingKeyframeIndex !== null && (
-                                    <button onClick={handleDeleteKeyframe} style={{ ...smallBtnStyle, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
-                                        <Trash2 size={12} /> 刪除關鍵幀
-                                    </button>
+                                    <>
+                                        <button onClick={handleUpdateKeyframe} style={{ ...smallBtnStyle, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0' }} title="以目前模型位置更新此關鍵幀">
+                                            <RefreshCw size={12} /> 更新關鍵幀
+                                        </button>
+                                        <button onClick={handleDeleteKeyframe} style={{ ...smallBtnStyle, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+                                            <Trash2 size={12} /> 刪除關鍵幀
+                                        </button>
+                                    </>
                                 )}
                                 <span style={{ flex: 1 }} />
                                 <span style={{ fontSize: 10, color: '#94a3b8' }}>
