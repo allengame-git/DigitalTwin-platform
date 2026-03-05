@@ -262,7 +262,7 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                 </div>
                             )}
                             <div className="dm-file-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-                                <button className="dm-file-btn" onClick={() => { setIsEditingRoot(true); setEditRootForm({ name: rootScene.name, description: rootScene.description || '', sceneType: rootScene.sceneType || 'normal' }); }}>編輯名稱</button>
+                                <button className="dm-file-btn" onClick={() => { setIsEditingRoot(true); setEditRootForm({ name: rootScene.name, description: rootScene.description || '', sceneType: rootScene.sceneType || 'normal' }); }}>編輯內容</button>
                                 <button className="dm-file-btn" onClick={() => { setPlanUploadSceneId(rootScene.id); planInputRef.current?.click(); }} disabled={isPlanUploading}>{isPlanUploading ? '上傳中...' : (rootScene.planImageUrl || rootScene.autoPlanImageUrl) ? '更換平面圖' : '上傳平面圖'}</button>
                             </div>
                         </div>
