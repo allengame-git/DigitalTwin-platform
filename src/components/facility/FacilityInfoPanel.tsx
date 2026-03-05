@@ -46,6 +46,9 @@ export default function FacilityInfoPanel() {
 
     if (!selectedModelId) return null
 
+    // 裝飾模型不顯示 InfoPanel
+    if (models.find(m => m.id === selectedModelId)?.modelType === 'decorative') return null
+
     // Lobby 模式下，有子場景的模型不顯示 InfoPanel
     if (currentSceneType === 'lobby' && selectedModelId && getChildScenes(selectedModelId).length > 0) return null
 
