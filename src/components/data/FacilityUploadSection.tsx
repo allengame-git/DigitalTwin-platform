@@ -42,6 +42,7 @@ interface FacilityModelItem {
     position?: { x: number; y: number; z: number };
     rotation?: { x: number; y: number; z: number };
     scale?: { x: number; y: number; z: number };
+    modelType?: 'primary' | 'decorative';
 }
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -420,6 +421,7 @@ const ModelUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
     const [sceneId, setSceneId] = useState('');
     const [modelName, setModelName] = useState('');
     const [childSceneId, setChildSceneId] = useState('');
+    const [modelType, setModelType] = useState<'primary' | 'decorative'>('primary');
     const [uploadProgress, setUploadProgress] = useState(0);
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -470,6 +472,7 @@ const ModelUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
             fd.append('name', modelName.trim());
             fd.append('sceneId', sceneId);
             if (childSceneId) fd.append('childSceneId', childSceneId);
+            fd.append('modelType', modelType);
 
             await axios.post(`${API_BASE}/api/facility/models`, fd, {
                 headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
@@ -483,6 +486,7 @@ const ModelUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
             setSelectedFile(null);
             setModelName('');
             setChildSceneId('');
+            setModelType('primary');
             setUploadProgress(0);
         } catch (e: any) {
             setError(e?.response?.data?.error || '上傳失敗');
@@ -500,6 +504,19 @@ const ModelUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
             <div className="dm-form-group">
                 <label className="dm-form-label">目標場景 *</label>
                 <SceneSelect scenes={scenes} value={sceneId} onChange={setSceneId} />
+            </div>
+
+            {/* Model type selector */}
+            <div className="dm-form-group">
+                <label className="dm-form-label">模型類型</label>
+                <select
+                    className="dm-form-input"
+                    value={modelType}
+                    onChange={e => setModelType(e.target.value as 'primary' | 'decorative')}
+                >
+                    <option value="primary">一般模型（可互動、可填資訊）</option>
+                    <option value="decorative">附屬模型（景觀裝飾，不可互動）</option>
+                </select>
             </div>
 
             {/* Drop zone */}
@@ -540,10 +557,12 @@ const ModelUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
             </div>
 
             {/* Child scene link */}
-            <div className="dm-form-group">
-                <label className="dm-form-label">點擊進入的子場景（可選）</label>
-                <SceneSelect scenes={scenes} value={childSceneId} onChange={setChildSceneId} placeholder="（無）" />
-            </div>
+            {modelType === 'primary' && (
+                <div className="dm-form-group">
+                    <label className="dm-form-label">點擊進入的子場景（可選）</label>
+                    <SceneSelect scenes={scenes} value={childSceneId} onChange={setChildSceneId} placeholder="（無）" />
+                </div>
+            )}
 
             {/* Progress */}
             {isUploading && (
@@ -924,12 +943,12 @@ const ModelInfoDashboard: React.FC<{ projectId: string }> = ({ projectId }) => {
             </div>
 
             {isLoadingModels && <div style={{ color: '#64748b', fontSize: 13 }}>載入中...</div>}
-            {!isLoadingModels && sceneId && models.length === 0 && (
+            {!isLoadingModels && sceneId && models.filter(m => m.modelType !== 'decorative').length === 0 && (
                 <div style={{ color: '#94a3b8', fontSize: 13 }}>此場景尚無模型</div>
             )}
-            {!isLoadingModels && models.length > 0 && (
+            {!isLoadingModels && models.filter(m => m.modelType !== 'decorative').length > 0 && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
-                    {models.map(m => (
+                    {models.filter(m => m.modelType !== 'decorative').map(m => (
                         <ModelCard key={m.id} model={m} onClick={() => setSelectedModel(m)} />
                     ))}
                 </div>
