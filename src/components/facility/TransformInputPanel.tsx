@@ -2,7 +2,7 @@
  * TransformInputPanel — 模型精確數值輸入面板
  * 編輯模式下選中模型後顯示，允許直接輸入 position / rotation / scale 數值。
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Move, RotateCcw, Maximize2 } from 'lucide-react';
 import type { FC, SVGProps } from 'react';
 import { useFacilityStore } from '../../stores/facilityStore';
@@ -24,26 +24,42 @@ const MODES: { key: Mode; label: string; Icon: LucideIcon }[] = [
     { key: 'scale',     label: '縮放', Icon: Maximize2 },
 ];
 
-const AXIS_COLOR: Record<Axis, string> = {
-    x: '#f87171',
-    y: '#4ade80',
-    z: '#60a5fa',
+// 專業配色：Violet / Sky / Teal — 有差異但低飽和，避免原色 RGB
+const AXIS_ACCENT: Record<Axis, string> = {
+    x: '#7c3aed',   // violet-700
+    y: '#0f766e',   // teal-700
+    z: '#0369a1',   // sky-700
 };
 
-const AXIS_LABEL: Record<Mode, Record<Axis, string>> = {
-    translate: { x: 'X  東',  y: 'Y  高程', z: 'Z  北'    },
-    rotate:    { x: 'Rx 俯仰', y: 'Ry 方位', z: 'Rz 橫滾'  },
-    scale:     { x: 'X',      y: 'Y',       z: 'Z'         },
+// 移動模式：顯示名稱 + 副標（單位/方向）
+const AXIS_META: Record<Mode, Record<Axis, { key: string; sub: string }>> = {
+    translate: {
+        x: { key: 'X',  sub: '東' },
+        y: { key: 'Y',  sub: '高程' },
+        z: { key: 'Z',  sub: '北' },
+    },
+    rotate: {
+        x: { key: 'Rx', sub: '俯仰' },
+        y: { key: 'Ry', sub: '方位' },
+        z: { key: 'Rz', sub: '橫滾' },
+    },
+    scale: {
+        x: { key: 'X',  sub: '寬' },
+        y: { key: 'Y',  sub: '高' },
+        z: { key: 'Z',  sub: '深' },
+    },
 };
 
-const HINT: Record<Mode, string> = {
-    translate: 'Enter / blur 套用 · 單位：m',
-    rotate:    'Enter / blur 套用 · 單位：°',
-    scale:     'Enter / blur 套用',
+const UNIT: Record<Mode, string> = {
+    translate: 'm',
+    rotate: '°',
+    scale: '×',
 };
 
 const vec3ToStr = (v: Vec3): Record<Axis, string> =>
     ({ x: String(v.x), y: String(v.y), z: String(v.z) });
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 const TransformInputPanel: React.FC = () => {
     const {
@@ -54,6 +70,7 @@ const TransformInputPanel: React.FC = () => {
     const editingModel = models.find(m => m.id === editingModelId) ?? null;
     const [draft, setDraft] = useState<Record<Axis, string>>({ x: '0', y: '0', z: '0' });
     const [focusedAxis, setFocusedAxis] = useState<Axis | null>(null);
+    const inputRefs = useRef<Partial<Record<Axis, HTMLInputElement>>>({});
 
     useEffect(() => {
         if (!editingModel) return;
@@ -86,56 +103,66 @@ const TransformInputPanel: React.FC = () => {
 
     if (!editMode || !editingModelId || !editingModel) return null;
 
-    // 移動模式：東(x) → 北(z) → 高程(y)，地理直覺順序
+    // 移動模式：東(x) → 北(z) → 高程(y)；其他模式：x y z
     const axes: Axis[] = transformMode === 'translate' ? ['x', 'z', 'y'] : ['x', 'y', 'z'];
 
     return (
         <div style={panel}>
-            {/* Header */}
+            {/* ── Header ── */}
             <div style={header}>
                 <div style={headerLeft}>
-                    <div style={headerDot} />
-                    <span style={headerTitle}>{editingModel.name}</span>
+                    <div style={statusDot} />
+                    <span style={modelName} title={editingModel.name}>{editingModel.name}</span>
                 </div>
-                <span style={headerBadge}>TRANSFORM</span>
+                <span style={badge}>TRANSFORM</span>
             </div>
 
-            {/* Divider */}
             <div style={divider} />
 
-            {/* Mode tabs */}
-            <div style={modeRow}>
+            {/* ── Mode tabs ── */}
+            <div style={tabBar}>
                 {MODES.map(({ key, label, Icon }) => {
                     const active = transformMode === key;
                     return (
                         <button
                             key={key}
                             onClick={() => setTransformMode(key)}
-                            style={{ ...modeBtn, ...(active ? modeBtnActive : {}) }}
+                            style={{ ...tab, ...(active ? tabActive : {}) }}
                         >
-                            <Icon size={12} strokeWidth={2} opacity={active ? 1 : 0.5} />
+                            <Icon size={11} strokeWidth={active ? 2.5 : 2} opacity={active ? 1 : 0.5} />
                             <span>{label}</span>
                         </button>
                     );
                 })}
             </div>
 
-            {/* Axis inputs */}
-            <div style={axisGrid}>
+            {/* ── Axis rows ── */}
+            <div style={axisStack}>
                 {axes.map(axis => {
                     const isFocused = focusedAxis === axis;
-                    const color = AXIS_COLOR[axis];
+                    const accent = AXIS_ACCENT[axis];
+                    const meta = AXIS_META[transformMode][axis];
                     return (
-                        <div key={axis} style={axisCell}>
-                            {/* Axis badge */}
-                            <div style={{ ...axisBadge, background: `${color}18`, borderColor: `${color}40` }}>
-                                <span style={{ ...axisDot, background: color }} />
-                                <span style={{ ...axisLabel, color }}>
-                                    {AXIS_LABEL[transformMode][axis]}
-                                </span>
+                        <div
+                            key={axis}
+                            style={{
+                                ...axisRow,
+                                borderLeftColor: accent,
+                                borderColor: isFocused ? accent + '60' : '#e2e8f0',
+                                boxShadow: isFocused ? `0 0 0 2px ${accent}18` : 'none',
+                                background: isFocused ? '#fafbff' : '#f8fafc',
+                            }}
+                            onClick={() => inputRefs.current[axis]?.focus()}
+                        >
+                            {/* Label */}
+                            <div style={axisLabelBlock}>
+                                <span style={{ ...axisKey, color: accent }}>{meta.key}</span>
+                                <span style={axisSub}>{meta.sub}</span>
                             </div>
+
                             {/* Input */}
                             <input
+                                ref={el => { if (el) inputRefs.current[axis] = el; }}
                                 type="text"
                                 inputMode="decimal"
                                 value={draft[axis]}
@@ -143,81 +170,79 @@ const TransformInputPanel: React.FC = () => {
                                 onFocus={() => setFocusedAxis(axis)}
                                 onBlur={() => { setFocusedAxis(null); handleCommit(); }}
                                 onKeyDown={handleKeyDown}
-                                style={{
-                                    ...axisInput,
-                                    borderColor: isFocused ? `${color}80` : '#e2e8f0',
-                                    boxShadow: isFocused ? `0 0 0 2px ${color}20` : 'none',
-                                }}
+                                style={axisInput}
                             />
+
+                            {/* Unit */}
+                            <span style={unitLabel}>{UNIT[transformMode]}</span>
                         </div>
                     );
                 })}
             </div>
 
-            {/* Hint */}
-            <div style={hint}>{HINT[transformMode]}</div>
+            {/* ── Hint ── */}
+            <div style={hint}>Enter 或點擊其他區域套用</div>
         </div>
     );
 };
 
-// ── Styles ──────────────────────────────────────────────────────────────────
+// ── Styles ───────────────────────────────────────────────────────────────────
 
 const panel: React.CSSProperties = {
     position: 'fixed',
     bottom: 20,
     left: 288,
     zIndex: 30,
-    background: 'rgba(255,255,255,0.97)',
-    backdropFilter: 'blur(16px)',
-    border: '1px solid rgba(0,0,0,0.08)',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
     borderRadius: 12,
-    padding: '14px 16px',
-    minWidth: 340,
-    boxShadow: '0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.06)',
-    color: '#0f172a',
-    fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif",
+    padding: '14px 14px 12px',
+    width: 248,
+    boxShadow: '0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)',
+    fontFamily: "'Inter', 'SF Pro Text', system-ui, sans-serif",
 };
 
 const header: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 10,
 };
 
 const headerLeft: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
     overflow: 'hidden',
+    flex: 1,
 };
 
-const headerDot: React.CSSProperties = {
-    width: 8,
-    height: 8,
+const statusDot: React.CSSProperties = {
+    width: 7,
+    height: 7,
     borderRadius: '50%',
     background: '#2563eb',
-    boxShadow: '0 0 6px #2563eb60',
     flexShrink: 0,
 };
 
-const headerTitle: React.CSSProperties = {
+const modelName: React.CSSProperties = {
     fontSize: 13,
     fontWeight: 600,
-    color: '#0f172a',
+    color: '#1e293b',
     letterSpacing: '-0.01em',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
 };
 
-const headerBadge: React.CSSProperties = {
+const badge: React.CSSProperties = {
     fontSize: 9,
     fontWeight: 700,
-    letterSpacing: '0.1em',
-    color: '#2563eb',
-    background: 'rgba(37,99,235,0.08)',
-    border: '1px solid rgba(37,99,235,0.2)',
+    letterSpacing: '0.08em',
+    color: '#64748b',
+    background: '#f1f5f9',
+    border: '1px solid #e2e8f0',
     borderRadius: 4,
     padding: '2px 6px',
     flexShrink: 0,
@@ -225,99 +250,115 @@ const headerBadge: React.CSSProperties = {
 
 const divider: React.CSSProperties = {
     height: 1,
-    background: 'linear-gradient(90deg, #e2e8f0 0%, transparent 100%)',
-    marginBottom: 12,
+    background: '#f1f5f9',
+    marginBottom: 10,
 };
 
-const modeRow: React.CSSProperties = {
+const tabBar: React.CSSProperties = {
     display: 'flex',
-    gap: 4,
-    marginBottom: 14,
+    gap: 3,
+    marginBottom: 12,
     background: '#f1f5f9',
-    borderRadius: 8,
+    borderRadius: 7,
     padding: 3,
     border: '1px solid #e2e8f0',
 };
 
-const modeBtn: React.CSSProperties = {
+const tab: React.CSSProperties = {
     flex: 1,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    padding: '6px 0',
-    borderRadius: 6,
+    gap: 4,
+    padding: '5px 0',
+    borderRadius: 5,
     border: 'none',
     fontSize: 11,
     fontWeight: 500,
     cursor: 'pointer',
-    transition: 'background 0.15s, color 0.15s',
+    transition: 'background 0.12s, color 0.12s, box-shadow 0.12s',
     background: 'transparent',
     color: '#94a3b8',
     letterSpacing: '0.01em',
+    userSelect: 'none',
 };
 
-const modeBtnActive: React.CSSProperties = {
+const tabActive: React.CSSProperties = {
     background: '#ffffff',
-    color: '#2563eb',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+    color: '#1e40af',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+    fontWeight: 600,
 };
 
-const axisGrid: React.CSSProperties = {
-    display: 'flex',
-    gap: 8,
-};
-
-const axisCell: React.CSSProperties = {
-    flex: 1,
+const axisStack: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: 5,
+    gap: 6,
 };
 
-const axisBadge: React.CSSProperties = {
+const axisRow: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: 5,
-    padding: '3px 7px',
-    borderRadius: 5,
+    gap: 10,
+    padding: '8px 10px 8px 12px',
+    borderRadius: 8,
     border: '1px solid',
+    borderLeft: '3px solid',
+    cursor: 'text',
+    transition: 'border-color 0.15s, box-shadow 0.15s, background 0.15s',
 };
 
-const axisDot: React.CSSProperties = {
-    width: 5,
-    height: 5,
-    borderRadius: '50%',
+const axisLabelBlock: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 1,
+    minWidth: 32,
     flexShrink: 0,
 };
 
-const axisLabel: React.CSSProperties = {
-    fontSize: 10,
+const axisKey: React.CSSProperties = {
+    fontSize: 12,
     fontWeight: 700,
-    letterSpacing: '0.04em',
-    whiteSpace: 'nowrap',
+    letterSpacing: '0.02em',
+    lineHeight: 1,
+};
+
+const axisSub: React.CSSProperties = {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: 400,
+    lineHeight: 1,
 };
 
 const axisInput: React.CSSProperties = {
-    width: '100%',
-    padding: '7px 9px',
-    borderRadius: 6,
-    border: '1px solid',
-    background: '#f8fafc',
-    color: '#0f172a',
-    fontSize: 12,
+    flex: 1,
+    minWidth: 0,
+    padding: 0,
+    border: 'none',
+    background: 'transparent',
+    color: '#1e293b',
+    fontSize: 13,
     fontFamily: "'JetBrains Mono', 'Fira Code', 'SF Mono', monospace",
+    fontWeight: 500,
     outline: 'none',
-    boxSizing: 'border-box',
-    transition: 'border-color 0.15s, box-shadow 0.15s',
-    letterSpacing: '0.02em',
+    textAlign: 'right',
+    letterSpacing: '0.01em',
+};
+
+const unitLabel: React.CSSProperties = {
+    fontSize: 11,
+    color: '#cbd5e1',
+    fontWeight: 500,
+    flexShrink: 0,
+    userSelect: 'none',
 };
 
 const hint: React.CSSProperties = {
     marginTop: 10,
     fontSize: 10,
-    color: '#94a3b8',
-    letterSpacing: '0.02em',
+    color: '#cbd5e1',
+    textAlign: 'center',
+    letterSpacing: '0.01em',
 };
 
 export default TransformInputPanel;
