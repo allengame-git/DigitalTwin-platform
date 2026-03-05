@@ -127,7 +127,7 @@ const FacilitySidebar: React.FC = () => {
                     {currentScene?.name ?? '設施導覽'}
                 </h1>
                 <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>
-                    {models.length > 0 ? `${models.length} 個模型` : '互動式 3D 設施導覽'}
+                    互動式 3D 設施導覽
                 </p>
             </div>
 
@@ -183,11 +183,6 @@ const FacilitySidebar: React.FC = () => {
                         }}>
                             模型清單
                         </span>
-                        {models.length > 0 && (
-                            <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9ca3af' }}>
-                                {models.length}
-                            </span>
-                        )}
                     </div>
 
                     {isLoading && (
