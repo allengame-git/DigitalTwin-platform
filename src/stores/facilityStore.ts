@@ -12,6 +12,7 @@ const getAuthHeaders = () => {
 
 interface FacilityState {
     // Scene tree
+    loadedProjectId: string | null;  // 記錄已載入的專案，避免重複重置
     scenes: FacilityScene[];
     currentSceneId: string | null;
     sceneStack: string[];            // navigation history
@@ -81,6 +82,7 @@ interface FacilityState {
 }
 
 export const useFacilityStore = create<FacilityState>((set, get) => ({
+    loadedProjectId: null,
     scenes: [],
     currentSceneId: null,
     sceneStack: [],
@@ -99,6 +101,8 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
 
     // ===== Scene Actions =====
     fetchScenes: async (projectId: string) => {
+        // 同一專案不重複重置（避免重新進入頁面時場景閃爍重載）
+        if (get().loadedProjectId === projectId) return;
         try {
             const res = await axios.get<FacilityScene[]>(`${API_BASE}/api/facility/scenes`, {
                 params: { projectId },
@@ -106,6 +110,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
                 withCredentials: true,
             });
             set({
+                loadedProjectId: projectId,
                 scenes: Array.isArray(res.data) ? res.data : [],
                 // 切換專案時清空導覽狀態，避免殘留舊專案資料
                 currentSceneId: null,
