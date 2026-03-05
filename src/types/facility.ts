@@ -50,6 +50,7 @@ export interface FacilityModel {
     rotation: { x: number; y: number; z: number };
     scale: { x: number; y: number; z: number };
     sortOrder: number;
+    modelType: 'primary' | 'decorative';
     createdAt: string;
     updatedAt: string;
     infos: FacilityModelInfo[];
