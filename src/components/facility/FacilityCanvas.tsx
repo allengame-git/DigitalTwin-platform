@@ -30,6 +30,7 @@ export function FacilityCanvas() {
                     powerPreference: 'high-performance',
                     preserveDrawingBuffer: true,   // 截圖必要
                 }}
+                linear={false}  // 確保 sRGB 輸出，GLB 材質顏色正確
                 shadows
                 onPointerMissed={() => selectModel(null)}
             >
