@@ -205,7 +205,7 @@ const FacilitySidebar: React.FC = () => {
                     {!isLoading && models.length > 0 && (
                         <ul style={{ listStyle: 'none', margin: 0, padding: '0 4px 4px' }}>
                             {models
-                                .slice()
+                                .filter(m => m.modelType !== 'decorative')
                                 .sort((a, b) => a.sortOrder - b.sortOrder)
                                 .map(model => {
                                     const isSelected = model.id === selectedModelId;
