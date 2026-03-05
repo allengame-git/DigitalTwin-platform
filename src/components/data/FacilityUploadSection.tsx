@@ -720,6 +720,17 @@ function ModelInfoModal({ model, onClose, onSaved }: ModelInfoModalProps) {
         introDebounceRef.current = setTimeout(() => saveIntro(html), 2000);
     };
 
+    const handleIntroImageUpload = async (file: File): Promise<string> => {
+        const formData = new FormData();
+        formData.append('image', file);
+        const res = await axios.post<{ url: string }>(
+            `${API_BASE}/api/facility/models/${model.id}/intro-image`,
+            formData,
+            { headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' }, withCredentials: true }
+        );
+        return `${API_BASE}${res.data.url}`;
+    };
+
     const handleDiagramFiles = async (files: FileList | null) => {
         if (!files || files.length === 0) return;
         setIsDiagramUploading(true);
@@ -819,7 +830,7 @@ function ModelInfoModal({ model, onClose, onSaved }: ModelInfoModalProps) {
                     {/* 設施介紹 */}
                     <div style={sectionStyle}>
                         <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>設施介紹</div>
-                        <RichTextEditor value={intro} onChange={handleIntroChange} placeholder="輸入設施介紹文字..." />
+                        <RichTextEditor value={intro} onChange={handleIntroChange} placeholder="輸入設施介紹文字..." onImageUpload={handleIntroImageUpload} />
                         <div style={{ textAlign: 'right', marginTop: 8 }}>
                             <button
                                 onClick={() => { if (introDebounceRef.current) clearTimeout(introDebounceRef.current); saveIntro(intro); }}

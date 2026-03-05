@@ -16,8 +16,9 @@ const MODELS_DIR = path.join(FACILITY_DIR, 'models');
 const INFO_DIR = path.join(FACILITY_DIR, 'info');
 const PLANS_DIR = path.join(FACILITY_DIR, 'plans');
 const TERRAIN_DIR = path.join(FACILITY_DIR, 'terrain');
+const INTRO_IMAGES_DIR = path.join(FACILITY_DIR, 'intro-images');
 
-[FACILITY_DIR, MODELS_DIR, INFO_DIR, PLANS_DIR, TERRAIN_DIR].forEach(dir => {
+[FACILITY_DIR, MODELS_DIR, INFO_DIR, PLANS_DIR, TERRAIN_DIR, INTRO_IMAGES_DIR].forEach(dir => {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
@@ -409,6 +410,29 @@ router.delete('/models/:id', authenticate, async (req: Request, res: Response) =
         console.error('[Facility] Delete model error:', error);
         res.status(500).json({ error: '刪除模型失敗' });
     }
+});
+
+// ===== Intro Image Upload =====
+const introImageStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, INTRO_IMAGES_DIR),
+    filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `intro-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`);
+    },
+});
+const introImageUpload = multer({
+    storage: introImageStorage,
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+        const allowed = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+        cb(null, allowed.includes(path.extname(file.originalname).toLowerCase()));
+    },
+});
+
+// POST /models/:id/intro-image — 上傳介紹內嵌圖片，回傳可存取 URL
+router.post('/models/:id/intro-image', authenticate, introImageUpload.single('image'), (req: Request, res: Response) => {
+    if (!req.file) return res.status(400).json({ error: '未上傳圖片' });
+    res.json({ url: `/uploads/facility/intro-images/${req.file.filename}` });
 });
 
 // ===== Rich Content (Info) =====
