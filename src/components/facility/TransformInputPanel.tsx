@@ -145,8 +145,8 @@ const TransformInputPanel: React.FC = () => {
                                 onKeyDown={handleKeyDown}
                                 style={{
                                     ...axisInput,
-                                    borderColor: isFocused ? `${color}60` : 'rgba(255,255,255,0.07)',
-                                    boxShadow: isFocused ? `0 0 0 1px ${color}30` : 'none',
+                                    borderColor: isFocused ? `${color}80` : '#e2e8f0',
+                                    boxShadow: isFocused ? `0 0 0 2px ${color}20` : 'none',
                                 }}
                             />
                         </div>
@@ -167,14 +167,14 @@ const panel: React.CSSProperties = {
     bottom: 20,
     left: 288,
     zIndex: 30,
-    background: 'linear-gradient(160deg, rgba(13,17,27,0.97) 0%, rgba(10,14,22,0.97) 100%)',
+    background: 'rgba(255,255,255,0.97)',
     backdropFilter: 'blur(16px)',
-    border: '1px solid rgba(255,255,255,0.07)',
+    border: '1px solid rgba(0,0,0,0.08)',
     borderRadius: 12,
     padding: '14px 16px',
     minWidth: 340,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
-    color: '#e2e8f0',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.06)',
+    color: '#0f172a',
     fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif",
 };
 
@@ -196,15 +196,15 @@ const headerDot: React.CSSProperties = {
     width: 8,
     height: 8,
     borderRadius: '50%',
-    background: '#3b82f6',
-    boxShadow: '0 0 8px #3b82f680',
+    background: '#2563eb',
+    boxShadow: '0 0 6px #2563eb60',
     flexShrink: 0,
 };
 
 const headerTitle: React.CSSProperties = {
     fontSize: 13,
     fontWeight: 600,
-    color: '#f1f5f9',
+    color: '#0f172a',
     letterSpacing: '-0.01em',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -215,9 +215,9 @@ const headerBadge: React.CSSProperties = {
     fontSize: 9,
     fontWeight: 700,
     letterSpacing: '0.1em',
-    color: '#3b82f6',
-    background: 'rgba(59,130,246,0.12)',
-    border: '1px solid rgba(59,130,246,0.25)',
+    color: '#2563eb',
+    background: 'rgba(37,99,235,0.08)',
+    border: '1px solid rgba(37,99,235,0.2)',
     borderRadius: 4,
     padding: '2px 6px',
     flexShrink: 0,
@@ -225,7 +225,7 @@ const headerBadge: React.CSSProperties = {
 
 const divider: React.CSSProperties = {
     height: 1,
-    background: 'linear-gradient(90deg, rgba(255,255,255,0.08) 0%, transparent 100%)',
+    background: 'linear-gradient(90deg, #e2e8f0 0%, transparent 100%)',
     marginBottom: 12,
 };
 
@@ -233,10 +233,10 @@ const modeRow: React.CSSProperties = {
     display: 'flex',
     gap: 4,
     marginBottom: 14,
-    background: 'rgba(0,0,0,0.25)',
+    background: '#f1f5f9',
     borderRadius: 8,
     padding: 3,
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid #e2e8f0',
 };
 
 const modeBtn: React.CSSProperties = {
@@ -253,14 +253,14 @@ const modeBtn: React.CSSProperties = {
     cursor: 'pointer',
     transition: 'background 0.15s, color 0.15s',
     background: 'transparent',
-    color: 'rgba(255,255,255,0.38)',
+    color: '#94a3b8',
     letterSpacing: '0.01em',
 };
 
 const modeBtnActive: React.CSSProperties = {
-    background: 'rgba(59,130,246,0.2)',
-    color: '#93c5fd',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)',
+    background: '#ffffff',
+    color: '#2563eb',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
 };
 
 const axisGrid: React.CSSProperties = {
@@ -303,8 +303,8 @@ const axisInput: React.CSSProperties = {
     padding: '7px 9px',
     borderRadius: 6,
     border: '1px solid',
-    background: 'rgba(255,255,255,0.04)',
-    color: '#f1f5f9',
+    background: '#f8fafc',
+    color: '#0f172a',
     fontSize: 12,
     fontFamily: "'JetBrains Mono', 'Fira Code', 'SF Mono', monospace",
     outline: 'none',
@@ -316,7 +316,7 @@ const axisInput: React.CSSProperties = {
 const hint: React.CSSProperties = {
     marginTop: 10,
     fontSize: 10,
-    color: 'rgba(255,255,255,0.2)',
+    color: '#94a3b8',
     letterSpacing: '0.02em',
 };
 
