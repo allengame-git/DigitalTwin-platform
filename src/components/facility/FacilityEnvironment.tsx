@@ -33,6 +33,12 @@ export function FacilityEnvironment() {
                 args={[2000, 100, '#cccccc', '#e0e0e0']}
                 position={[0, -0.01, 0]}
             />
+
+            {/* 透明地面 — 只用來接收模型陰影 */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
+                <planeGeometry args={[4000, 4000]} />
+                <shadowMaterial transparent opacity={0.35} />
+            </mesh>
         </>
     );
 }
