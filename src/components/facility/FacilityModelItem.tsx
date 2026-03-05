@@ -4,7 +4,7 @@
  */
 import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
-import { Html, TransformControls } from '@react-three/drei';
+import { Html, TransformControls, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useFrame } from '@react-three/fiber';
@@ -141,6 +141,7 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const selectedAnimationId = useFacilityStore(state => state.selectedAnimationId);
     const manualPlayingModelIds = useFacilityStore(state => state.manualPlayingModelIds);
     const isManualPlaying = manualPlayingModelIds.includes(model.id);
+    const editingKeyframeIndex = useFacilityStore(state => state.editingKeyframeIndex);
 
     const isSelected = selectedModelIds.includes(model.id);
     const isFocused = focusedModelId === model.id;
@@ -473,6 +474,17 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
         document.body.style.cursor = 'auto';
     }, [setHoveredModel]);
 
+    // ── 動畫路徑可視化資料 ──
+    const pathVizData = useMemo(() => {
+        if (!animationMode || !selectedAnimationId) return null;
+        const anim = animations.find(a => a.id === selectedAnimationId && a.type === 'keyframe');
+        if (!anim) return null;
+        const posKfs = anim.keyframes.filter(kf => kf.position);
+        if (posKfs.length < 2) return null;
+        const points = posKfs.map(kf => new THREE.Vector3(kf.position!.x, kf.position!.y, kf.position!.z));
+        return { points, keyframes: posKfs, animKeyframes: anim.keyframes };
+    }, [animationMode, selectedAnimationId, animations]);
+
     // 隱藏模型：不渲染但保留 ref 註冊
     if (isHidden) return null;
 
@@ -541,6 +553,27 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                     mode={transformMode}
                     onChange={isEditing ? handleTransformChange : undefined}
                 />
+            )}
+
+            {/* 動畫路徑可視化：路徑線 + 關鍵幀節點球 */}
+            {pathVizData && (
+                <>
+                    <Line
+                        points={pathVizData.points}
+                        color="#7c3aed"
+                        lineWidth={2}
+                    />
+                    {pathVizData.points.map((pt, i) => {
+                        const kfIndex = pathVizData.animKeyframes.indexOf(pathVizData.keyframes[i]);
+                        const isEditingKf = editingKeyframeIndex === kfIndex;
+                        return (
+                            <mesh key={i} position={pt}>
+                                <sphereGeometry args={[isEditingKf ? 0.5 : 0.3, 12, 8]} />
+                                <meshBasicMaterial color={isEditingKf ? '#a78bfa' : '#7c3aed'} />
+                            </mesh>
+                        );
+                    })}
+                </>
             )}
         </>
     );
