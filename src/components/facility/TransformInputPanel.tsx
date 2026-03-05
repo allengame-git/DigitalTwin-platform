@@ -74,9 +74,15 @@ const TransformInputPanel: React.FC = () => {
 
     useEffect(() => {
         if (!editingModel) return;
-        if (transformMode === 'translate') setDraft(vec3ToStr(editingModel.position ?? DEFAULT_VEC3));
-        else if (transformMode === 'rotate') setDraft(vec3ToStr(editingModel.rotation ?? DEFAULT_VEC3));
-        else setDraft(vec3ToStr(editingModel.scale ?? DEFAULT_SCALE));
+        if (transformMode === 'translate') {
+            // Three.js +X = West, +Z = South；UI 顯示東/北，需對 X/Z 取反
+            const p = editingModel.position ?? DEFAULT_VEC3;
+            setDraft(vec3ToStr({ x: -p.x, y: p.y, z: -p.z }));
+        } else if (transformMode === 'rotate') {
+            setDraft(vec3ToStr(editingModel.rotation ?? DEFAULT_VEC3));
+        } else {
+            setDraft(vec3ToStr(editingModel.scale ?? DEFAULT_SCALE));
+        }
     }, [editingModel?.id, transformMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleAxisChange = useCallback((axis: Axis, raw: string) => {
@@ -85,15 +91,18 @@ const TransformInputPanel: React.FC = () => {
 
     const handleCommit = useCallback(() => {
         if (!editingModelId) return;
-        const vec: Vec3 = {
-            x: parseFloat(draft.x) || 0,
-            y: parseFloat(draft.y) || 0,
-            z: parseFloat(draft.z) || 0,
-        };
+        const uiX = parseFloat(draft.x) || 0;
+        const uiY = parseFloat(draft.y) || 0;
+        const uiZ = parseFloat(draft.z) || 0;
         const transform: Transform = {};
-        if (transformMode === 'translate') transform.position = vec;
-        else if (transformMode === 'rotate') transform.rotation = vec;
-        else transform.scale = vec;
+        if (transformMode === 'translate') {
+            // UI 東/北 為正 → Three.js X/Z 需取反
+            transform.position = { x: -uiX, y: uiY, z: -uiZ };
+        } else if (transformMode === 'rotate') {
+            transform.rotation = { x: uiX, y: uiY, z: uiZ };
+        } else {
+            transform.scale = { x: uiX, y: uiY, z: uiZ };
+        }
         updateModelTransform(editingModelId, transform);
     }, [editingModelId, transformMode, draft, updateModelTransform]);
 
