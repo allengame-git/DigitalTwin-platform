@@ -8,11 +8,13 @@ import { FacilityCameraController } from './FacilityCameraController';
 import { FacilityCaptureHandler } from './FacilityCaptureHandler';
 import { useFacilityStore } from '../../stores/facilityStore';
 import { ScaleBarCalculator, ScaleBarOverlay, useScaleBar } from '../overlay/ScaleBar';
+import { FacilityNorthArrowCalculator, FacilityNorthArrowOverlay, useFacilityNorthArrow } from './FacilityNorthArrow';
 
 export function FacilityCanvas() {
     const isLoading = useFacilityStore(state => state.isLoading);
     const selectModel = useFacilityStore(state => state.selectModel);
     const { pixelsPerMeter, handleScaleChange } = useScaleBar();
+    const { cameraRotation, handleRotationChange } = useFacilityNorthArrow();
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -55,9 +57,11 @@ export function FacilityCanvas() {
                 <FacilityCameraController />
                 <FacilityCaptureHandler />
                 <ScaleBarCalculator onScaleChange={handleScaleChange} />
+                <FacilityNorthArrowCalculator onRotationChange={handleRotationChange} />
             </Canvas>
 
             <ScaleBarOverlay pixelsPerMeter={pixelsPerMeter} />
+            <FacilityNorthArrowOverlay cameraRotation={cameraRotation} />
 
             {isLoading && (
                 <div style={{
