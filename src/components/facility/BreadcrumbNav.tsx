@@ -35,8 +35,10 @@ const BreadcrumbNav: React.FC = () => {
             useFacilityStore.setState({
                 currentSceneId: sceneId,
                 sceneStack: targetStack,
-                selectedModelId: null,
+                selectedModelIds: [],
+                focusedModelId: null,
                 hoveredModelId: null,
+                hiddenModelIds: [],
                 editingModelId: null,
             });
             useFacilityStore.getState().fetchModels(sceneId);

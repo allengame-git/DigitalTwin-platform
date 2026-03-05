@@ -13,7 +13,7 @@ export default function PlanView() {
     const scenes = useFacilityStore(state => state.scenes);
     const currentSceneId = useFacilityStore(state => state.currentSceneId);
     const models = useFacilityStore(state => state.models);
-    const selectedModelId = useFacilityStore(state => state.selectedModelId);
+    const selectedModelId = useFacilityStore(state => state.focusedModelId);
     const selectModel = useFacilityStore(state => state.selectModel);
 
     const [expanded, setExpanded] = useState(true);

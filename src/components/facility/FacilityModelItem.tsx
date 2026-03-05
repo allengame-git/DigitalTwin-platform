@@ -109,8 +109,10 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const mixerRef = useRef<THREE.AnimationMixer | null>(null);
     const animStartTimeRef = useRef<number>(0);
 
-    const selectedModelId = useFacilityStore(state => state.selectedModelId);
+    const selectedModelIds = useFacilityStore(state => state.selectedModelIds);
+    const focusedModelId = useFacilityStore(state => state.focusedModelId);
     const hoveredModelId = useFacilityStore(state => state.hoveredModelId);
+    const hiddenModelIds = useFacilityStore(state => state.hiddenModelIds);
     const editMode = useFacilityStore(state => state.editMode);
     const editingModelId = useFacilityStore(state => state.editingModelId);
     const transformMode = useFacilityStore(state => state.transformMode);
@@ -135,8 +137,10 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const playbackTime = useFacilityStore(state => state.playbackTime);
     const selectedAnimationId = useFacilityStore(state => state.selectedAnimationId);
 
-    const isSelected = selectedModelId === model.id;
+    const isSelected = selectedModelIds.includes(model.id);
+    const isFocused = focusedModelId === model.id;
     const isHovered = hoveredModelId === model.id;
+    const isHidden = hiddenModelIds.includes(model.id);
     const isEditing = editMode && editingModelId === model.id;
     const isDecorative = model.modelType === 'decorative';
     const isLobby = currentSceneType === 'lobby';
@@ -207,15 +211,21 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
         return () => { unregisterModelGroupRef(model.id); };
     }, [model.id]);
 
-    // 動畫編輯中：有選取模型 + 選取動畫 + 非播放中
-    const isAnimEditing = animationMode && isSelected && selectedAnimationId !== null && playbackState !== 'playing';
+    // 動畫編輯中：焦點模型 + 選取動畫 + 非播放中
+    const isAnimEditing = animationMode && isFocused && selectedAnimationId !== null && playbackState !== 'playing';
 
     // ── 播放狀態切換時標記需要重置起始時間 ──
     const needResetStartTime = useRef(false);
     const prevPlaybackState = useRef(playbackState);
+    // paused 時只在 playbackTime 變化那一幀套用 interpolation，之後允許自由拖曳
+    const lastAppliedPauseTime = useRef<number>(-1);
     useEffect(() => {
         if (playbackState === 'playing' && prevPlaybackState.current !== 'playing') {
             needResetStartTime.current = true;
+        }
+        // 進入 paused 或 stopped 時重置，確保下次 snap
+        if (playbackState !== 'playing') {
+            lastAppliedPauseTime.current = -1;
         }
         prevPlaybackState.current = playbackState;
     }, [playbackState]);
@@ -279,11 +289,17 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                     useFacilityStore.getState().setPlaybackTime(currentTime);
                     shouldAnimate = true;
                 } else if (playbackState === 'paused') {
-                    currentTime = playbackTime;
-                    shouldAnimate = true;
+                    // 只在 playbackTime 實際變化時 snap 一次，之後允許 TransformControls 自由拖曳
+                    if (playbackTime !== lastAppliedPauseTime.current) {
+                        currentTime = playbackTime;
+                        shouldAnimate = true;
+                        lastAppliedPauseTime.current = playbackTime;
+                    }
                 }
-            } else if (anim.trigger === 'auto') {
-                // 自動播放模式
+            } else if (animationMode) {
+                // 動畫編輯模式中但非正在編輯的動畫 → 全部凍結不動
+            } else if (anim.trigger === 'auto' && playbackState !== 'paused') {
+                // 自動播放模式（暫停時不執行；stopped 代表正常自動播放狀態）
                 const elapsed = clock.elapsedTime;
                 currentTime = anim.loop
                     ? elapsed % anim.duration
@@ -393,12 +409,12 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
 
     const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation();
+        const multi = e.nativeEvent.metaKey || e.nativeEvent.ctrlKey;
         if (editMode) {
-            selectModel(model.id);
+            selectModel(model.id, multi);
             setEditingModel(model.id);
         } else {
-            // 任何情況下都只選取模型；有子場景時由 sidebar 提供進入入口
-            selectModel(model.id);
+            selectModel(model.id, multi);
         }
     }, [editMode, model.id, selectModel, setEditingModel]);
 
@@ -412,6 +428,9 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
         setHoveredModel(null);
         document.body.style.cursor = 'auto';
     }, [setHoveredModel]);
+
+    // 隱藏模型：不渲染但保留 ref 註冊
+    if (isHidden) return null;
 
     return (
         <>
@@ -439,8 +458,9 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                     <Html center zIndexRange={[100, 0]}>
                         <div
                             ref={labelRef}
-                            onClick={() => {
-                                selectModel(model.id);
+                            onClick={(e: React.MouseEvent) => {
+                                const multi = e.metaKey || e.ctrlKey;
+                                selectModel(model.id, multi);
                                 if (editMode) setEditingModel(model.id);
                             }}
                             style={{

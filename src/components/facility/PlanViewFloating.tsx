@@ -21,7 +21,7 @@ export default function PlanViewFloating() {
     const scenes        = useFacilityStore(s => s.scenes);
     const currentSceneId = useFacilityStore(s => s.currentSceneId);
     const models        = useFacilityStore(s => s.models);
-    const selectedModelId = useFacilityStore(s => s.selectedModelId);
+    const selectedModelId = useFacilityStore(s => s.focusedModelId);
     const selectModel   = useFacilityStore(s => s.selectModel);
     const flyToModel    = useFacilityStore(s => s.flyToModel);
     const showPlanView  = useFacilityStore(s => s.showPlanView);

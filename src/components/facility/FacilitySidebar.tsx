@@ -6,21 +6,104 @@
 
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronRight, Box, DoorOpen, Edit3, Tag, Map, Film, Move, RotateCw, Maximize2, ChevronDown } from 'lucide-react';
-import { useFacilityStore } from '@/stores/facilityStore';
+import { ChevronRight, Box, DoorOpen, Edit3, Tag, Map, Film, Move, RotateCw, Maximize2, ChevronDown, Trash2, Eye, EyeOff, CheckSquare, Play, Pause, Square } from 'lucide-react';
+import { useFacilityStore, getModelGroupRef } from '@/stores/facilityStore';
 import BreadcrumbNav from './BreadcrumbNav';
 
-// ── 動畫模式下的 Transform 操控（可摺疊）──
+type Axis = 'x' | 'y' | 'z';
+type TMode = 'translate' | 'rotate' | 'scale';
+
+const RAD2DEG = 180 / Math.PI;
+const DEG2RAD = Math.PI / 180;
+
+const AXIS_ACCENT: Record<Axis, string> = {
+    x: '#7c3aed', y: '#0f766e', z: '#0369a1',
+};
+
+const AXIS_META: Record<TMode, Record<Axis, { key: string; sub: string }>> = {
+    translate: { x: { key: 'X', sub: '東' }, y: { key: 'Y', sub: '高程' }, z: { key: 'Z', sub: '北' } },
+    rotate:    { x: { key: 'Rx', sub: '俯仰' }, y: { key: 'Ry', sub: '方位' }, z: { key: 'Rz', sub: '橫滾' } },
+    scale:     { x: { key: 'X', sub: '寬' }, y: { key: 'Y', sub: '高' }, z: { key: 'Z', sub: '深' } },
+};
+
+const UNIT: Record<TMode, string> = { translate: 'm', rotate: '\u00B0', scale: '\u00D7' };
+
+/** 從 3D groupRef 讀取即時值 */
+function readGroupTransform(modelId: string, mode: TMode): Record<Axis, string> {
+    const group = getModelGroupRef(modelId);
+    if (!group) return { x: '0', y: '0', z: '0' };
+    if (mode === 'translate') {
+        return { x: String(+group.position.x.toFixed(3)), y: String(+group.position.y.toFixed(3)), z: String(+group.position.z.toFixed(3)) };
+    } else if (mode === 'rotate') {
+        return { x: String(+(group.rotation.x * RAD2DEG).toFixed(2)), y: String(+(group.rotation.y * RAD2DEG).toFixed(2)), z: String(+(group.rotation.z * RAD2DEG).toFixed(2)) };
+    } else {
+        return { x: String(+group.scale.x.toFixed(3)), y: String(+group.scale.y.toFixed(3)), z: String(+group.scale.z.toFixed(3)) };
+    }
+}
+
+/** 將輸入值寫回 3D groupRef */
+function writeGroupTransform(modelId: string, mode: TMode, vals: Record<Axis, string>) {
+    const group = getModelGroupRef(modelId);
+    if (!group) return;
+    const x = parseFloat(vals.x) || 0;
+    const y = parseFloat(vals.y) || 0;
+    const z = parseFloat(vals.z) || 0;
+    if (mode === 'translate') {
+        group.position.set(x, y, z);
+    } else if (mode === 'rotate') {
+        group.rotation.set(x * DEG2RAD, y * DEG2RAD, z * DEG2RAD);
+    } else {
+        group.scale.set(x, y, z);
+    }
+}
+
+// ── 動畫模式下的 Transform 操控（可摺疊 + 數值輸入）──
 function AnimTransformSection({ transformMode, setTransformMode }: {
-    transformMode: 'translate' | 'rotate' | 'scale';
-    setTransformMode: (m: 'translate' | 'rotate' | 'scale') => void;
+    transformMode: TMode;
+    setTransformMode: (m: TMode) => void;
 }) {
+    const focusedModelId = useFacilityStore(s => s.focusedModelId);
     const [expanded, setExpanded] = React.useState(true);
+    const [draft, setDraft] = React.useState<Record<Axis, string>>({ x: '0', y: '0', z: '0' });
+    const syncRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // 每 200ms 從 3D 同步數值（當無 focus 時）
+    const [focusedAxis, setFocusedAxis] = React.useState<Axis | null>(null);
+
+    React.useEffect(() => {
+        if (!focusedModelId) return;
+        // 初始讀取
+        setDraft(readGroupTransform(focusedModelId, transformMode));
+        // 週期同步
+        syncRef.current = setInterval(() => {
+            if (!focusedAxis && focusedModelId) {
+                setDraft(readGroupTransform(focusedModelId, transformMode));
+            }
+        }, 200);
+        return () => { if (syncRef.current) clearInterval(syncRef.current); };
+    }, [focusedModelId, transformMode, focusedAxis]);
+
+    const handleChange = (axis: Axis, val: string) => {
+        setDraft(prev => ({ ...prev, [axis]: val }));
+    };
+
+    const handleCommit = () => {
+        if (!focusedModelId) return;
+        writeGroupTransform(focusedModelId, transformMode, draft);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') { handleCommit(); (e.target as HTMLInputElement).blur(); }
+    };
+
     const modes = [
-        { key: 'translate' as const, label: '移動', icon: <Move size={12} /> },
-        { key: 'rotate' as const, label: '旋轉', icon: <RotateCw size={12} /> },
-        { key: 'scale' as const, label: '縮放', icon: <Maximize2 size={12} /> },
+        { key: 'translate' as const, label: '移動', icon: <Move size={11} /> },
+        { key: 'rotate' as const, label: '旋轉', icon: <RotateCw size={11} /> },
+        { key: 'scale' as const, label: '縮放', icon: <Maximize2 size={11} /> },
     ];
+
+    const axes: Axis[] = transformMode === 'translate' ? ['x', 'z', 'y'] : ['x', 'y', 'z'];
+
     return (
         <div style={{ marginTop: 6, border: '1px solid #e9d5ff', borderRadius: 6, overflow: 'hidden' }}>
             <button
@@ -35,23 +118,70 @@ function AnimTransformSection({ transformMode, setTransformMode }: {
                 Transform 操控
             </button>
             {expanded && (
-                <div style={{ display: 'flex', gap: 4, padding: '6px 10px', background: '#fff' }}>
-                    {modes.map(m => (
-                        <button
-                            key={m.key}
-                            onClick={() => setTransformMode(m.key)}
-                            style={{
-                                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                gap: 4, padding: '5px 0', borderRadius: 4, fontSize: 11, fontWeight: 500,
-                                cursor: 'pointer', transition: 'all 0.15s',
-                                border: transformMode === m.key ? '1px solid #7c3aed' : '1px solid #e5e7eb',
-                                background: transformMode === m.key ? '#7c3aed' : '#fff',
-                                color: transformMode === m.key ? '#fff' : '#4b5563',
-                            }}
-                        >
-                            {m.icon} {m.label}
-                        </button>
-                    ))}
+                <div style={{ background: '#fff', padding: '6px 8px' }}>
+                    {/* Mode tabs */}
+                    <div style={{ display: 'flex', gap: 3, marginBottom: 6, background: '#f5f3ff', borderRadius: 5, padding: 2 }}>
+                        {modes.map(m => (
+                            <button
+                                key={m.key}
+                                onClick={() => setTransformMode(m.key)}
+                                style={{
+                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    gap: 3, padding: '4px 0', borderRadius: 4, fontSize: 10, fontWeight: 500,
+                                    cursor: 'pointer', transition: 'all 0.15s', border: 'none',
+                                    background: transformMode === m.key ? '#7c3aed' : 'transparent',
+                                    color: transformMode === m.key ? '#fff' : '#6b7280',
+                                }}
+                            >
+                                {m.icon} {m.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Axis inputs */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {axes.map(axis => {
+                            const accent = AXIS_ACCENT[axis];
+                            const meta = AXIS_META[transformMode][axis];
+                            const isFocused = focusedAxis === axis;
+                            return (
+                                <div key={axis} style={{
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                    padding: '4px 6px 4px 8px', borderRadius: 5,
+                                    border: `1px solid ${isFocused ? accent + '60' : '#e2e8f0'}`,
+                                    borderLeft: `3px solid ${accent}`,
+                                    background: isFocused ? '#fafbff' : '#f8fafc',
+                                    transition: 'border-color 0.15s',
+                                }}>
+                                    <div style={{ minWidth: 28 }}>
+                                        <div style={{ fontSize: 11, fontWeight: 700, color: accent, lineHeight: 1 }}>{meta.key}</div>
+                                        <div style={{ fontSize: 9, color: '#94a3b8', lineHeight: 1.2 }}>{meta.sub}</div>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={draft[axis]}
+                                        onChange={e => handleChange(axis, e.target.value)}
+                                        onFocus={() => setFocusedAxis(axis)}
+                                        onBlur={() => { setFocusedAxis(null); handleCommit(); }}
+                                        onKeyDown={handleKeyDown}
+                                        style={{
+                                            flex: 1, minWidth: 0, padding: 0, border: 'none',
+                                            background: 'transparent', color: '#1e293b',
+                                            fontSize: 12, fontFamily: "'JetBrains Mono', monospace",
+                                            fontWeight: 500, outline: 'none', textAlign: 'right',
+                                        }}
+                                    />
+                                    <span style={{ fontSize: 10, color: '#cbd5e1', fontWeight: 500, flexShrink: 0 }}>
+                                        {UNIT[transformMode]}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div style={{ marginTop: 4, fontSize: 9, color: '#cbd5e1', textAlign: 'center' }}>
+                        Enter 套用 · 拖曳 gizmo 自動同步
+                    </div>
                 </div>
             )}
         </div>
@@ -64,17 +194,26 @@ const FacilitySidebar: React.FC = () => {
 
     const {
         models,
-        selectedModelId,
+        selectedModelIds,
+        focusedModelId,
         selectModel,
+        toggleModelSelection,
+        hiddenModelIds,
+        toggleModelVisibility,
+        batchDeleteModels,
         currentSceneId,
         scenes,
         isLoading,
         editMode,
         setEditMode,
         setEditingModel,
+        animations,
         animationMode,
         setAnimationMode,
         selectedAnimationId,
+        playbackState,
+        setPlaybackState,
+        setPlaybackTime,
         transformMode,
         setTransformMode,
         showLabels,
@@ -85,9 +224,11 @@ const FacilitySidebar: React.FC = () => {
         enterScene,
     } = useFacilityStore();
 
-    // 找到選取模型下的所有子場景（透過 scene.parentModelId）
-    const selectedModelSubScenes = selectedModelId
-        ? scenes.filter(s => s.parentModelId === selectedModelId)
+    const [confirmBatchDelete, setConfirmBatchDelete] = React.useState(false);
+
+    // 找到焦點模型下的所有子場景（透過 scene.parentModelId）
+    const selectedModelSubScenes = focusedModelId
+        ? scenes.filter(s => s.parentModelId === focusedModelId)
         : [];
 
     const currentScene = scenes.find(s => s.id === currentSceneId);
@@ -236,7 +377,96 @@ const FacilitySidebar: React.FC = () => {
                         }}>
                             模型清單
                         </span>
+                        <span style={{ flex: 1 }} />
+                        {selectedModelIds.length > 0 && (
+                            <span style={{ fontSize: 10, color: '#6b7280' }}>
+                                {selectedModelIds.length} 已選取
+                            </span>
+                        )}
+                        {/* 全域播放/暫停（場景內有動畫時顯示，動畫編輯模式隱藏） */}
+                        {!animationMode && animations.some(a => a.keyframes && a.keyframes.length > 0) && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (playbackState === 'playing') {
+                                        setPlaybackState('paused');
+                                    } else {
+                                        if (playbackState === 'stopped') setPlaybackTime(0);
+                                        setPlaybackState('playing');
+                                    }
+                                }}
+                                title={playbackState === 'playing' ? '暫停所有動畫' : '播放所有動畫'}
+                                style={{
+                                    background: playbackState === 'playing' ? '#7c3aed' : 'none',
+                                    border: playbackState === 'playing' ? '1px solid #7c3aed' : '1px solid #d1d5db',
+                                    borderRadius: 4,
+                                    cursor: 'pointer',
+                                    padding: '2px 6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 3,
+                                    flexShrink: 0,
+                                    color: playbackState === 'playing' ? '#fff' : '#6b7280',
+                                    fontSize: 10,
+                                    fontWeight: 500,
+                                    transition: 'all 0.15s',
+                                }}
+                            >
+                                {playbackState === 'playing'
+                                    ? <><Pause size={10} /> 暫停</>
+                                    : <><Play size={10} /> 播放</>
+                                }
+                            </button>
+                        )}
                     </div>
+
+                    {/* 批次操作工具列 */}
+                    {selectedModelIds.length >= 2 && (
+                        <div style={{
+                            display: 'flex', gap: 4, padding: '4px 8px 6px',
+                            borderBottom: '1px solid #f1f5f9',
+                        }}>
+                            <button
+                                onClick={() => {
+                                    const allHidden = selectedModelIds.every(id => hiddenModelIds.includes(id));
+                                    toggleModelVisibility(selectedModelIds);
+                                }}
+                                title="切換顯示/隱藏"
+                                style={{
+                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    gap: 4, padding: '4px 0', borderRadius: 4, fontSize: 10, fontWeight: 500,
+                                    cursor: 'pointer', border: '1px solid #e5e7eb', background: '#fff', color: '#4b5563',
+                                }}
+                            >
+                                {selectedModelIds.every(id => hiddenModelIds.includes(id))
+                                    ? <><Eye size={11} /> 顯示</>
+                                    : <><EyeOff size={11} /> 隱藏</>
+                                }
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (confirmBatchDelete) {
+                                        batchDeleteModels(selectedModelIds);
+                                        setConfirmBatchDelete(false);
+                                    } else {
+                                        setConfirmBatchDelete(true);
+                                        setTimeout(() => setConfirmBatchDelete(false), 3000);
+                                    }
+                                }}
+                                title="批次刪除"
+                                style={{
+                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    gap: 4, padding: '4px 0', borderRadius: 4, fontSize: 10, fontWeight: 500,
+                                    cursor: 'pointer',
+                                    border: confirmBatchDelete ? '1px solid #ef4444' : '1px solid #e5e7eb',
+                                    background: confirmBatchDelete ? '#fef2f2' : '#fff',
+                                    color: confirmBatchDelete ? '#dc2626' : '#4b5563',
+                                }}
+                            >
+                                <Trash2 size={11} /> {confirmBatchDelete ? '確認刪除?' : '刪除'}
+                            </button>
+                        </div>
+                    )}
 
                     {isLoading && (
                         <div style={{ padding: '8px 12px', fontSize: 12, color: '#9ca3af' }}>
@@ -256,44 +486,70 @@ const FacilitySidebar: React.FC = () => {
                                 .filter(m => m.modelType !== 'decorative')
                                 .sort((a, b) => a.sortOrder - b.sortOrder)
                                 .map(model => {
-                                    const isSelected = model.id === selectedModelId;
+                                    const isSelected = selectedModelIds.includes(model.id);
+                                    const isFocused = model.id === focusedModelId;
+                                    const isHidden = hiddenModelIds.includes(model.id);
                                     const hasChildScene = scenes.some(s => s.parentModelId === model.id);
 
                                     return (
-                                        <li key={model.id}>
+                                        <li key={model.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            {/* Checkbox for multi-select */}
                                             <button
-                                                onClick={() => {
-                                                    selectModel(isSelected ? null : model.id);
-                                                    if (!isSelected) flyToModel(model.id);
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleModelSelection(model.id);
+                                                }}
+                                                title="多選"
+                                                style={{
+                                                    background: 'none', border: 'none', cursor: 'pointer',
+                                                    padding: '2px', display: 'flex', alignItems: 'center',
+                                                    flexShrink: 0, color: isSelected ? '#2563eb' : '#d1d5db',
+                                                }}
+                                            >
+                                                <CheckSquare size={13} style={{
+                                                    opacity: isSelected ? 1 : 0.4,
+                                                }} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    const multi = e.metaKey || e.ctrlKey;
+                                                    if (isFocused && !multi) {
+                                                        selectModel(null);
+                                                    } else {
+                                                        selectModel(model.id, multi);
+                                                        flyToModel(model.id);
+                                                    }
                                                 }}
                                                 title={model.name}
                                                 style={{
-                                                    width: '100%',
+                                                    flex: 1,
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     gap: 8,
-                                                    padding: '7px 12px',
+                                                    padding: '7px 8px',
                                                     borderRadius: 4,
                                                     border: 'none',
-                                                    background: isSelected ? '#2563eb' : 'transparent',
-                                                    color: isSelected ? 'white' : '#374151',
+                                                    background: isFocused ? '#2563eb' : isSelected ? '#dbeafe' : 'transparent',
+                                                    color: isFocused ? 'white' : isHidden ? '#9ca3af' : '#374151',
                                                     cursor: 'pointer',
                                                     textAlign: 'left',
                                                     transition: 'background 0.15s',
                                                     fontSize: 12,
+                                                    opacity: isHidden ? 0.5 : 1,
                                                 }}
                                                 onMouseEnter={e => {
-                                                    if (!isSelected) e.currentTarget.style.background = '#f3f4f6';
+                                                    if (!isFocused && !isSelected) e.currentTarget.style.background = '#f3f4f6';
                                                 }}
                                                 onMouseLeave={e => {
-                                                    if (!isSelected) e.currentTarget.style.background = 'transparent';
+                                                    if (!isFocused && !isSelected) e.currentTarget.style.background = 'transparent';
+                                                    else if (isSelected && !isFocused) e.currentTarget.style.background = '#dbeafe';
                                                 }}
                                             >
                                                 <Box
                                                     size={13}
                                                     style={{
                                                         flexShrink: 0,
-                                                        color: isSelected ? 'rgba(255,255,255,0.7)' : '#9ca3af',
+                                                        color: isFocused ? 'rgba(255,255,255,0.7)' : '#9ca3af',
                                                     }}
                                                 />
                                                 <span style={{
@@ -301,6 +557,7 @@ const FacilitySidebar: React.FC = () => {
                                                     overflow: 'hidden',
                                                     textOverflow: 'ellipsis',
                                                     whiteSpace: 'nowrap',
+                                                    textDecoration: isHidden ? 'line-through' : 'none',
                                                 }}>
                                                     {model.name}
                                                 </span>
@@ -309,7 +566,7 @@ const FacilitySidebar: React.FC = () => {
                                                         size={12}
                                                         style={{
                                                             flexShrink: 0,
-                                                            color: isSelected ? 'rgba(255,255,255,0.5)' : '#d1d5db',
+                                                            color: isFocused ? 'rgba(255,255,255,0.5)' : '#d1d5db',
                                                         }}
                                                         title="包含子場景"
                                                     />
@@ -503,7 +760,7 @@ const FacilitySidebar: React.FC = () => {
                 </button>
 
                 {/* 動畫模式：Transform 切換（可摺疊） */}
-                {animationMode && selectedModelId && selectedAnimationId && (
+                {animationMode && focusedModelId && selectedAnimationId && (
                     <AnimTransformSection transformMode={transformMode} setTransformMode={setTransformMode} />
                 )}
             </div>

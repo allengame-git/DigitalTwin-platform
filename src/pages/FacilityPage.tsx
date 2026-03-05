@@ -24,9 +24,9 @@ export const FacilityPage: React.FC = () => {
     const enterScene = useFacilityStore(state => state.enterScene);
     const selectModel = useFacilityStore(state => state.selectModel);
     const scenes = useFacilityStore(state => state.scenes);
-    const selectedModelId = useFacilityStore(state => state.selectedModelId);
+    const focusedModelId = useFacilityStore(state => state.focusedModelId);
     const selectedModel = useFacilityStore(state =>
-        state.selectedModelId ? state.models.find(m => m.id === state.selectedModelId) : null
+        state.focusedModelId ? state.models.find(m => m.id === state.focusedModelId) : null
     );
     const animationMode = useFacilityStore(state => state.animationMode);
     // InfoPanel 開啟條件：有選取且不是裝飾模型，且不在動畫模式
@@ -39,9 +39,9 @@ export const FacilityPage: React.FC = () => {
 
     // Lobby: 選取模型的子場景清單
     const lobbyChildScenes = useMemo<FacilityScene[]>(() => {
-        if (!isLobby || !selectedModelId) return [];
-        return scenes.filter(s => s.parentModelId === selectedModelId);
-    }, [isLobby, selectedModelId, scenes]);
+        if (!isLobby || !focusedModelId) return [];
+        return scenes.filter(s => s.parentModelId === focusedModelId);
+    }, [isLobby, focusedModelId, scenes]);
 
     // ESC 取消選取
     useEffect(() => {

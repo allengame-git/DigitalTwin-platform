@@ -12,7 +12,7 @@ function resolveUrl(url: string) {
 
 export default function FacilityInfoPanel() {
     const models = useFacilityStore(state => state.models)
-    const selectedModelId = useFacilityStore(state => state.selectedModelId)
+    const selectedModelId = useFacilityStore(state => state.focusedModelId)
     const editMode = useFacilityStore(state => state.editMode)
     const selectModel = useFacilityStore(state => state.selectModel)
     const setEditingModel = useFacilityStore(state => state.setEditingModel)

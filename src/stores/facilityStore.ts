@@ -31,8 +31,10 @@ interface FacilityState {
 
     // Models in current scene
     models: FacilityModel[];
-    selectedModelId: string | null;
+    selectedModelIds: string[];       // 多選模型
+    focusedModelId: string | null;    // 焦點模型（最後點擊的，顯示 TransformControls）
     hoveredModelId: string | null;
+    hiddenModelIds: string[];         // 隱藏的模型 ID
 
     // Edit mode
     editMode: boolean;
@@ -70,10 +72,17 @@ interface FacilityState {
 
     // Model actions
     fetchModels: (sceneId: string) => Promise<void>;
-    selectModel: (modelId: string | null) => void;
+    selectModel: (modelId: string | null, multi?: boolean) => void;  // multi = Cmd/Ctrl+Click
+    toggleModelSelection: (modelId: string) => void;
+    setFocusedModel: (modelId: string | null) => void;
     setHoveredModel: (modelId: string | null) => void;
     updateModelTransform: (modelId: string, transform: Transform) => Promise<void>;
     updateModelMeta: (modelId: string, data: { name?: string; introduction?: string }) => Promise<void>;
+
+    // Batch actions
+    batchDeleteModels: (modelIds: string[]) => Promise<void>;
+    toggleModelVisibility: (modelIds: string[]) => void;
+    setHiddenModelIds: (ids: string[]) => void;
 
     // Edit mode
     setEditMode: (enabled: boolean) => void;
@@ -101,6 +110,7 @@ interface FacilityState {
     editingKeyframeIndex: number | null;  // 正在編輯的關鍵幀 index
 
     fetchAnimations: (modelId: string) => Promise<void>;
+    fetchAnimationsForModels: (modelIds: string[]) => Promise<void>;
     createAnimation: (modelId: string, data?: Partial<FacilityAnimation>) => Promise<FacilityAnimation>;
     updateAnimation: (animId: string, data: Partial<FacilityAnimation>) => Promise<void>;
     deleteAnimation: (animId: string) => Promise<void>;
@@ -120,8 +130,10 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     currentSceneId: null,
     sceneStack: [],
     models: [],
-    selectedModelId: null,
+    selectedModelIds: [],
+    focusedModelId: null,
     hoveredModelId: null,
+    hiddenModelIds: [],
     editMode: false,
     editingModelId: null,
     transformMode: 'translate',
@@ -149,8 +161,10 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
                 currentSceneId: null,
                 sceneStack: [],
                 models: [],
-                selectedModelId: null,
+                selectedModelIds: [],
+                focusedModelId: null,
                 hoveredModelId: null,
+                hiddenModelIds: [],
                 editingModelId: null,
                 flyToModelId: null,
                 modelBboxCenters: {},
@@ -200,8 +214,10 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
             sceneStack: currentSceneId
                 ? [...state.sceneStack, currentSceneId]
                 : state.sceneStack,
-            selectedModelId: null,
+            selectedModelIds: [],
+            focusedModelId: null,
             hoveredModelId: null,
+            hiddenModelIds: [],
             editingModelId: null,
         }));
         await fetchModels(sceneId);
@@ -217,8 +233,10 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
         set({
             currentSceneId: prevSceneId,
             sceneStack: newStack,
-            selectedModelId: null,
+            selectedModelIds: [],
+            focusedModelId: null,
             hoveredModelId: null,
+            hiddenModelIds: [],
             editingModelId: null,
         });
         await fetchModels(prevSceneId);
@@ -232,8 +250,10 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
         set({
             currentSceneId: root.id,
             sceneStack: [],
-            selectedModelId: null,
+            selectedModelIds: [],
+            focusedModelId: null,
             hoveredModelId: null,
+            hiddenModelIds: [],
             editingModelId: null,
         });
         await fetchModels(root.id);
@@ -274,14 +294,59 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
                 headers: getAuthHeaders(),
                 withCredentials: true,
             });
-            set({ models: Array.isArray(res.data) ? res.data : [], isLoading: false });
+            const loadedModels = Array.isArray(res.data) ? res.data : [];
+            set({ models: loadedModels, isLoading: false });
+            // 載入所有模型的動畫（auto-play 動畫需要）
+            if (loadedModels.length > 0) {
+                get().fetchAnimationsForModels(loadedModels.map(m => m.id));
+            }
         } catch (err: any) {
             console.error('[FacilityStore] fetchModels error:', err);
             set({ error: err.message, isLoading: false, models: [] });
         }
     },
 
-    selectModel: (modelId) => set({ selectedModelId: modelId }),
+    selectModel: (modelId, multi) => {
+        if (modelId === null) {
+            set({ selectedModelIds: [], focusedModelId: null });
+            return;
+        }
+        if (multi) {
+            // Cmd/Ctrl+Click: toggle in/out of selection
+            set(state => {
+                const has = state.selectedModelIds.includes(modelId);
+                const newIds = has
+                    ? state.selectedModelIds.filter(id => id !== modelId)
+                    : [...state.selectedModelIds, modelId];
+                return {
+                    selectedModelIds: newIds,
+                    focusedModelId: has
+                        ? (newIds.length > 0 ? newIds[newIds.length - 1] : null)
+                        : modelId,
+                };
+            });
+        } else {
+            // Normal click: single select
+            set({ selectedModelIds: [modelId], focusedModelId: modelId });
+        }
+    },
+
+    toggleModelSelection: (modelId) => {
+        set(state => {
+            const has = state.selectedModelIds.includes(modelId);
+            const newIds = has
+                ? state.selectedModelIds.filter(id => id !== modelId)
+                : [...state.selectedModelIds, modelId];
+            return {
+                selectedModelIds: newIds,
+                focusedModelId: has
+                    ? (newIds.length > 0 ? newIds[newIds.length - 1] : null)
+                    : modelId,
+            };
+        });
+    },
+
+    setFocusedModel: (modelId) => set({ focusedModelId: modelId }),
     setHoveredModel: (modelId) => set({ hoveredModelId: modelId }),
 
     updateModelTransform: async (modelId, transform) => {
@@ -313,6 +378,44 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
             console.error('[FacilityStore] updateModelMeta error:', err);
         }
     },
+
+    // ===== Batch Actions =====
+    batchDeleteModels: async (modelIds) => {
+        try {
+            await Promise.all(
+                modelIds.map(id =>
+                    axios.delete(`${API_BASE}/api/facility/models/${id}`, {
+                        headers: getAuthHeaders(), withCredentials: true,
+                    })
+                )
+            );
+            set(state => ({
+                models: state.models.filter(m => !modelIds.includes(m.id)),
+                selectedModelIds: state.selectedModelIds.filter(id => !modelIds.includes(id)),
+                focusedModelId: modelIds.includes(state.focusedModelId ?? '') ? null : state.focusedModelId,
+                animations: state.animations.filter(a => !modelIds.includes(a.modelId)),
+            }));
+        } catch (err: any) {
+            console.error('[FacilityStore] batchDeleteModels error:', err);
+        }
+    },
+
+    toggleModelVisibility: (modelIds) => {
+        set(state => {
+            const newHidden = [...state.hiddenModelIds];
+            for (const id of modelIds) {
+                const idx = newHidden.indexOf(id);
+                if (idx >= 0) {
+                    newHidden.splice(idx, 1);
+                } else {
+                    newHidden.push(id);
+                }
+            }
+            return { hiddenModelIds: newHidden };
+        });
+    },
+
+    setHiddenModelIds: (ids) => set({ hiddenModelIds: ids }),
 
     // ===== Edit Mode =====
     setEditMode: (enabled) => set(state => ({
@@ -353,6 +456,31 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
         }
     },
 
+    fetchAnimationsForModels: async (modelIds: string[]) => {
+        if (modelIds.length === 0) return;
+        try {
+            const results = await Promise.all(
+                modelIds.map(id =>
+                    axios.get<FacilityAnimation[]>(
+                        `${API_BASE}/api/facility/models/${id}/animations`,
+                        { headers: getAuthHeaders(), withCredentials: true }
+                    )
+                )
+            );
+            const fetched = results.flatMap(r => Array.isArray(r.data) ? r.data : []);
+            // 合併：保留不在本次 fetch 範圍的既有動畫 + 本次取得的新資料
+            const fetchedModelIdSet = new Set(modelIds);
+            set(state => ({
+                animations: [
+                    ...state.animations.filter(a => !fetchedModelIdSet.has(a.modelId)),
+                    ...fetched,
+                ],
+            }));
+        } catch (err: any) {
+            console.error('[FacilityStore] fetchAnimationsForModels error:', err);
+        }
+    },
+
     createAnimation: async (modelId, data = {}) => {
         const res = await axios.post<FacilityAnimation>(
             `${API_BASE}/api/facility/models/${modelId}/animations`,
@@ -384,13 +512,13 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
         }));
     },
 
-    setAnimationMode: (enabled) => set({
+    setAnimationMode: (enabled) => set(state => ({
         animationMode: enabled,
         selectedAnimationId: null,
-        playbackState: 'stopped',
-        playbackTime: 0,
+        playbackState: enabled ? 'paused' : 'stopped',
+        playbackTime: enabled ? state.playbackTime : 0,
         editingKeyframeIndex: null,
-    }),
+    })),
 
     selectAnimation: (animId) => set({
         selectedAnimationId: animId,
