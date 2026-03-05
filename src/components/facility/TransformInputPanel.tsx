@@ -36,33 +36,40 @@ const TransformInputPanel: React.FC = () => {
 
     const editingModel = models.find(m => m.id === editingModelId) ?? null;
 
-    // Local draft values (to avoid calling API on every keystroke)
-    const [draft, setDraft] = useState<Vec3>(DEFAULT_VEC3);
+    // Local draft values — 用 string 讓使用者自由輸入（含 "-", "0.", 空字串）
+    const [draft, setDraft] = useState<Record<Axis, string>>({ x: '0', y: '0', z: '0' });
+
+    const vec3ToStrings = (v: Vec3): Record<Axis, string> => ({
+        x: String(v.x), y: String(v.y), z: String(v.z),
+    });
 
     // Sync draft when editing model or transform mode changes
     useEffect(() => {
         if (!editingModel) return;
         if (transformMode === 'translate') {
-            setDraft(editingModel.position ?? DEFAULT_VEC3);
+            setDraft(vec3ToStrings(editingModel.position ?? DEFAULT_VEC3));
         } else if (transformMode === 'rotate') {
-            setDraft(editingModel.rotation ?? DEFAULT_VEC3);
+            setDraft(vec3ToStrings(editingModel.rotation ?? DEFAULT_VEC3));
         } else {
-            setDraft(editingModel.scale ?? DEFAULT_SCALE);
+            setDraft(vec3ToStrings(editingModel.scale ?? DEFAULT_SCALE));
         }
     }, [editingModel?.id, transformMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleAxisChange = useCallback((axis: Axis, raw: string) => {
-        const value = parseFloat(raw);
-        if (isNaN(value)) return;
-        setDraft(prev => ({ ...prev, [axis]: value }));
+        setDraft(prev => ({ ...prev, [axis]: raw }));
     }, []);
 
     const handleCommit = useCallback(() => {
         if (!editingModelId) return;
+        const vec: Vec3 = {
+            x: parseFloat(draft.x) || 0,
+            y: parseFloat(draft.y) || 0,
+            z: parseFloat(draft.z) || 0,
+        };
         const transform: Transform = {};
-        if (transformMode === 'translate') transform.position = draft;
-        else if (transformMode === 'rotate') transform.rotation = draft;
-        else transform.scale = draft;
+        if (transformMode === 'translate') transform.position = vec;
+        else if (transformMode === 'rotate') transform.rotation = vec;
+        else transform.scale = vec;
         updateModelTransform(editingModelId, transform);
     }, [editingModelId, transformMode, draft, updateModelTransform]);
 
@@ -154,8 +161,8 @@ const TransformInputPanel: React.FC = () => {
                             }
                         </label>
                         <input
-                            type="number"
-                            step={transformMode === 'rotate' ? 1 : transformMode === 'scale' ? 0.01 : 0.1}
+                            type="text"
+                            inputMode="decimal"
                             value={draft[axis]}
                             onChange={e => handleAxisChange(axis, e.target.value)}
                             onBlur={handleCommit}
