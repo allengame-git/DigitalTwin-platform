@@ -57,7 +57,17 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const { scene: gltfScene } = useGLTF(model.modelUrl);
 
     // Clone scene 以避免多個 instance 共用同一 scene（memo 確保 bbox 不重算）
-    const clonedScene = useMemo(() => gltfScene.clone(true), [gltfScene]);
+    const clonedScene = useMemo(() => {
+        const clone = gltfScene.clone(true);
+        // 讓 GLB 內每個 mesh 投射並接收陰影
+        clone.traverse(node => {
+            if ((node as THREE.Mesh).isMesh) {
+                node.castShadow = true;
+                node.receiveShadow = true;
+            }
+        });
+        return clone;
+    }, [gltfScene]);
 
     // 計算 bbox（clonedScene 隔離空間）
     // cx/cz = 水平中心，maxY = 幾何頂部（均在 clonedScene 自身空間）
