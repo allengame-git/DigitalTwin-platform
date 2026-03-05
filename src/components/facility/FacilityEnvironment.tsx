@@ -18,11 +18,11 @@ export function FacilityEnvironment() {
                 castShadow
                 shadow-mapSize-width={4096}
                 shadow-mapSize-height={4096}
-                shadow-camera-far={1500}
-                shadow-camera-left={-300}
-                shadow-camera-right={300}
-                shadow-camera-top={300}
-                shadow-camera-bottom={-300}
+                shadow-camera-far={3000}
+                shadow-camera-left={-1200}
+                shadow-camera-right={1200}
+                shadow-camera-top={1200}
+                shadow-camera-bottom={-1200}
                 shadow-bias={-0.0005}
             />
             <hemisphereLight
