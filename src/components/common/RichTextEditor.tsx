@@ -6,10 +6,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import { Image } from '@tiptap/extension-image';
-import { Table } from '@tiptap/extension-table';
-import { TableRow } from '@tiptap/extension-table-row';
-import { TableCell } from '@tiptap/extension-table-cell';
-import { TableHeader } from '@tiptap/extension-table-header';
+import { TableKit } from '@tiptap/extension-table';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { Underline } from '@tiptap/extension-underline';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -41,7 +38,7 @@ function TablePopover({ onInsert, onClose }: {
     }, [onClose]);
 
     return (
-        <div ref={ref} style={popoverStyle}>
+        <div ref={ref} style={popoverStyle} onMouseDown={e => e.stopPropagation()}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 10 }}>插入表格</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                 <label style={labelStyle}>
@@ -84,10 +81,7 @@ export function RichTextEditor({ value, onChange, placeholder, onImageUpload }: 
             Underline,
             Link.configure({ openOnClick: false }),
             Image.configure({ inline: false, allowBase64: false }),
-            Table.configure({ resizable: true }),
-            TableRow,
-            TableHeader,
-            TableCell,
+            TableKit,
             TextAlign.configure({ types: ['heading', 'paragraph'] }),
         ],
         content: value,
@@ -257,7 +251,7 @@ export function RichTextEditor({ value, onChange, placeholder, onImageUpload }: 
                 <div style={{ position: 'relative' }}>
                     <button title="插入表格"
                         style={tb(showTablePop)}
-                        onMouseDown={e => { e.preventDefault(); setShowTablePop(v => !v); }}>
+                        onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setShowTablePop(v => !v); }}>
                         表格
                     </button>
                     {showTablePop && (
