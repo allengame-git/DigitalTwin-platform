@@ -78,7 +78,7 @@ export default function FacilityInfoPanel() {
                 background: '#fff',
                 borderRadius: 14,
                 boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-                zIndex: 40,
+                zIndex: 110,
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
