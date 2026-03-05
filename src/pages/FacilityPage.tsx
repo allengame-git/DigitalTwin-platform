@@ -24,6 +24,11 @@ export const FacilityPage: React.FC = () => {
     const selectModel = useFacilityStore(state => state.selectModel);
     const scenes = useFacilityStore(state => state.scenes);
     const selectedModelId = useFacilityStore(state => state.selectedModelId);
+    const selectedModel = useFacilityStore(state =>
+        state.selectedModelId ? state.models.find(m => m.id === state.selectedModelId) : null
+    );
+    // InfoPanel 開啟條件：有選取且不是裝飾模型
+    const isInfoPanelOpen = !!selectedModel && selectedModel.modelType !== 'decorative';
     const currentScene = useFacilityStore(state => {
         const sid = state.currentSceneId;
         return sid ? state.scenes.find(s => s.id === sid) : null;
@@ -191,13 +196,15 @@ export const FacilityPage: React.FC = () => {
                     </div>
                 )}
 
-                {/* Screenshot button — bottom-right corner */}
+                {/* Screenshot button — bottom-right corner，InfoPanel 開啟時向左滑開 */}
                 {!isLobby && (
                 <div style={{
                     position: 'absolute',
                     bottom: 24,
-                    right: 24,
+                    // InfoPanel (width:340, right:24) 開啟時往左移，留 12px 間距
+                    right: isInfoPanelOpen ? 24 + 340 + 12 : 24,
                     zIndex: 50,
+                    transition: 'right 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}>
                     <button
                         onClick={handleScreenshot}
