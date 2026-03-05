@@ -49,6 +49,7 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const isSelected = selectedModelId === model.id;
     const isHovered = hoveredModelId === model.id;
     const isEditing = editMode && editingModelId === model.id;
+    const isDecorative = model.modelType === 'decorative';
     const isLobby = currentSceneType === 'lobby';
     const childScenes = useMemo(() => getChildScenes(model.id), [getChildScenes, model.id]);
     const hasChildScene = childScenes.length > 0;
@@ -203,16 +204,16 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                     model.rotation.z * DEG2RAD,
                 ]}
                 scale={[model.scale.x, model.scale.y, model.scale.z]}
-                onClick={handleClick}
-                onPointerOver={handlePointerOver}
-                onPointerOut={handlePointerOut}
+                onClick={isDecorative && !editMode ? undefined : handleClick}
+                onPointerOver={isDecorative && !editMode ? undefined : handlePointerOver}
+                onPointerOut={isDecorative && !editMode ? undefined : handlePointerOut}
             >
                 <primitive object={clonedScene} />
             </group>
 
             {/* 標籤 group：在模型 group 外，位置由 useFrame + localToWorld 設定
                 不受模型 scale 影響，固定 world-space 高度 */}
-            {showLabels && (
+            {showLabels && !isDecorative && (
                 <group ref={labelGroupRef}>
                     <Html center zIndexRange={[100, 0]}>
                         <div
