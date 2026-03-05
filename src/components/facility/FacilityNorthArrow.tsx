@@ -32,12 +32,12 @@ export function FacilityNorthArrowCalculator({
             const up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
             up.y = 0;
             up.normalize();
-            // 北方 = +Z，angle 為相機 up 相對於 +Z 的偏轉
-            angle = Math.atan2(up.x, up.z);
+            // 北方 = -Z，與地質模組一致
+            angle = Math.atan2(up.x, -up.z);
         } else {
             forward.normalize();
-            // 北方 = +Z；camera 朝 +Z 時 angle = 0
-            angle = Math.atan2(forward.x, forward.z);
+            // 北方 = -Z；camera 朝 -Z 時 angle = 0
+            angle = Math.atan2(forward.x, -forward.z);
         }
 
         const degrees = THREE.MathUtils.radToDeg(angle);
