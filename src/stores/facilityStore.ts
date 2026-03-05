@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import axios from 'axios';
 import { useAuthStore } from './authStore';
-import type { FacilityScene, FacilityModel, Transform } from '../types/facility';
+import type { FacilityScene, FacilityModel, FacilityAnimation, AnimationKeyframe, Transform } from '../types/facility';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -79,6 +79,27 @@ interface FacilityState {
     // Bbox centers (world-space, reported by FacilityModelItem on first frame)
     modelBboxCenters: Record<string, { x: number; y: number; z: number }>;
     setModelBboxCenter: (modelId: string, center: { x: number; y: number; z: number }) => void;
+
+    // Animation
+    animations: FacilityAnimation[];
+    animationMode: boolean;
+    selectedAnimationId: string | null;
+    playbackState: 'stopped' | 'playing' | 'paused';
+    playbackTime: number;       // 目前播放時間（秒）
+    editingKeyframeIndex: number | null;  // 正在編輯的關鍵幀 index
+
+    fetchAnimations: (modelId: string) => Promise<void>;
+    createAnimation: (modelId: string, data?: Partial<FacilityAnimation>) => Promise<FacilityAnimation>;
+    updateAnimation: (animId: string, data: Partial<FacilityAnimation>) => Promise<void>;
+    deleteAnimation: (animId: string) => Promise<void>;
+    setAnimationMode: (enabled: boolean) => void;
+    selectAnimation: (animId: string | null) => void;
+    setPlaybackState: (state: 'stopped' | 'playing' | 'paused') => void;
+    setPlaybackTime: (time: number) => void;
+    setEditingKeyframeIndex: (index: number | null) => void;
+    addKeyframe: (animId: string, keyframe: AnimationKeyframe) => Promise<void>;
+    updateKeyframe: (animId: string, index: number, keyframe: AnimationKeyframe) => Promise<void>;
+    deleteKeyframe: (animId: string, index: number) => Promise<void>;
 }
 
 export const useFacilityStore = create<FacilityState>((set, get) => ({
@@ -299,4 +320,97 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     setModelBboxCenter: (modelId, center) => set(state => ({
         modelBboxCenters: { ...state.modelBboxCenters, [modelId]: center },
     })),
+
+    // ===== Animation =====
+    animations: [],
+    animationMode: false,
+    selectedAnimationId: null,
+    playbackState: 'stopped',
+    playbackTime: 0,
+    editingKeyframeIndex: null,
+
+    fetchAnimations: async (modelId: string) => {
+        try {
+            const res = await axios.get<FacilityAnimation[]>(
+                `${API_BASE}/api/facility/models/${modelId}/animations`,
+                { headers: getAuthHeaders(), withCredentials: true }
+            );
+            set({ animations: Array.isArray(res.data) ? res.data : [] });
+        } catch (err: any) {
+            console.error('[FacilityStore] fetchAnimations error:', err);
+        }
+    },
+
+    createAnimation: async (modelId, data = {}) => {
+        const res = await axios.post<FacilityAnimation>(
+            `${API_BASE}/api/facility/models/${modelId}/animations`,
+            { name: '未命名動畫', ...data },
+            { headers: getAuthHeaders(), withCredentials: true }
+        );
+        set(state => ({ animations: [...state.animations, res.data] }));
+        return res.data;
+    },
+
+    updateAnimation: async (animId, data) => {
+        const res = await axios.put<FacilityAnimation>(
+            `${API_BASE}/api/facility/animations/${animId}`,
+            data,
+            { headers: getAuthHeaders(), withCredentials: true }
+        );
+        set(state => ({
+            animations: state.animations.map(a => a.id === animId ? { ...a, ...res.data } : a),
+        }));
+    },
+
+    deleteAnimation: async (animId) => {
+        await axios.delete(`${API_BASE}/api/facility/animations/${animId}`, {
+            headers: getAuthHeaders(), withCredentials: true,
+        });
+        set(state => ({
+            animations: state.animations.filter(a => a.id !== animId),
+            selectedAnimationId: state.selectedAnimationId === animId ? null : state.selectedAnimationId,
+        }));
+    },
+
+    setAnimationMode: (enabled) => set({
+        animationMode: enabled,
+        selectedAnimationId: null,
+        playbackState: 'stopped',
+        playbackTime: 0,
+        editingKeyframeIndex: null,
+    }),
+
+    selectAnimation: (animId) => set({
+        selectedAnimationId: animId,
+        playbackState: 'stopped',
+        playbackTime: 0,
+        editingKeyframeIndex: null,
+    }),
+
+    setPlaybackState: (state) => set({ playbackState: state }),
+    setPlaybackTime: (time) => set({ playbackTime: time }),
+    setEditingKeyframeIndex: (index) => set({ editingKeyframeIndex: index }),
+
+    addKeyframe: async (animId, keyframe) => {
+        const anim = get().animations.find(a => a.id === animId);
+        if (!anim) return;
+        const keyframes = [...anim.keyframes, keyframe].sort((a, b) => a.time - b.time);
+        await get().updateAnimation(animId, { keyframes });
+    },
+
+    updateKeyframe: async (animId, index, keyframe) => {
+        const anim = get().animations.find(a => a.id === animId);
+        if (!anim) return;
+        const keyframes = [...anim.keyframes];
+        keyframes[index] = keyframe;
+        keyframes.sort((a, b) => a.time - b.time);
+        await get().updateAnimation(animId, { keyframes });
+    },
+
+    deleteKeyframe: async (animId, index) => {
+        const anim = get().animations.find(a => a.id === animId);
+        if (!anim) return;
+        const keyframes = anim.keyframes.filter((_, i) => i !== index);
+        await get().updateAnimation(animId, { keyframes });
+    },
 }));

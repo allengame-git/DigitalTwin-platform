@@ -371,9 +371,31 @@ model FacilityModel {
   scene       FacilityScene       @relation("SceneModels", fields: [sceneId], references: [id], onDelete: Cascade)
   childScenes FacilityScene[]     @relation("ModelChildScenes")
   infos       FacilityModelInfo[]
+  animations  FacilityAnimation[]
 
   @@index([sceneId])
   @@map("facility_models")
+}
+
+/// 設施模型動畫
+model FacilityAnimation {
+  id            String        @id @default(uuid())
+  modelId       String
+  name          String
+  type          String        @default("keyframe")   // "keyframe" | "gltf"
+  trigger       String        @default("auto")       // "auto" | "manual"
+  loop          Boolean       @default(true)
+  duration      Float         @default(5)            // seconds
+  easing        String        @default("linear")     // "linear" | "easeIn" | "easeOut" | "easeInOut"
+  gltfClipName  String?                              // GLB 內嵌動畫名稱
+  keyframes     Json          @default("[]")         // [{ time, position, rotation, scale }]
+  sortOrder     Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  model         FacilityModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@index([modelId])
+  @@map("facility_animations")
 }
 
 /// 設施模型資訊 (Rich Content)

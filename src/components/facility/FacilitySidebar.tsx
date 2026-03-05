@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronRight, Box, DoorOpen, Edit3, Tag, Map } from 'lucide-react';
+import { ChevronRight, Box, DoorOpen, Edit3, Tag, Map, Film } from 'lucide-react';
 import { useFacilityStore } from '@/stores/facilityStore';
 import BreadcrumbNav from './BreadcrumbNav';
 
@@ -24,6 +24,8 @@ const FacilitySidebar: React.FC = () => {
         editMode,
         setEditMode,
         setEditingModel,
+        animationMode,
+        setAnimationMode,
         showLabels,
         toggleLabels,
         showPlanView,
@@ -419,6 +421,35 @@ const FacilitySidebar: React.FC = () => {
                         點擊模型以選取並調整位置/旋轉/縮放
                     </p>
                 )}
+
+                {/* 動畫模式 */}
+                <button
+                    onClick={() => {
+                        const next = !animationMode;
+                        setAnimationMode(next);
+                        if (next && editMode) setEditMode(false);
+                    }}
+                    style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        padding: '7px 0',
+                        borderRadius: 6,
+                        border: animationMode ? '1px solid #7c3aed' : '1px solid #d1d5db',
+                        background: animationMode ? '#7c3aed' : 'white',
+                        color: animationMode ? 'white' : '#374151',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                        marginTop: 6,
+                    }}
+                >
+                    <Film size={13} />
+                    {animationMode ? '退出動畫模式' : '進入動畫模式'}
+                </button>
             </div>
 
             {/* Footer */}

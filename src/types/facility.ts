@@ -66,6 +66,29 @@ export interface FacilityModelInfo {
     createdAt: string;
 }
 
+export interface AnimationKeyframe {
+    time: number;                                  // 秒
+    position?: { x: number; y: number; z: number };
+    rotation?: { x: number; y: number; z: number };
+    scale?: { x: number; y: number; z: number };
+}
+
+export interface FacilityAnimation {
+    id: string;
+    modelId: string;
+    name: string;
+    type: 'keyframe' | 'gltf';
+    trigger: 'auto' | 'manual';
+    loop: boolean;
+    duration: number;
+    easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+    gltfClipName?: string;
+    keyframes: AnimationKeyframe[];
+    sortOrder: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export interface Transform {
     position?: { x: number; y: number; z: number };
     rotation?: { x: number; y: number; z: number };

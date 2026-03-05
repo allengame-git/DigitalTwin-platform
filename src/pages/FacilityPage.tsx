@@ -15,6 +15,7 @@ const FacilitySidebar = React.lazy(() => import('../components/facility/Facility
 const FacilityInfoPanel = React.lazy(() => import('../components/facility/FacilityInfoPanel'));
 const TransformInputPanel = React.lazy(() => import('../components/facility/TransformInputPanel'));
 const PlanViewFloating = React.lazy(() => import('../components/facility/PlanViewFloating'));
+const AnimationTimeline = React.lazy(() => import('../components/facility/AnimationTimeline'));
 
 export const FacilityPage: React.FC = () => {
     const { projectCode } = useParams<{ projectCode: string }>();
@@ -27,8 +28,9 @@ export const FacilityPage: React.FC = () => {
     const selectedModel = useFacilityStore(state =>
         state.selectedModelId ? state.models.find(m => m.id === state.selectedModelId) : null
     );
-    // InfoPanel 開啟條件：有選取且不是裝飾模型
-    const isInfoPanelOpen = !!selectedModel && selectedModel.modelType !== 'decorative';
+    const animationMode = useFacilityStore(state => state.animationMode);
+    // InfoPanel 開啟條件：有選取且不是裝飾模型，且不在動畫模式
+    const isInfoPanelOpen = !!selectedModel && selectedModel.modelType !== 'decorative' && !animationMode;
     const currentScene = useFacilityStore(state => {
         const sid = state.currentSceneId;
         return sid ? state.scenes.find(s => s.id === sid) : null;
@@ -128,6 +130,11 @@ export const FacilityPage: React.FC = () => {
                 <React.Suspense fallback={null}>
                     <PlanViewFloating />
                 </React.Suspense>
+                {animationMode && (
+                    <React.Suspense fallback={null}>
+                        <AnimationTimeline />
+                    </React.Suspense>
+                )}
 
                 {/* Lobby: 「進入」按鈕 — 畫面上方中央 */}
                 {isLobby && lobbyChildScenes.length > 0 && (
@@ -200,11 +207,11 @@ export const FacilityPage: React.FC = () => {
                 {!isLobby && (
                 <div style={{
                     position: 'absolute',
-                    bottom: 24,
+                    bottom: animationMode ? 270 : 24,
                     // InfoPanel (width:340, right:24) 開啟時往左移，留 12px 間距
                     right: isInfoPanelOpen ? 24 + 340 + 12 : 24,
                     zIndex: 50,
-                    transition: 'right 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transition: 'right 0.25s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}>
                     <button
                         onClick={handleScreenshot}

@@ -819,5 +819,83 @@ router.delete('/scenes/:id/terrain', authenticate, async (req: Request, res: Res
     }
 });
 
+// ===== Animation CRUD =====
+
+// GET /models/:id/animations
+router.get('/models/:id/animations', async (req: Request, res: Response) => {
+    try {
+        const animations = await prisma.facilityAnimation.findMany({
+            where: { modelId: req.params.id },
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        });
+        res.json(animations);
+    } catch (error) {
+        console.error('[FacilityAnimation] Fetch error:', error);
+        res.status(500).json({ error: '取得動畫失敗' });
+    }
+});
+
+// POST /models/:id/animations
+router.post('/models/:id/animations', authenticate, async (req: Request, res: Response) => {
+    try {
+        const { name, type, trigger, loop, duration, easing, gltfClipName, keyframes, sortOrder } = req.body;
+        const animation = await prisma.facilityAnimation.create({
+            data: {
+                modelId: req.params.id,
+                name: name || '未命名動畫',
+                type: type || 'keyframe',
+                trigger: trigger || 'auto',
+                loop: loop ?? true,
+                duration: duration ?? 5,
+                easing: easing || 'linear',
+                gltfClipName: gltfClipName || null,
+                keyframes: keyframes || [],
+                sortOrder: sortOrder ?? 0,
+            },
+        });
+        res.status(201).json(animation);
+    } catch (error) {
+        console.error('[FacilityAnimation] Create error:', error);
+        res.status(500).json({ error: '建立動畫失敗' });
+    }
+});
+
+// PUT /animations/:animId
+router.put('/animations/:animId', authenticate, async (req: Request, res: Response) => {
+    try {
+        const { name, type, trigger, loop, duration, easing, gltfClipName, keyframes, sortOrder } = req.body;
+        const data: Record<string, unknown> = {};
+        if (name !== undefined) data.name = name;
+        if (type !== undefined) data.type = type;
+        if (trigger !== undefined) data.trigger = trigger;
+        if (loop !== undefined) data.loop = loop;
+        if (duration !== undefined) data.duration = duration;
+        if (easing !== undefined) data.easing = easing;
+        if (gltfClipName !== undefined) data.gltfClipName = gltfClipName;
+        if (keyframes !== undefined) data.keyframes = keyframes;
+        if (sortOrder !== undefined) data.sortOrder = sortOrder;
+
+        const animation = await prisma.facilityAnimation.update({
+            where: { id: req.params.animId },
+            data,
+        });
+        res.json(animation);
+    } catch (error) {
+        console.error('[FacilityAnimation] Update error:', error);
+        res.status(500).json({ error: '更新動畫失敗' });
+    }
+});
+
+// DELETE /animations/:animId
+router.delete('/animations/:animId', authenticate, async (req: Request, res: Response) => {
+    try {
+        await prisma.facilityAnimation.delete({ where: { id: req.params.animId } });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[FacilityAnimation] Delete error:', error);
+        res.status(500).json({ error: '刪除動畫失敗' });
+    }
+});
+
 export default router;
 

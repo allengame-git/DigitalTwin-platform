@@ -9,10 +9,89 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useFrame } from '@react-three/fiber';
 import { useFacilityStore } from '@/stores/facilityStore';
-import type { FacilityModel } from '@/types/facility';
+import type { FacilityModel, AnimationKeyframe } from '@/types/facility';
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
+
+// ── Easing functions ────────────────────────────────────────────
+const easingFns: Record<string, (t: number) => number> = {
+    linear: t => t,
+    easeIn: t => t * t,
+    easeOut: t => t * (2 - t),
+    easeInOut: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+};
+
+// ── Keyframe interpolation ──────────────────────────────────────
+function interpolateKeyframes(
+    keyframes: AnimationKeyframe[],
+    time: number,
+    duration: number,
+    easing: string,
+): { position?: THREE.Vector3; rotation?: THREE.Euler; scale?: THREE.Vector3 } | null {
+    if (keyframes.length === 0) return null;
+    if (keyframes.length === 1) {
+        const kf = keyframes[0];
+        return {
+            position: kf.position ? new THREE.Vector3(kf.position.x, kf.position.y, kf.position.z) : undefined,
+            rotation: kf.rotation ? new THREE.Euler(kf.rotation.x * DEG2RAD, kf.rotation.y * DEG2RAD, kf.rotation.z * DEG2RAD) : undefined,
+            scale: kf.scale ? new THREE.Vector3(kf.scale.x, kf.scale.y, kf.scale.z) : undefined,
+        };
+    }
+
+    // Clamp time
+    const t = Math.max(0, Math.min(duration, time));
+
+    // Find surrounding keyframes
+    let prev = keyframes[0];
+    let next = keyframes[keyframes.length - 1];
+    for (let i = 0; i < keyframes.length - 1; i++) {
+        if (t >= keyframes[i].time && t <= keyframes[i + 1].time) {
+            prev = keyframes[i];
+            next = keyframes[i + 1];
+            break;
+        }
+    }
+
+    const segment = next.time - prev.time;
+    const rawAlpha = segment > 0 ? (t - prev.time) / segment : 0;
+    const ease = easingFns[easing] || easingFns.linear;
+    const alpha = ease(rawAlpha);
+
+    const result: { position?: THREE.Vector3; rotation?: THREE.Euler; scale?: THREE.Vector3 } = {};
+
+    // Position lerp
+    if (prev.position && next.position) {
+        result.position = new THREE.Vector3().lerpVectors(
+            new THREE.Vector3(prev.position.x, prev.position.y, prev.position.z),
+            new THREE.Vector3(next.position.x, next.position.y, next.position.z),
+            alpha,
+        );
+    }
+
+    // Rotation slerp via quaternion
+    if (prev.rotation && next.rotation) {
+        const q1 = new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(prev.rotation.x * DEG2RAD, prev.rotation.y * DEG2RAD, prev.rotation.z * DEG2RAD),
+        );
+        const q2 = new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(next.rotation.x * DEG2RAD, next.rotation.y * DEG2RAD, next.rotation.z * DEG2RAD),
+        );
+        const q = new THREE.Quaternion().slerpQuaternions(q1, q2, alpha);
+        result.rotation = new THREE.Euler().setFromQuaternion(q);
+    }
+
+    // Scale lerp
+    if (prev.scale && next.scale) {
+        result.scale = new THREE.Vector3().lerpVectors(
+            new THREE.Vector3(prev.scale.x, prev.scale.y, prev.scale.z),
+            new THREE.Vector3(next.scale.x, next.scale.y, next.scale.z),
+            alpha,
+        );
+    }
+
+    return result;
+}
 
 interface FacilityModelItemProps {
     model: FacilityModel;
@@ -27,6 +106,8 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const labelGroupRef = useRef<THREE.Group>(null);
     const labelRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+    const animStartTimeRef = useRef<number>(0);
 
     const selectedModelId = useFacilityStore(state => state.selectedModelId);
     const hoveredModelId = useFacilityStore(state => state.hoveredModelId);
@@ -46,6 +127,13 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
         return sid ? state.scenes.find(s => s.id === sid)?.sceneType : undefined;
     });
 
+    // Animation state from store
+    const animations = useFacilityStore(state => state.animations.filter(a => a.modelId === model.id));
+    const animationMode = useFacilityStore(state => state.animationMode);
+    const playbackState = useFacilityStore(state => state.playbackState);
+    const playbackTime = useFacilityStore(state => state.playbackTime);
+    const selectedAnimationId = useFacilityStore(state => state.selectedAnimationId);
+
     const isSelected = selectedModelId === model.id;
     const isHovered = hoveredModelId === model.id;
     const isEditing = editMode && editingModelId === model.id;
@@ -53,8 +141,8 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const isLobby = currentSceneType === 'lobby';
     const childScenes = useMemo(() => getChildScenes(model.id), [getChildScenes, model.id]);
     const hasChildScene = childScenes.length > 0;
-    // useGLTF 載入模型
-    const { scene: gltfScene } = useGLTF(model.modelUrl);
+    // useGLTF 載入模型（含 animations）
+    const { scene: gltfScene, animations: gltfAnimations } = useGLTF(model.modelUrl);
 
     // Clone scene 以避免多個 instance 共用同一 scene（memo 確保 bbox 不重算）
     const clonedScene = useMemo(() => {
@@ -110,10 +198,99 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
 
     const bboxCenterReported = useRef(false);
 
+    // ── 播放狀態切換時標記需要重置起始時間 ──
+    const needResetStartTime = useRef(false);
+    const prevPlaybackState = useRef(playbackState);
+    useEffect(() => {
+        if (playbackState === 'playing' && prevPlaybackState.current !== 'playing') {
+            needResetStartTime.current = true;
+        }
+        prevPlaybackState.current = playbackState;
+    }, [playbackState]);
+
+    // ── GLB AnimationMixer 初始化 ──
+    useEffect(() => {
+        if (gltfAnimations.length === 0) return;
+        const mixer = new THREE.AnimationMixer(clonedScene);
+        mixerRef.current = mixer;
+
+        // 自動播放 trigger='auto' 的 gltf 動畫
+        for (const anim of animations) {
+            if (anim.type === 'gltf' && anim.gltfClipName) {
+                const clip = gltfAnimations.find(c => c.name === anim.gltfClipName);
+                if (clip && anim.trigger === 'auto') {
+                    const action = mixer.clipAction(clip);
+                    action.setLoop(anim.loop ? THREE.LoopRepeat : THREE.LoopOnce, anim.loop ? Infinity : 1);
+                    if (!anim.loop) action.clampWhenFinished = true;
+                    action.play();
+                }
+            }
+        }
+
+        return () => {
+            mixer.stopAllAction();
+            mixer.uncacheRoot(clonedScene);
+            mixerRef.current = null;
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [clonedScene, gltfAnimations]);
+
     // 每幀：用 localToWorld 把 bbox 頂點轉成 world space → 設定 labelGroup 位置
     // 標籤 group 在 model group 外面，不受 model scale 影響
-    useFrame(({ camera }) => {
-        if (!labelGroupRef.current || !groupRef.current) return;
+    useFrame(({ camera, clock }, delta) => {
+        if (!groupRef.current) return;
+
+        // ── GLB mixer update ──
+        if (mixerRef.current) {
+            mixerRef.current.update(delta);
+        }
+
+        // ── Keyframe animation playback ──
+        const activeKeyframeAnims = animations.filter(a => a.type === 'keyframe' && a.keyframes.length > 0);
+        for (const anim of activeKeyframeAnims) {
+            // 動畫編輯模式中：選中的動畫用 playbackTime scrub
+            const isEditingThis = animationMode && selectedAnimationId === anim.id;
+            let shouldAnimate = false;
+            let currentTime = 0;
+
+            if (isEditingThis) {
+                // 編輯模式：跟隨 store 的 playbackTime
+                if (playbackState === 'playing') {
+                    if (needResetStartTime.current) {
+                        animStartTimeRef.current = clock.elapsedTime - playbackTime;
+                        needResetStartTime.current = false;
+                    }
+                    const elapsed = clock.elapsedTime - animStartTimeRef.current;
+                    currentTime = anim.loop
+                        ? elapsed % anim.duration
+                        : Math.min(elapsed, anim.duration);
+                    useFacilityStore.getState().setPlaybackTime(currentTime);
+                    shouldAnimate = true;
+                } else if (playbackState === 'paused') {
+                    currentTime = playbackTime;
+                    shouldAnimate = true;
+                }
+            } else if (anim.trigger === 'auto') {
+                // 自動播放模式
+                const elapsed = clock.elapsedTime;
+                currentTime = anim.loop
+                    ? elapsed % anim.duration
+                    : Math.min(elapsed, anim.duration);
+                shouldAnimate = true;
+            }
+
+            if (shouldAnimate) {
+                const result = interpolateKeyframes(anim.keyframes, currentTime, anim.duration, anim.easing);
+                if (result) {
+                    if (result.position) groupRef.current.position.copy(result.position);
+                    if (result.rotation) groupRef.current.rotation.copy(result.rotation);
+                    if (result.scale) groupRef.current.scale.copy(result.scale);
+                }
+            }
+        }
+
+        // ── Label positioning ──
+        if (!labelGroupRef.current) return;
 
         // 第一幀：把 bbox 視覺中心的 world-space 座標存進 store（供 fly-to 使用）
         if (!bboxCenterReported.current) {
@@ -125,11 +302,10 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
 
         // local → world（含 model scale / rotation / translation）
         _topLocal.set(bboxInfo.cx, bboxInfo.maxY, bboxInfo.cz);
-        groupRef.current.localToWorld(_topLocal);   // 就地修改
+        groupRef.current.localToWorld(_topLocal);
 
         // 固定 20 world units above model top（Y 方向）
         labelGroupRef.current.position.set(_topLocal.x, _topLocal.y + 20, _topLocal.z);
-
 
         // 依相機距離動態調整字體
         if (labelRef.current) {
