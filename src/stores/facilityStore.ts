@@ -108,7 +108,9 @@ interface FacilityState {
     playbackState: 'stopped' | 'playing' | 'paused';
     playbackTime: number;       // 目前播放時間（秒）
     editingKeyframeIndex: number | null;  // 正在編輯的關鍵幀 index
+    manualPlayingModelIds: string[];     // 正在播放 manual 動畫的模型 ID
 
+    toggleManualPlay: (modelId: string) => void;
     fetchAnimations: (modelId: string) => Promise<void>;
     fetchAnimationsForModels: (modelIds: string[]) => Promise<void>;
     createAnimation: (modelId: string, data?: Partial<FacilityAnimation>) => Promise<FacilityAnimation>;
@@ -164,7 +166,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
                 selectedModelIds: [],
                 focusedModelId: null,
                 hoveredModelId: null,
-                hiddenModelIds: [],
+                hiddenModelIds: [], manualPlayingModelIds: [],
                 editingModelId: null,
                 flyToModelId: null,
                 modelBboxCenters: {},
@@ -217,7 +219,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
             selectedModelIds: [],
             focusedModelId: null,
             hoveredModelId: null,
-            hiddenModelIds: [],
+            hiddenModelIds: [], manualPlayingModelIds: [],
             editingModelId: null,
         }));
         await fetchModels(sceneId);
@@ -236,7 +238,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
             selectedModelIds: [],
             focusedModelId: null,
             hoveredModelId: null,
-            hiddenModelIds: [],
+            hiddenModelIds: [], manualPlayingModelIds: [],
             editingModelId: null,
         });
         await fetchModels(prevSceneId);
@@ -253,7 +255,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
             selectedModelIds: [],
             focusedModelId: null,
             hoveredModelId: null,
-            hiddenModelIds: [],
+            hiddenModelIds: [], manualPlayingModelIds: [],
             editingModelId: null,
         });
         await fetchModels(root.id);
@@ -443,6 +445,16 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     playbackState: 'stopped',
     playbackTime: 0,
     editingKeyframeIndex: null,
+    manualPlayingModelIds: [],
+
+    toggleManualPlay: (modelId) => set(state => {
+        const isPlaying = state.manualPlayingModelIds.includes(modelId);
+        return {
+            manualPlayingModelIds: isPlaying
+                ? state.manualPlayingModelIds.filter(id => id !== modelId)
+                : [...state.manualPlayingModelIds, modelId],
+        };
+    }),
 
     fetchAnimations: async (modelId: string) => {
         try {
@@ -518,6 +530,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
         playbackState: enabled ? 'paused' : 'stopped',
         playbackTime: enabled ? state.playbackTime : 0,
         editingKeyframeIndex: null,
+        manualPlayingModelIds: [],
     })),
 
     selectAnimation: (animId) => set({

@@ -108,6 +108,9 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const mixerRef = useRef<THREE.AnimationMixer | null>(null);
     const animStartTimeRef = useRef<number>(0);
+    const manualStartTimeRef = useRef<number>(0);
+    const manualNeedReset = useRef(true);
+    const manualGltfActionsRef = useRef<THREE.AnimationAction[]>([]);
 
     const selectedModelIds = useFacilityStore(state => state.selectedModelIds);
     const focusedModelId = useFacilityStore(state => state.focusedModelId);
@@ -136,6 +139,8 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     const playbackState = useFacilityStore(state => state.playbackState);
     const playbackTime = useFacilityStore(state => state.playbackTime);
     const selectedAnimationId = useFacilityStore(state => state.selectedAnimationId);
+    const manualPlayingModelIds = useFacilityStore(state => state.manualPlayingModelIds);
+    const isManualPlaying = manualPlayingModelIds.includes(model.id);
 
     const isSelected = selectedModelIds.includes(model.id);
     const isFocused = focusedModelId === model.id;
@@ -236,26 +241,50 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
         const mixer = new THREE.AnimationMixer(clonedScene);
         mixerRef.current = mixer;
 
-        // 自動播放 trigger='auto' 的 gltf 動畫
+        // 初始化 gltf 動畫 actions
+        const manualActions: THREE.AnimationAction[] = [];
         for (const anim of animations) {
             if (anim.type === 'gltf' && anim.gltfClipName) {
                 const clip = gltfAnimations.find(c => c.name === anim.gltfClipName);
-                if (clip && anim.trigger === 'auto') {
+                if (clip) {
                     const action = mixer.clipAction(clip);
                     action.setLoop(anim.loop ? THREE.LoopRepeat : THREE.LoopOnce, anim.loop ? Infinity : 1);
                     if (!anim.loop) action.clampWhenFinished = true;
-                    action.play();
+                    if (anim.trigger === 'auto') {
+                        action.play();
+                    } else {
+                        // manual: 建立 action 但不 play，存入 ref
+                        manualActions.push(action);
+                    }
                 }
             }
         }
+        manualGltfActionsRef.current = manualActions;
 
         return () => {
             mixer.stopAllAction();
             mixer.uncacheRoot(clonedScene);
             mixerRef.current = null;
+            manualGltfActionsRef.current = [];
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [clonedScene, gltfAnimations]);
+
+    // ── Manual 動畫播放控制 ──
+    useEffect(() => {
+        if (isManualPlaying) {
+            // 開始播放：重設 keyframe start time + 播放 GLB actions
+            manualNeedReset.current = true;
+            for (const action of manualGltfActionsRef.current) {
+                action.reset().play();
+            }
+        } else {
+            // 停止：停止 GLB actions
+            for (const action of manualGltfActionsRef.current) {
+                action.stop();
+            }
+        }
+    }, [isManualPlaying]);
 
     // 每幀：用 localToWorld 把 bbox 頂點轉成 world space → 設定 labelGroup 位置
     // 標籤 group 在 model group 外面，不受 model scale 影響
@@ -305,6 +334,21 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                     ? elapsed % anim.duration
                     : Math.min(elapsed, anim.duration);
                 shouldAnimate = true;
+            } else if (anim.trigger === 'manual' && isManualPlaying) {
+                // 手動觸發播放
+                if (manualNeedReset.current) {
+                    manualStartTimeRef.current = clock.elapsedTime;
+                    manualNeedReset.current = false;
+                }
+                const elapsed = clock.elapsedTime - manualStartTimeRef.current;
+                currentTime = anim.loop
+                    ? elapsed % anim.duration
+                    : Math.min(elapsed, anim.duration);
+                shouldAnimate = true;
+                // 非循環且播完 → 自動停止
+                if (!anim.loop && elapsed >= anim.duration) {
+                    useFacilityStore.getState().toggleManualPlay(model.id);
+                }
             }
 
             if (shouldAnimate) {

@@ -200,6 +200,8 @@ const FacilitySidebar: React.FC = () => {
         toggleModelSelection,
         hiddenModelIds,
         toggleModelVisibility,
+        manualPlayingModelIds,
+        toggleManualPlay,
         batchDeleteModels,
         currentSceneId,
         scenes,
@@ -490,6 +492,8 @@ const FacilitySidebar: React.FC = () => {
                                     const isFocused = model.id === focusedModelId;
                                     const isHidden = hiddenModelIds.includes(model.id);
                                     const hasChildScene = scenes.some(s => s.parentModelId === model.id);
+                                    const hasManualAnim = animations.some(a => a.modelId === model.id && a.trigger === 'manual');
+                                    const isManualPlaying = manualPlayingModelIds.includes(model.id);
 
                                     return (
                                         <li key={model.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -572,6 +576,32 @@ const FacilitySidebar: React.FC = () => {
                                                     />
                                                 )}
                                             </button>
+                                            {/* 手動動畫播放按鈕 */}
+                                            {hasManualAnim && !animationMode && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleManualPlay(model.id);
+                                                    }}
+                                                    title={isManualPlaying ? '停止動畫' : '播放動畫'}
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        padding: '2px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        flexShrink: 0,
+                                                        color: isManualPlaying ? '#7c3aed' : '#9ca3af',
+                                                        transition: 'color 0.15s',
+                                                    }}
+                                                >
+                                                    {isManualPlaying
+                                                        ? <Pause size={13} />
+                                                        : <Play size={13} />
+                                                    }
+                                                </button>
+                                            )}
                                         </li>
                                     );
                                 })}
