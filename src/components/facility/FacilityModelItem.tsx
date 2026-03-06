@@ -574,25 +574,41 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
         }
     });
 
-    // 高亮：hover=黃色，selected=藍色，兩者同時以 hover 優先
-    // 直接修改 emissive 屬性，不 clone 材質，避免 GPU 記憶體洩漏
+    // 高亮 + 路徑節點編輯時半透明
+    // 直接修改材質屬性，不 clone，避免 GPU 記憶體洩漏
+    const isEditingPathNode = editingKeyframeIndex !== null && animationMode;
+
     useEffect(() => {
         const emissiveColor = isHovered ? '#ffaa00' : isSelected ? '#2255ff' : '#000000';
         const emissiveIntensity = isHovered ? 0.3 : isSelected ? 0.25 : 0;
+        const ghostMode = isEditingPathNode;
 
         clonedScene.traverse((node) => {
             if ((node as THREE.Mesh).isMesh) {
                 const mesh = node as THREE.Mesh;
+                // ghostMode: 禁用 raycasting 讓射線穿透模型打到節點球
+                if (ghostMode) {
+                    if (!(mesh.userData as Record<string, unknown>)._origRaycast) {
+                        (mesh.userData as Record<string, unknown>)._origRaycast = mesh.raycast;
+                    }
+                    mesh.raycast = () => {};
+                } else if ((mesh.userData as Record<string, unknown>)._origRaycast) {
+                    mesh.raycast = (mesh.userData as Record<string, unknown>)._origRaycast as typeof mesh.raycast;
+                    delete (mesh.userData as Record<string, unknown>)._origRaycast;
+                }
+
                 const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
                 for (const mat of mats) {
                     if (mat instanceof THREE.MeshStandardMaterial) {
                         mat.emissive.set(emissiveColor);
                         mat.emissiveIntensity = emissiveIntensity;
+                        mat.transparent = ghostMode ? true : mat.transparent;
+                        mat.opacity = ghostMode ? 0.3 : 1;
                     }
                 }
             }
         });
-    }, [isHovered, isSelected, clonedScene]);
+    }, [isHovered, isSelected, isEditingPathNode, clonedScene]);
 
     // TransformControls onChange：debounce 更新後端
     const handleTransformChange = useCallback(() => {
