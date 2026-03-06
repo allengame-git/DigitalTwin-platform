@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronRight, Box, DoorOpen, Edit3, Tag, Map, Film, Move, RotateCw, Maximize2, ChevronDown, Trash2, Eye, EyeOff, CheckSquare, Play, Pause, Square } from 'lucide-react';
+import { ChevronRight, Box, DoorOpen, Edit3, Tag, Map, Film, Move, RotateCw, Maximize2, ChevronDown, Trash2, Eye, EyeOff, CheckSquare, Play, Pause, Square, ArrowDown, Video, RotateCcw } from 'lucide-react';
 import { useFacilityStore, getModelGroupRef } from '@/stores/facilityStore';
 import BreadcrumbNav from './BreadcrumbNav';
 
@@ -225,6 +225,7 @@ const FacilitySidebar: React.FC = () => {
         flyToModel,
         enterScene,
         startSceneTransition,
+        setViewPreset,
     } = useFacilityStore();
 
     const [confirmBatchDelete, setConfirmBatchDelete] = React.useState(false);
@@ -366,6 +367,55 @@ const FacilitySidebar: React.FC = () => {
                 <div style={{ borderBottom: '1px solid #e5e7eb' }}>
                     <BreadcrumbNav />
                 </div>
+
+                {/* 視角快速切換 */}
+                <section style={{ borderBottom: '1px solid #e5e7eb', padding: '8px 10px' }}>
+                    <div style={{
+                        display: 'flex',
+                        gap: 4,
+                        background: '#f3f4f6',
+                        borderRadius: 6,
+                        padding: 3,
+                    }}>
+                        {([
+                            { key: 'top' as const, label: '俯視', icon: <ArrowDown size={12} /> },
+                            { key: 'default' as const, label: '預設', icon: <Video size={12} /> },
+                            { key: 'reset' as const, label: '重置', icon: <RotateCcw size={12} /> },
+                        ]).map(v => (
+                            <button
+                                key={v.key}
+                                onClick={() => setViewPreset(v.key)}
+                                title={v.label + '視角'}
+                                style={{
+                                    flex: 1,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 4,
+                                    padding: '5px 0',
+                                    borderRadius: 4,
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: '#4b5563',
+                                    fontSize: 11,
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s',
+                                }}
+                                onMouseEnter={e => {
+                                    e.currentTarget.style.background = '#e5e7eb';
+                                    e.currentTarget.style.color = '#111827';
+                                }}
+                                onMouseLeave={e => {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.color = '#4b5563';
+                                }}
+                            >
+                                {v.icon} {v.label}
+                            </button>
+                        ))}
+                    </div>
+                </section>
 
                 {/* 模型清單 */}
                 <section style={{ borderBottom: '1px solid #e5e7eb' }}>

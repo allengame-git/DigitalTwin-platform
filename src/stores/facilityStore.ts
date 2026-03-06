@@ -47,6 +47,7 @@ interface FacilityState {
 
     // Camera fly-to
     flyToModelId: string | null;
+    viewPreset: 'top' | 'default' | 'reset' | null;
 
     // Async state
     isLoading: boolean;
@@ -96,6 +97,8 @@ interface FacilityState {
     // Camera
     flyToModel: (modelId: string) => void;
     clearFlyTo: () => void;
+    setViewPreset: (preset: 'top' | 'default' | 'reset') => void;
+    clearViewPreset: () => void;
 
     // Bbox centers (world-space, reported by FacilityModelItem on first frame)
     modelBboxCenters: Record<string, { x: number; y: number; z: number }>;
@@ -149,6 +152,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     showLabels: true,
     showPlanView: false,
     flyToModelId: null,
+    viewPreset: null,
     modelBboxCenters: {},
     isLoading: false,
     error: null,
@@ -446,6 +450,8 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     // ===== Camera =====
     flyToModel: (modelId) => set({ flyToModelId: modelId }),
     clearFlyTo: () => set({ flyToModelId: null }),
+    setViewPreset: (preset) => set({ viewPreset: preset }),
+    clearViewPreset: () => set({ viewPreset: null }),
     setModelBboxCenter: (modelId, center) => set(state => ({
         modelBboxCenters: { ...state.modelBboxCenters, [modelId]: center },
     })),

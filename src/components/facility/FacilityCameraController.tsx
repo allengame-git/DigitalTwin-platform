@@ -25,6 +25,8 @@ export function FacilityCameraController() {
     const modelBboxCenters = useFacilityStore(state => state.modelBboxCenters);
     const transitionState = useFacilityStore(state => state.transitionState);
     const advanceTransition = useFacilityStore(state => state.advanceTransition);
+    const viewPreset = useFacilityStore(state => state.viewPreset);
+    const clearViewPreset = useFacilityStore(state => state.clearViewPreset);
 
     // 場景切換時飛到場景預設相機位置（非 transition 模式才飛行）
     useEffect(() => {
@@ -90,6 +92,90 @@ export function FacilityCameraController() {
 
         clearFlyTo();
     }, [flyToModelId, models, controls, camera, clearFlyTo, modelBboxCenters, transitionState, advanceTransition]);
+
+    // 視角快速切換
+    useEffect(() => {
+        if (!viewPreset) return;
+        clearViewPreset();
+
+        const ctrl = controls as any;
+        const scene = useFacilityStore.getState().getCurrentScene();
+        const { models: curModels, modelBboxCenters: centers } = useFacilityStore.getState();
+
+        // 計算場景中心（所有模型 bbox center 的平均；無模型則 fallback 原點）
+        const computeSceneCenter = (): THREE.Vector3 => {
+            const ct = scene?.cameraTarget;
+            if (ct) return new THREE.Vector3(ct.x, ct.y, ct.z);
+            const vals = Object.values(centers);
+            if (vals.length > 0) {
+                const avg = vals.reduce(
+                    (acc, c) => ({ x: acc.x + c.x, y: acc.y + c.y, z: acc.z + c.z }),
+                    { x: 0, y: 0, z: 0 }
+                );
+                return new THREE.Vector3(avg.x / vals.length, avg.y / vals.length, avg.z / vals.length);
+            }
+            if (curModels.length > 0) {
+                const avg = curModels.reduce(
+                    (acc, m) => ({ x: acc.x + m.position.x, y: acc.y + m.position.y, z: acc.z + m.position.z }),
+                    { x: 0, y: 0, z: 0 }
+                );
+                return new THREE.Vector3(avg.x / curModels.length, avg.y / curModels.length, avg.z / curModels.length);
+            }
+            return new THREE.Vector3(0, 0, 0);
+        };
+
+        // 估算場景範圍（用來決定相機距離）
+        const computeSceneRadius = (center: THREE.Vector3): number => {
+            let maxDist = 50;
+            for (const m of curModels) {
+                const dx = m.position.x - center.x;
+                const dy = m.position.y - center.y;
+                const dz = m.position.z - center.z;
+                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) + Math.max(m.scale.x, m.scale.y, m.scale.z) * 5;
+                if (dist > maxDist) maxDist = dist;
+            }
+            return maxDist;
+        };
+
+        let camTo: THREE.Vector3;
+        let targetTo: THREE.Vector3;
+
+        if (viewPreset === 'top') {
+            // 俯視：從正上方看下去
+            targetTo = computeSceneCenter();
+            const radius = computeSceneRadius(targetTo);
+            const height = Math.max(300, radius * 1.5);
+            camTo = new THREE.Vector3(targetTo.x, height, targetTo.z + 0.01); // +0.01 避免正上方 gimbal lock
+        } else if (viewPreset === 'default') {
+            // 回到場景預設相機位置（有設定時）；無設定則用斜 45° 俯視
+            const cp = scene?.cameraPosition;
+            if (cp) {
+                camTo = new THREE.Vector3(cp.x, cp.y, cp.z);
+                const ct = scene?.cameraTarget;
+                targetTo = ct ? new THREE.Vector3(ct.x, ct.y, ct.z) : new THREE.Vector3(0, 0, 0);
+            } else {
+                targetTo = computeSceneCenter();
+                const radius = computeSceneRadius(targetTo);
+                const dist = Math.max(200, radius * 1.2);
+                camTo = targetTo.clone().add(new THREE.Vector3(0, dist * 0.6, dist));
+            }
+        } else {
+            // reset: 根據模型分布計算 fit-all 視角
+            targetTo = computeSceneCenter();
+            const radius = computeSceneRadius(targetTo);
+            const dist = Math.max(200, radius * 1.2);
+            camTo = targetTo.clone().add(new THREE.Vector3(0, dist * 0.6, dist));
+        }
+
+        flyRef.current = {
+            camFrom: camera.position.clone(),
+            camTo,
+            targetFrom: ctrl?.target?.clone() ?? new THREE.Vector3(),
+            targetTo,
+            duration: 800,
+            startTime: performance.now(),
+        };
+    }, [viewPreset, camera, controls, clearViewPreset]);
 
     useFrame(() => {
         const fly = flyRef.current;
