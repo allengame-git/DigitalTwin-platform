@@ -493,10 +493,11 @@ router.post('/models/:id/info', authenticate, infoUpload.single('file'), async (
             infoDir = path.join(INFO_DIR, infoId);
             fs.mkdirSync(infoDir, { recursive: true });
 
-            const destPath = path.join(infoDir, file.originalname);
+            const safeName = path.basename(file.originalname);
+            const destPath = path.join(infoDir, safeName);
             fs.renameSync(file.path, destPath);
 
-            const finalContent = `/uploads/facility/info/${infoId}/${file.originalname}`;
+            const finalContent = `/uploads/facility/info/${infoId}/${encodeURIComponent(safeName)}`;
 
             const info = await prisma.facilityModelInfo.create({
                 data: {

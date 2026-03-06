@@ -1,3 +1,5 @@
+import DOMPurify from 'dompurify';
+
 /**
  * RichTextView — 顯示 WYSIWYG HTML 內容（唯讀）
  */
@@ -8,12 +10,13 @@ interface RichTextViewProps {
 
 export function RichTextView({ html, style }: RichTextViewProps) {
     if (!html || /^(<p>(\s|<br[^>]*>)*<\/p>\s*)+$/.test(html)) return null;
+    const cleanHtml = DOMPurify.sanitize(html);
     return (
         <>
             <div
                 className="rich-text-view"
                 style={{ fontSize: 14, lineHeight: 1.7, color: '#1e293b', ...style }}
-                dangerouslySetInnerHTML={{ __html: html }}
+                dangerouslySetInnerHTML={{ __html: cleanHtml }}
             />
             <style>{viewCSS}</style>
         </>
