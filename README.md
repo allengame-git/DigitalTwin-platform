@@ -540,6 +540,19 @@ npm run build
   - **動畫載入優化**: `fetchModels` 完成後自動 `fetchAnimationsForModels`，merge 策略保留既有動畫
   - **Sidebar Transform 輸入**: 動畫模式下提供 XYZ 數值輸入面板，200ms 同步 3D groupRef
 
+- [x] **手動觸發動畫播放 UI (2026-03-06, A2)**:
+  - **Store 層**: `manualPlayingModelIds: string[]` 追蹤正在播放手動動畫的模型 ID，`toggleManualPlay(modelId)` 切換播放/停止
+  - **Keyframe 手動播放**: `FacilityModelItem.tsx` useFrame 新增 `trigger === 'manual' && isManualPlaying` 分支，獨立 `manualStartTimeRef` 計時，非循環動畫播完自動停止
+  - **GLB 手動播放**: `manualGltfActionsRef` 預建 AnimationAction 但不播放，`isManualPlaying` useEffect 控制 play/stop
+  - **Sidebar 按鈕**: 有 `trigger='manual'` 動畫的模型旁顯示 Play/Pause 按鈕（紫色 `#7c3aed`），動畫編輯模式下隱藏
+  - **狀態隔離**: `manualPlayingModelIds` 獨立於全域 `playbackState`，場景切換與動畫模式進入時自動清空
+
+- [x] **動畫預覽路徑可視化 (2026-03-06, A4)**:
+  - **路徑線**: 動畫編輯模式下選中 keyframe 動畫時，用 drei `<Line>` 繪製直線連接所有帶 position 的關鍵幀（與實際 lerp 插值一致）
+  - **節點球**: 每個關鍵幀位置用紫色小球（`SphereGeometry(0.3)`）標記，當前編輯中的 keyframe 用亮紫色（`#a78bfa`）較大球（`0.5`）區分
+  - **多模型支援**: 多選模型時各自獨立顯示各自動畫的路徑
+  - **場景空間渲染**: 路徑線在場景空間中渲染（不掛在模型 group 下），避免被動畫 transform 影響
+
 - [x] **設施模型資訊系統 (2026-03-04)**:
   - **DB Schema 擴充**: `FacilityModel` 新增 `introduction String?`（WYSIWYG HTML 設施介紹）
   - **WYSIWYG 編輯器**: TipTap 2.x 共用元件 `RichTextEditor`（Bold/Italic/Underline/H1-H3/BulletList/OrderedList/TextAlign/Link/Image Upload/Table 工具列）
