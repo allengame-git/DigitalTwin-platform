@@ -8,6 +8,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { safeResolvePath } from '../lib/safePath';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -184,17 +185,15 @@ router.delete('/:id', authenticate, async (req: Request, res: Response) => {
 
         await prisma.waterLevel.delete({ where: { id } });
 
-        // Delete files
-        const filesToDelete = [
-            path.join(__dirname, '..', waterLevel.path),
-            path.join(__dirname, '..', waterLevel.heightmap),
-        ];
-
-        for (const f of filesToDelete) {
-            try {
-                if (fs.existsSync(f)) fs.unlinkSync(f);
-            } catch (e) {
-                console.warn(`[Water Level] Failed to delete: ${f}`);
+        // Delete files (with path traversal protection)
+        for (const url of [waterLevel.path, waterLevel.heightmap]) {
+            const safe = safeResolvePath(url);
+            if (safe) {
+                try {
+                    if (fs.existsSync(safe)) fs.unlinkSync(safe);
+                } catch (e) {
+                    console.warn(`[Water Level] Failed to delete: ${safe}`);
+                }
             }
         }
 

@@ -10,6 +10,8 @@ import { authenticate } from '../middleware/auth';
 
 const router = Router();
 
+import { safeResolvePath } from '../lib/safePath';
+
 // ===== Upload directories =====
 const FACILITY_DIR = path.join(__dirname, '../uploads/facility');
 const MODELS_DIR = path.join(FACILITY_DIR, 'models');
@@ -25,7 +27,7 @@ const INTRO_IMAGES_DIR = path.join(FACILITY_DIR, 'intro-images');
 // ===== Scene CRUD =====
 
 // GET /scenes?projectId=xxx
-router.get('/scenes', async (req: Request, res: Response) => {
+router.get('/scenes', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId } = req.query;
         if (!projectId) return res.status(400).json({ error: 'projectId required' });
@@ -140,11 +142,12 @@ router.delete('/scenes/:id', authenticate, async (req: Request, res: Response) =
                 infos?: Array<{ id: string; type: string }>;
             }>;
         }) => {
-            if (s.planImageUrl) filesToDelete.push(path.join(__dirname, '..', s.planImageUrl));
-            if (s.autoPlanImageUrl) filesToDelete.push(path.join(__dirname, '..', s.autoPlanImageUrl));
-            if (s.terrainCsvUrl) filesToDelete.push(path.join(__dirname, '..', s.terrainCsvUrl));
-            if (s.terrainHeightmapUrl) filesToDelete.push(path.join(__dirname, '..', s.terrainHeightmapUrl));
-            if (s.terrainTextureUrl) filesToDelete.push(path.join(__dirname, '..', s.terrainTextureUrl));
+            for (const url of [s.planImageUrl, s.autoPlanImageUrl, s.terrainCsvUrl, s.terrainHeightmapUrl, s.terrainTextureUrl]) {
+                if (url) {
+                    const safe = safeResolvePath(url);
+                    if (safe) filesToDelete.push(safe);
+                }
+            }
 
             for (const model of s.models || []) {
                 const modelDir = path.join(MODELS_DIR, model.id);
@@ -245,7 +248,7 @@ const modelUpload = multer({
 });
 
 // GET /models?sceneId=xxx
-router.get('/models', async (req: Request, res: Response) => {
+router.get('/models', authenticate, async (req: Request, res: Response) => {
     try {
         const { sceneId } = req.query;
         if (!sceneId) return res.status(400).json({ error: 'sceneId required' });
@@ -451,7 +454,7 @@ const infoUpload = multer({
 });
 
 // GET /models/:id/info
-router.get('/models/:id/info', async (req: Request, res: Response) => {
+router.get('/models/:id/info', authenticate, async (req: Request, res: Response) => {
     try {
         const modelId = req.params.id as string;
         const infos = await prisma.facilityModelInfo.findMany({
@@ -823,7 +826,7 @@ router.delete('/scenes/:id/terrain', authenticate, async (req: Request, res: Res
 // ===== Animation CRUD =====
 
 // GET /models/:id/animations
-router.get('/models/:id/animations', async (req: Request, res: Response) => {
+router.get('/models/:id/animations', authenticate, async (req: Request, res: Response) => {
     try {
         const animations = await prisma.facilityAnimation.findMany({
             where: { modelId: req.params.id as string },
@@ -863,9 +866,23 @@ router.post('/models/:id/animations', authenticate, async (req: Request, res: Re
     }
 });
 
+// Helper: verify animation belongs to a valid project chain
+async function verifyAnimationOwnership(animId: string): Promise<boolean> {
+    const anim = await prisma.facilityAnimation.findUnique({
+        where: { id: animId },
+        select: { model: { select: { scene: { select: { projectId: true } } } } },
+    });
+    return !!anim;
+}
+
 // PUT /animations/:animId
 router.put('/animations/:animId', authenticate, async (req: Request, res: Response) => {
     try {
+        const animId = req.params.animId as string;
+        if (!(await verifyAnimationOwnership(animId))) {
+            return res.status(404).json({ error: '動畫不存在' });
+        }
+
         const { name, type, trigger, loop, duration, easing, gltfClipName, pathMode, autoOrient, keyframes, sortOrder } = req.body;
         const data: Record<string, unknown> = {};
         if (name !== undefined) data.name = name;
@@ -881,7 +898,7 @@ router.put('/animations/:animId', authenticate, async (req: Request, res: Respon
         if (sortOrder !== undefined) data.sortOrder = sortOrder;
 
         const animation = await prisma.facilityAnimation.update({
-            where: { id: req.params.animId as string },
+            where: { id: animId },
             data,
         });
         res.json(animation);
@@ -894,7 +911,12 @@ router.put('/animations/:animId', authenticate, async (req: Request, res: Respon
 // DELETE /animations/:animId
 router.delete('/animations/:animId', authenticate, async (req: Request, res: Response) => {
     try {
-        await prisma.facilityAnimation.delete({ where: { id: req.params.animId as string } });
+        const animId = req.params.animId as string;
+        if (!(await verifyAnimationOwnership(animId))) {
+            return res.status(404).json({ error: '動畫不存在' });
+        }
+
+        await prisma.facilityAnimation.delete({ where: { id: animId } });
         res.json({ success: true });
     } catch (error) {
         console.error('[FacilityAnimation] Delete error:', error);

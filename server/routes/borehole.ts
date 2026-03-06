@@ -8,6 +8,7 @@ import multer from 'multer';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
+import { safeResolvePath } from '../lib/safePath';
 
 import prisma from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
@@ -550,12 +551,11 @@ router.delete('/:id/photos/:photoId', authenticate, async (req: Request, res: Re
             return res.status(404).json({ error: '找不到照片' });
         }
 
-        // Delete physical files
-        const filePath = path.join(__dirname, '..', photo.url);
-        const thumbPath = path.join(__dirname, '..', photo.thumbnailUrl);
-
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
+        // Delete physical files (with path traversal protection)
+        for (const url of [photo.url, photo.thumbnailUrl]) {
+            const safe = safeResolvePath(url);
+            if (safe && fs.existsSync(safe)) fs.unlinkSync(safe);
+        }
 
         // Delete DB record
         await prisma.boreholePhoto.delete({ where: { id: photoId } });

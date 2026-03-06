@@ -22,6 +22,21 @@ const easingFns: Record<string, (t: number) => number> = {
     easeInOut: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
 };
 
+// ── Reusable THREE objects for interpolation (avoid GC in useFrame) ──
+const _posA = new THREE.Vector3();
+const _posB = new THREE.Vector3();
+const _posResult = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _q1 = new THREE.Quaternion();
+const _q2 = new THREE.Quaternion();
+const _qResult = new THREE.Quaternion();
+const _eulerA = new THREE.Euler();
+const _eulerB = new THREE.Euler();
+const _eulerResult = new THREE.Euler();
+const _scaleA = new THREE.Vector3();
+const _scaleB = new THREE.Vector3();
+const _scaleResult = new THREE.Vector3();
+
 // ── Keyframe interpolation ──────────────────────────────────────
 
 // Per-animation curve cache — keyed by animation content, supports multiple simultaneous animations
@@ -94,9 +109,9 @@ function interpolateKeyframes(
     if (keyframes.length === 1) {
         const kf = keyframes[0];
         return {
-            position: kf.position ? new THREE.Vector3(kf.position.x, kf.position.y, kf.position.z) : undefined,
-            rotation: kf.rotation ? new THREE.Euler(kf.rotation.x * DEG2RAD, kf.rotation.y * DEG2RAD, kf.rotation.z * DEG2RAD) : undefined,
-            scale: kf.scale ? new THREE.Vector3(kf.scale.x, kf.scale.y, kf.scale.z) : undefined,
+            position: kf.position ? _posResult.set(kf.position.x, kf.position.y, kf.position.z) : undefined,
+            rotation: kf.rotation ? _eulerResult.set(kf.rotation.x * DEG2RAD, kf.rotation.y * DEG2RAD, kf.rotation.z * DEG2RAD) : undefined,
+            scale: kf.scale ? _scaleResult.set(kf.scale.x, kf.scale.y, kf.scale.z) : undefined,
         };
     }
 
@@ -136,22 +151,18 @@ function interpolateKeyframes(
                 const { point, tangent } = sampleGlobalCurve(curve, arcLengths, segIdx, alpha);
                 result.position = point;
                 if (autoOrient) {
-                    result.rotation = new THREE.Euler(0, Math.atan2(tangent.x, tangent.z), 0);
+                    result.rotation = _eulerResult.set(0, Math.atan2(tangent.x, tangent.z), 0);
                 }
             }
         } else {
             // Linear lerp
-            result.position = new THREE.Vector3().lerpVectors(
-                new THREE.Vector3(prev.position.x, prev.position.y, prev.position.z),
-                new THREE.Vector3(next.position.x, next.position.y, next.position.z),
-                alpha,
-            );
+            _posA.set(prev.position.x, prev.position.y, prev.position.z);
+            _posB.set(next.position.x, next.position.y, next.position.z);
+            result.position = _posResult.lerpVectors(_posA, _posB, alpha);
             if (autoOrient) {
-                const dir = new THREE.Vector3(
-                    next.position.x - prev.position.x, 0, next.position.z - prev.position.z,
-                );
-                if (dir.lengthSq() > 0.0001) {
-                    result.rotation = new THREE.Euler(0, Math.atan2(dir.x, dir.z), 0);
+                _dir.set(next.position.x - prev.position.x, 0, next.position.z - prev.position.z);
+                if (_dir.lengthSq() > 0.0001) {
+                    result.rotation = _eulerResult.set(0, Math.atan2(_dir.x, _dir.z), 0);
                 }
             }
         }
@@ -173,17 +184,13 @@ function interpolateKeyframes(
             const segment = next.time - prev.time;
             const rawAlpha = segment > 0 ? (t - prev.time) / segment : 0;
             const alpha = ease(rawAlpha);
-            const q1 = new THREE.Quaternion().setFromEuler(
-                new THREE.Euler(prev.rotation!.x * DEG2RAD, prev.rotation!.y * DEG2RAD, prev.rotation!.z * DEG2RAD),
-            );
-            const q2 = new THREE.Quaternion().setFromEuler(
-                new THREE.Euler(next.rotation!.x * DEG2RAD, next.rotation!.y * DEG2RAD, next.rotation!.z * DEG2RAD),
-            );
-            const q = new THREE.Quaternion().slerpQuaternions(q1, q2, alpha);
-            result.rotation = new THREE.Euler().setFromQuaternion(q);
+            _q1.setFromEuler(_eulerA.set(prev.rotation!.x * DEG2RAD, prev.rotation!.y * DEG2RAD, prev.rotation!.z * DEG2RAD));
+            _q2.setFromEuler(_eulerB.set(next.rotation!.x * DEG2RAD, next.rotation!.y * DEG2RAD, next.rotation!.z * DEG2RAD));
+            _qResult.slerpQuaternions(_q1, _q2, alpha);
+            result.rotation = _eulerResult.setFromQuaternion(_qResult);
         } else if (rotKeyframes.length === 1) {
             const r = rotKeyframes[0].rotation!;
-            result.rotation = new THREE.Euler(r.x * DEG2RAD, r.y * DEG2RAD, r.z * DEG2RAD);
+            result.rotation = _eulerResult.set(r.x * DEG2RAD, r.y * DEG2RAD, r.z * DEG2RAD);
         }
     }
 
@@ -202,14 +209,12 @@ function interpolateKeyframes(
         const segment = next.time - prev.time;
         const rawAlpha = segment > 0 ? (t - prev.time) / segment : 0;
         const alpha = ease(rawAlpha);
-        result.scale = new THREE.Vector3().lerpVectors(
-            new THREE.Vector3(prev.scale!.x, prev.scale!.y, prev.scale!.z),
-            new THREE.Vector3(next.scale!.x, next.scale!.y, next.scale!.z),
-            alpha,
-        );
+        _scaleA.set(prev.scale!.x, prev.scale!.y, prev.scale!.z);
+        _scaleB.set(next.scale!.x, next.scale!.y, next.scale!.z);
+        result.scale = _scaleResult.lerpVectors(_scaleA, _scaleB, alpha);
     } else if (scaleKeyframes.length === 1) {
         const s = scaleKeyframes[0].scale!;
-        result.scale = new THREE.Vector3(s.x, s.y, s.z);
+        result.scale = _scaleResult.set(s.x, s.y, s.z);
     }
 
     return result;
