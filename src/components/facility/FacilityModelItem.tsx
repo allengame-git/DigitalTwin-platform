@@ -2,7 +2,7 @@
  * FacilityModelItem — 單一 GLB 模型元件
  * 支援 hover 高亮、click 選取、Tooltip、Transform 編輯
  */
-import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { Html, TransformControls, Line } from '@react-three/drei';
 import * as THREE from 'three';
@@ -199,6 +199,69 @@ function interpolateKeyframes(
     }
 
     return result;
+}
+
+// ── 可拖曳的路徑控制點 ─────────────────────────────────────────────
+function PathControlPoint({ position, kfIndex, isEditing, animationId, keyframe }: {
+    position: THREE.Vector3;
+    kfIndex: number;
+    isEditing: boolean;
+    animationId: string;
+    keyframe: AnimationKeyframe;
+}) {
+    const meshRef = useRef<THREE.Mesh>(null);
+    const setEditingKeyframeIndex = useFacilityStore(s => s.setEditingKeyframeIndex);
+    const setPlaybackTime = useFacilityStore(s => s.setPlaybackTime);
+    const setPlaybackState = useFacilityStore(s => s.setPlaybackState);
+    const updateKeyframe = useFacilityStore(s => s.updateKeyframe);
+    const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+    const [hovered, setHovered] = useState(false);
+
+    const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
+        e.stopPropagation();
+        setEditingKeyframeIndex(kfIndex);
+        setPlaybackTime(keyframe.time);
+        setPlaybackState('paused');
+    }, [kfIndex, keyframe.time, setEditingKeyframeIndex, setPlaybackTime, setPlaybackState]);
+
+    // TransformControls 拖曳結束 → 更新 keyframe position
+    const handleDragChange = useCallback(() => {
+        if (!meshRef.current) return;
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            if (!meshRef.current) return;
+            const pos = meshRef.current.position;
+            updateKeyframe(animationId, kfIndex, {
+                ...keyframe,
+                position: { x: pos.x, y: pos.y, z: pos.z },
+            });
+        }, 300);
+    }, [animationId, kfIndex, keyframe, updateKeyframe]);
+
+    useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+
+    return (
+        <>
+            <mesh
+                ref={meshRef}
+                position={position}
+                onClick={handleClick}
+                onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
+                onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
+            >
+                <sphereGeometry args={[isEditing ? 1.2 : hovered ? 1.0 : 0.8, 12, 8]} />
+                <meshBasicMaterial color={isEditing ? '#a78bfa' : hovered ? '#c4b5fd' : '#7c3aed'} />
+            </mesh>
+            {isEditing && meshRef.current && (
+                <TransformControls
+                    object={meshRef.current}
+                    mode="translate"
+                    size={0.6}
+                    onChange={handleDragChange}
+                />
+            )}
+        </>
+    );
 }
 
 interface FacilityModelItemProps {
@@ -685,7 +748,7 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                 />
             )}
 
-            {/* 動畫路徑可視化：路徑線 + 關鍵幀節點球 */}
+            {/* 動畫路徑可視化：路徑線 + 可拖曳關鍵幀節點球 */}
             {pathVizData && (
                 <>
                     <Line
@@ -697,10 +760,14 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                         const kfIndex = pathVizData.animKeyframes.indexOf(pathVizData.keyframes[i]);
                         const isEditingKf = editingKeyframeIndex === kfIndex;
                         return (
-                            <mesh key={i} position={pt}>
-                                <sphereGeometry args={[isEditingKf ? 0.5 : 0.3, 12, 8]} />
-                                <meshBasicMaterial color={isEditingKf ? '#a78bfa' : '#7c3aed'} />
-                            </mesh>
+                            <PathControlPoint
+                                key={i}
+                                position={pt}
+                                kfIndex={kfIndex}
+                                isEditing={isEditingKf}
+                                animationId={selectedAnimationId!}
+                                keyframe={pathVizData.keyframes[i]}
+                            />
                         );
                     })}
                 </>
