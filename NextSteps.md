@@ -471,21 +471,54 @@ const adjustedZ = model.position.z - (currentScene?.coordShiftZ ?? 0);
 
 ## 設施導覽模組 — 中優先級待辦
 
-### N5. 上傳後自動刷新 3D 場景
+### ~~N5. 上傳後自動刷新 3D 場景~~ — 已完成 (2026-03-06)
 
-**目的**：在 FacilityDataPage 上傳/刪除模型後，若使用者同時有開 FacilityPage，3D 場景不會自動更新。
+**實作摘要**：
 
-**簡單方案**（建議）：
-- 在 `FacilityPage.tsx` 監聯 `visibilitychange` 事件，tab 切回來時自動 refetch 當前場景模型
-- 或在 `facilityStore` 新增 `refreshCurrentScene()` action，讓 FacilityDataPage 呼叫
+- **雙重策略**: 主動刷新 + 被動刷新並用
+- **`refreshCurrentScene()` action**（`facilityStore.ts`）:
+  - 繞過 `fetchScenes()` 的 `loadedProjectId` guard，直接 `axios.get` 重抓場景列表
+  - 若有 `currentSceneId` 則接著 `fetchModels(currentSceneId)` 重載模型
+- **被動刷新**（`FacilityPage.tsx`）:
+  - `document.addEventListener('visibilitychange', ...)` 監聽 tab 切回
+  - `document.visibilityState === 'visible'` 時呼叫 `refreshCurrentScene()`
+- **主動刷新**（`FacilityUploadSection.tsx`）:
+  - 5 處 callback 結尾加 `useFacilityStore.getState().refreshCurrentScene()`：
+    1. 模型上傳成功（`SceneModelUpload` 元件）
+    2. ModelManager 儲存（Tab 5）
+    3. ModelManager 刪除（Tab 5）
+    4. 地形上傳成功（`SceneTerrainUpload` 元件）
+    5. Dashboard 模型刪除（Tab 3）
+- **使用 `getState()` 模式**: 因為 FacilityUploadSection 的子元件不直接 subscribe store，用 `useFacilityStore.getState()` 直接呼叫 action
 
-### N6. 大型 GLB 載入進度
+**Debug tips**:
+- 若 tab 切回未刷新，檢查 `visibilitychange` listener 是否被 cleanup
+- 若主動刷新無效，確認 `loadedProjectId` 有值（第一次進入場景後才會設定）
 
-**目的**：大型 GLB（>50MB）載入時間較長，無進度提示。
+---
 
-**方案**：
-- 改用 `useLoader(GLTFLoader, url, undefined, (xhr) => setProgress(xhr.loaded/xhr.total*100))` 追蹤進度
-- 或使用 `@react-three/drei` 的 `useProgress` + `<Html>` 顯示百分比
+### ~~N6. 大型 GLB 載入進度~~ — 已完成 (2026-03-06)
+
+**實作摘要**：
+
+- **攔截點**: `THREE.DefaultLoadingManager`（全域 loading manager，`useGLTF` 自動使用）
+- **State**: `loadProgress` (0–100)，初始 100（隱藏）
+- **Callbacks**:
+  - `onStart(url, loaded, total)`: 設定初始進度，清除隱藏 timer
+  - `onProgress(url, loaded, total)`: 更新進度百分比
+  - `onLoad()`: 設定 100%，500ms 後保持 100%（觸發隱藏）
+- **UI**: `FacilityPage.tsx` Canvas 上方，`position: absolute; top: 0; height: 3px`
+  - 藍色 `#2563eb`，`transition: width 0.3s ease-out`
+  - `zIndex: 20`，`pointerEvents: none`
+  - `loadProgress < 100` 時顯示
+- **保留既有 callbacks**: 存儲 `prevOnStart/prevOnProgress/prevOnLoad`，chain call 避免破壞其他程式碼
+- **Cleanup**: `useEffect` return 時還原原始 callbacks + clearTimeout
+
+**為何不用 `useProgress`**: drei 的 `useProgress` hook 必須在 `<Canvas>` 內部使用，而進度條 UI 在 Canvas 外面的 HTML overlay，因此直接 hook `THREE.DefaultLoadingManager` 更合適。
+
+**Debug tips**:
+- 進度條一直不消失 → 檢查 `onLoad` 是否被觸發（可能有資源載入失敗卡住）
+- 進度跳動不平滑 → `onProgress` 的 `total` 是檔案總數非位元組數，大 GLB 會一次跳大幅度
 
 ### N7. Hover 高亮優化
 

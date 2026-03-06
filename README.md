@@ -589,6 +589,18 @@ npm run build
   - **Store**: `viewPreset` state + `setViewPreset` / `clearViewPreset` actions
   - **相機飛行**: 800ms cubic ease-out，與 fly-to 模型共用 `flyRef` 機制
 
+- [x] **上傳後自動刷新 3D 場景 (2026-03-06, N5)**:
+  - **主動刷新**: `facilityStore.refreshCurrentScene()` — 繞過 `loadedProjectId` guard 直接 axios 重新抓取場景 + 模型
+  - **被動刷新**: `FacilityPage` 監聽 `visibilitychange`，tab 切回來時自動重新載入
+  - **觸發點**: FacilityUploadSection 的 5 個位置 — 模型上傳成功 / ModelManager 儲存 / ModelManager 刪除 / Dashboard 刪除 / 地形上傳成功
+  - **跨頁同步**: 資料管理頁操作完切回 3D 頁時，場景自動更新無需手動重載
+
+- [x] **GLB 載入進度條 (2026-03-06, N6)**:
+  - **全域攔截**: Hook `THREE.DefaultLoadingManager` 的 `onStart/onProgress/onLoad`，追蹤所有 GLB/texture 載入進度
+  - **UI**: 頁面頂部 3px 藍色進度條，`transition: width 0.3s ease-out`，載入完成後自動隱藏
+  - **非侵入式**: 保留既有 manager callbacks（chain call），不需改動任何 loader 呼叫
+  - **位置**: `FacilityPage.tsx`，Canvas 上方 `zIndex: 20`
+
 - [x] **設施模型資訊系統 (2026-03-04)**:
   - **DB Schema 擴充**: `FacilityModel` 新增 `introduction String?`（WYSIWYG HTML 設施介紹）
   - **WYSIWYG 編輯器**: TipTap 2.x 共用元件 `RichTextEditor`（Bold/Italic/Underline/H1-H3/BulletList/OrderedList/TextAlign/Link/Image Upload/Table 工具列）

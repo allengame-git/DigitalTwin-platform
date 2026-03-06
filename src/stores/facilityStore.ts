@@ -94,6 +94,9 @@ interface FacilityState {
     toggleLabels: () => void;
     togglePlanView: () => void;
 
+    // Refresh
+    refreshCurrentScene: () => Promise<void>;
+
     // Camera
     flyToModel: (modelId: string) => void;
     clearFlyTo: () => void;
@@ -446,6 +449,28 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     // ===== UI =====
     toggleLabels: () => set(state => ({ showLabels: !state.showLabels })),
     togglePlanView: () => set(state => ({ showPlanView: !state.showPlanView })),
+
+    // ===== Refresh =====
+    refreshCurrentScene: async () => {
+        const { currentSceneId, loadedProjectId, fetchModels } = get();
+        // 重新取得場景列表（繞過 loadedProjectId 守衛）
+        if (loadedProjectId) {
+            try {
+                const res = await axios.get<FacilityScene[]>(`${API_BASE}/api/facility/scenes`, {
+                    params: { projectId: loadedProjectId },
+                    headers: getAuthHeaders(),
+                    withCredentials: true,
+                });
+                set({ scenes: Array.isArray(res.data) ? res.data : [] });
+            } catch (err: any) {
+                console.error('[FacilityStore] refreshCurrentScene scenes error:', err);
+            }
+        }
+        // 重新取得當前場景模型
+        if (currentSceneId) {
+            await fetchModels(currentSceneId);
+        }
+    },
 
     // ===== Camera =====
     flyToModel: (modelId) => set({ flyToModelId: modelId }),

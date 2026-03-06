@@ -3,8 +3,9 @@
  * @module pages/FacilityPage
  */
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
+import * as THREE from 'three';
 import { useProjectStore } from '../stores/projectStore';
 import { useFacilityStore } from '../stores/facilityStore';
 import { facilityCanvasEl } from '../components/facility/FacilityCaptureHandler';
@@ -23,6 +24,7 @@ export const FacilityPage: React.FC = () => {
     const fetchScenes = useFacilityStore(state => state.fetchScenes);
     const enterScene = useFacilityStore(state => state.enterScene);
     const selectModel = useFacilityStore(state => state.selectModel);
+    const refreshCurrentScene = useFacilityStore(state => state.refreshCurrentScene);
     const scenes = useFacilityStore(state => state.scenes);
     const focusedModelId = useFacilityStore(state => state.focusedModelId);
     const selectedModel = useFacilityStore(state =>
@@ -40,6 +42,39 @@ export const FacilityPage: React.FC = () => {
     const advanceTransition = useFacilityStore(state => state.advanceTransition);
     const startSceneTransition = useFacilityStore(state => state.startSceneTransition);
     const isLoading = useFacilityStore(state => state.isLoading);
+
+    // GLB 載入進度 (N6)
+    const [loadProgress, setLoadProgress] = useState(100);
+    const loadHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        const mgr = THREE.DefaultLoadingManager;
+        const prevOnStart = mgr.onStart;
+        const prevOnProgress = mgr.onProgress;
+        const prevOnLoad = mgr.onLoad;
+
+        mgr.onStart = (url, loaded, total) => {
+            setLoadProgress(total > 0 ? (loaded / total) * 100 : 0);
+            if (loadHideTimer.current) { clearTimeout(loadHideTimer.current); loadHideTimer.current = null; }
+            prevOnStart?.call(mgr, url, loaded, total);
+        };
+        mgr.onProgress = (url, loaded, total) => {
+            setLoadProgress(total > 0 ? (loaded / total) * 100 : 50);
+            prevOnProgress?.call(mgr, url, loaded, total);
+        };
+        mgr.onLoad = () => {
+            setLoadProgress(100);
+            loadHideTimer.current = setTimeout(() => setLoadProgress(100), 500);
+            prevOnLoad?.call(mgr);
+        };
+
+        return () => {
+            mgr.onStart = prevOnStart ?? (() => {});
+            mgr.onProgress = prevOnProgress ?? (() => {});
+            mgr.onLoad = prevOnLoad ?? (() => {});
+            if (loadHideTimer.current) clearTimeout(loadHideTimer.current);
+        };
+    }, []);
 
     // Lobby: 選取模型的子場景清單
     const lobbyChildScenes = useMemo<FacilityScene[]>(() => {
@@ -76,6 +111,17 @@ export const FacilityPage: React.FC = () => {
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [selectModel]);
+
+    // Tab 切回來時自動刷新場景 (N5)
+    useEffect(() => {
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') {
+                refreshCurrentScene();
+            }
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => document.removeEventListener('visibilitychange', onVisible);
+    }, [refreshCurrentScene]);
 
     // Sync project and fetch scenes
     useEffect(() => {
@@ -146,6 +192,27 @@ export const FacilityPage: React.FC = () => {
                         <FacilityCanvas />
                     </React.Suspense>
                 </div>
+                {/* GLB 載入進度條 (N6) */}
+                {loadProgress < 100 && (
+                    <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: 3,
+                        zIndex: 20,
+                        background: 'rgba(0,0,0,0.1)',
+                        pointerEvents: 'none',
+                    }}>
+                        <div style={{
+                            height: '100%',
+                            width: `${loadProgress}%`,
+                            background: '#2563eb',
+                            transition: 'width 0.3s ease-out',
+                            borderRadius: '0 2px 2px 0',
+                        }} />
+                    </div>
+                )}
                 {/* 場景切換黑幕過渡 (N1) */}
                 <div style={{
                     position: 'absolute',

@@ -488,6 +488,8 @@ const ModelUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
             setChildSceneId('');
             setModelType('primary');
             setUploadProgress(0);
+            // N5: 通知 3D 場景刷新
+            useFacilityStore.getState().refreshCurrentScene();
         } catch (e: any) {
             setError(e?.response?.data?.error || '上傳失敗');
         } finally {
@@ -1066,6 +1068,8 @@ const ModelManager: React.FC<{ projectId: string }> = ({ projectId }) => {
 
             setModels(prev => prev.map(m => m.id === modelId ? { ...m, name: s.name.trim() } : m));
             setSuccessMsg('儲存成功');
+            // N5: 通知 3D 場景刷新
+            useFacilityStore.getState().refreshCurrentScene();
             if (successTimerRef.current) clearTimeout(successTimerRef.current);
             successTimerRef.current = setTimeout(() => setSuccessMsg(null), 2500);
         } catch (e: any) {
@@ -1084,6 +1088,8 @@ const ModelManager: React.FC<{ projectId: string }> = ({ projectId }) => {
             setModels(prev => prev.filter(m => m.id !== modelId));
             setDeleteConfirmId(null);
             if (expandedId === modelId) setExpandedId(null);
+            // N5: 通知 3D 場景刷新
+            useFacilityStore.getState().refreshCurrentScene();
         } catch (e: any) {
             setError(e?.response?.data?.error || '刪除失敗');
             setDeleteConfirmId(null);
@@ -1359,6 +1365,8 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
             setCsvFile(null);
             setSatelliteFile(null);
             setUploadProgress(0);
+            // N5: 通知 3D 場景刷新
+            useFacilityStore.getState().refreshCurrentScene();
         } catch (e: any) {
             setTerrainError(e?.response?.data?.error || '上傳失敗');
         } finally {
@@ -1451,6 +1459,8 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
             });
             setSceneModels(prev => prev.filter(m => m.id !== modelId));
             setDeleteConfirmModelId(null);
+            // N5: 通知 3D 場景刷新
+            useFacilityStore.getState().refreshCurrentScene();
         } catch (e: any) {
             setModelListError(e?.response?.data?.error || '刪除失敗');
             setDeleteConfirmModelId(null);
