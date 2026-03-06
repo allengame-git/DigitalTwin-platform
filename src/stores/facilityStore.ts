@@ -110,6 +110,13 @@ interface FacilityState {
     editingKeyframeIndex: number | null;  // 正在編輯的關鍵幀 index
     manualPlayingModelIds: string[];     // 正在播放 manual 動畫的模型 ID
 
+    // Scene transition (N1)
+    transitionState: 'idle' | 'flyToModel' | 'fadeOut' | 'loading' | 'fadeIn';
+    transitionTargetSceneId: string | null;
+    transitionModelId: string | null;     // fly-to 目標模型 ID
+    startSceneTransition: (sceneId: string, modelId: string | null) => void;
+    advanceTransition: () => void;
+
     toggleManualPlay: (modelId: string) => void;
     fetchAnimations: (modelId: string) => Promise<void>;
     fetchAnimationsForModels: (modelIds: string[]) => Promise<void>;
@@ -145,6 +152,11 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     modelBboxCenters: {},
     isLoading: false,
     error: null,
+
+    // Scene transition (N1)
+    transitionState: 'idle' as const,
+    transitionTargetSceneId: null,
+    transitionModelId: null,
 
     // ===== Scene Actions =====
     fetchScenes: async (projectId: string) => {
@@ -437,6 +449,56 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     setModelBboxCenter: (modelId, center) => set(state => ({
         modelBboxCenters: { ...state.modelBboxCenters, [modelId]: center },
     })),
+
+    // ===== Scene Transition (N1) =====
+    startSceneTransition: (sceneId, modelId) => {
+        if (get().transitionState !== 'idle') return; // 防止重複觸發
+        if (modelId) {
+            // 有模型 → 先飛向模型再淡出
+            set({
+                transitionState: 'flyToModel',
+                transitionTargetSceneId: sceneId,
+                transitionModelId: modelId,
+                flyToModelId: modelId,
+            });
+        } else {
+            // 無模型（如 lobby 直接進入）→ 直接淡出
+            set({
+                transitionState: 'fadeOut',
+                transitionTargetSceneId: sceneId,
+                transitionModelId: null,
+            });
+        }
+    },
+
+    advanceTransition: () => {
+        const { transitionState, transitionTargetSceneId, enterScene } = get();
+        switch (transitionState) {
+            case 'flyToModel':
+                // fly-to 完成 → 開始淡出
+                set({ transitionState: 'fadeOut' });
+                break;
+            case 'fadeOut':
+                // 淡出完成 → 切換場景
+                set({ transitionState: 'loading' });
+                if (transitionTargetSceneId) {
+                    enterScene(transitionTargetSceneId);
+                }
+                break;
+            case 'loading':
+                // 載入完成 → 開始淡入
+                set({ transitionState: 'fadeIn' });
+                break;
+            case 'fadeIn':
+                // 淡入完成 → 回到 idle
+                set({
+                    transitionState: 'idle',
+                    transitionTargetSceneId: null,
+                    transitionModelId: null,
+                });
+                break;
+        }
+    },
 
     // ===== Animation =====
     animations: [],

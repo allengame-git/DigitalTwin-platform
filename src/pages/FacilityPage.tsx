@@ -36,12 +36,37 @@ export const FacilityPage: React.FC = () => {
         return sid ? state.scenes.find(s => s.id === sid) : null;
     });
     const isLobby = currentScene?.sceneType === 'lobby';
+    const transitionState = useFacilityStore(state => state.transitionState);
+    const advanceTransition = useFacilityStore(state => state.advanceTransition);
+    const startSceneTransition = useFacilityStore(state => state.startSceneTransition);
+    const isLoading = useFacilityStore(state => state.isLoading);
 
     // Lobby: 選取模型的子場景清單
     const lobbyChildScenes = useMemo<FacilityScene[]>(() => {
         if (!isLobby || !focusedModelId) return [];
         return scenes.filter(s => s.parentModelId === focusedModelId);
     }, [isLobby, focusedModelId, scenes]);
+
+    // Scene transition: fadeOut 完成 → advance; loading 完成 → advance; fadeIn 完成 → advance
+    useEffect(() => {
+        if (transitionState === 'fadeOut') {
+            const timer = setTimeout(() => advanceTransition(), 220); // 200ms fade + 20ms buffer
+            return () => clearTimeout(timer);
+        }
+        if (transitionState === 'fadeIn') {
+            const timer = setTimeout(() => advanceTransition(), 220);
+            return () => clearTimeout(timer);
+        }
+    }, [transitionState, advanceTransition]);
+
+    // loading → fadeIn: 等 isLoading 變 false
+    useEffect(() => {
+        if (transitionState === 'loading' && !isLoading) {
+            // 延遲一幀讓模型渲染，再淡入
+            const timer = setTimeout(() => advanceTransition(), 50);
+            return () => clearTimeout(timer);
+        }
+    }, [transitionState, isLoading, advanceTransition]);
 
     // ESC 取消選取
     useEffect(() => {
@@ -121,6 +146,16 @@ export const FacilityPage: React.FC = () => {
                         <FacilityCanvas />
                     </React.Suspense>
                 </div>
+                {/* 場景切換黑幕過渡 (N1) */}
+                <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 15,
+                    background: '#000',
+                    opacity: (transitionState === 'fadeOut' || transitionState === 'loading') ? 1 : 0,
+                    pointerEvents: transitionState === 'idle' ? 'none' : 'all',
+                    transition: 'opacity 200ms ease-in-out',
+                }} />
                 <React.Suspense fallback={null}>
                     <FacilityInfoPanel />
                 </React.Suspense>
@@ -152,7 +187,7 @@ export const FacilityPage: React.FC = () => {
                         {lobbyChildScenes.map(scene => (
                             <button
                                 key={scene.id}
-                                onClick={() => enterScene(scene.id)}
+                                onClick={() => startSceneTransition(scene.id, focusedModelId)}
                                 style={{
                                     background: 'rgba(37,99,235,0.92)',
                                     color: 'white',

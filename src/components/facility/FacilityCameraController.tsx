@@ -16,16 +16,32 @@ export function FacilityCameraController() {
     const { camera, controls } = useThree();
     const flyRef = useRef<FlyTarget | null>(null);
     const lastFlyModelId = useRef<string | null>(null);
+    const flyCompleteCallback = useRef<(() => void) | null>(null);
 
     const currentScene = useFacilityStore(state => state.getCurrentScene());
     const flyToModelId = useFacilityStore(state => state.flyToModelId);
     const models = useFacilityStore(state => state.models);
     const clearFlyTo = useFacilityStore(state => state.clearFlyTo);
     const modelBboxCenters = useFacilityStore(state => state.modelBboxCenters);
+    const transitionState = useFacilityStore(state => state.transitionState);
+    const advanceTransition = useFacilityStore(state => state.advanceTransition);
 
-    // 場景切換時飛到場景預設相機位置
+    // 場景切換時飛到場景預設相機位置（非 transition 模式才飛行）
     useEffect(() => {
         if (!currentScene?.cameraPosition) return;
+        // transition 中場景載入 → 瞬間設定相機（黑幕遮蓋中）
+        if (transitionState === 'loading' || transitionState === 'fadeIn') {
+            const cp = currentScene.cameraPosition;
+            const ct = currentScene.cameraTarget;
+            camera.position.set(cp.x, cp.y, cp.z);
+            const ctrl = controls as any;
+            if (ctrl?.target) {
+                ctrl.target.set(ct?.x ?? 0, ct?.y ?? 0, ct?.z ?? 0);
+                ctrl.update?.();
+            }
+            return;
+        }
+        // 正常場景切換（goBack/goToRoot）：飛行動畫
         const cp = currentScene.cameraPosition;
         const ctrl = controls as any;
         flyRef.current = {
@@ -38,9 +54,12 @@ export function FacilityCameraController() {
         };
     }, [currentScene?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Sidebar 點擊模型時飛向目標
+    // Sidebar 點擊模型時飛向目標（含 transition fly-to）
     useEffect(() => {
-        if (!flyToModelId || flyToModelId === lastFlyModelId.current) return;
+        if (!flyToModelId) return;
+        // transition fly-to 不跳過重複 ID（可能連續進入同一模型的子場景）
+        const isTransition = useFacilityStore.getState().transitionState === 'flyToModel';
+        if (!isTransition && flyToModelId === lastFlyModelId.current) return;
         lastFlyModelId.current = flyToModelId;
 
         const model = models.find(m => m.id === flyToModelId);
@@ -56,17 +75,21 @@ export function FacilityCameraController() {
         const dist = Math.max(200, Math.max(model.scale.x, model.scale.y, model.scale.z) * 50);
         const camTo = targetTo.clone().add(new THREE.Vector3(0, dist * 0.6, dist));
 
+        // transition fly-to 用較短時間（300ms），一般 fly-to 用 1000ms
+        const isTransitionFly = transitionState === 'flyToModel';
         flyRef.current = {
             camFrom: camera.position.clone(),
             camTo,
             targetFrom: ctrl?.target?.clone() ?? new THREE.Vector3(),
             targetTo,
-            duration: 1000,
+            duration: isTransitionFly ? 300 : 1000,
             startTime: performance.now(),
         };
+        // fly-to 完成時，若在 transition 模式需 advance
+        flyCompleteCallback.current = isTransitionFly ? advanceTransition : null;
 
         clearFlyTo();
-    }, [flyToModelId, models, controls, camera, clearFlyTo, modelBboxCenters]);
+    }, [flyToModelId, models, controls, camera, clearFlyTo, modelBboxCenters, transitionState, advanceTransition]);
 
     useFrame(() => {
         const fly = flyRef.current;
@@ -84,7 +107,13 @@ export function FacilityCameraController() {
             ctrl.update?.();
         }
 
-        if (t >= 1) flyRef.current = null;
+        if (t >= 1) {
+            flyRef.current = null;
+            if (flyCompleteCallback.current) {
+                flyCompleteCallback.current();
+                flyCompleteCallback.current = null;
+            }
+        }
     });
 
     return null;

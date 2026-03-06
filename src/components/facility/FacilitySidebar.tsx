@@ -224,6 +224,7 @@ const FacilitySidebar: React.FC = () => {
         togglePlanView,
         flyToModel,
         enterScene,
+        startSceneTransition,
     } = useFacilityStore();
 
     const [confirmBatchDelete, setConfirmBatchDelete] = React.useState(false);
@@ -628,7 +629,7 @@ const FacilitySidebar: React.FC = () => {
                             {selectedModelSubScenes.map(sub => (
                                 <button
                                     key={sub.id}
-                                    onClick={() => enterScene(sub.id)}
+                                    onClick={() => startSceneTransition(sub.id, focusedModelId)}
                                     style={{
                                         width: '100%',
                                         display: 'flex',
