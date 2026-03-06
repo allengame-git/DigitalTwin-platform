@@ -338,6 +338,7 @@ model FacilityScene {
   coordShiftZ         Float           @default(0)
   coordRotation       Float           @default(0)
   sortOrder           Int             @default(0)
+  sceneBounds         Json?           // { width, depth, height } 米; null=自動計算
   sceneType           String          @default("normal")   // "lobby" | "normal"
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt

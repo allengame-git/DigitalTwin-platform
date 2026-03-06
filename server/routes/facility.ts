@@ -81,7 +81,7 @@ router.post('/scenes', authenticate, async (req: Request, res: Response) => {
 router.put('/scenes/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        const { name, description, cameraPosition, cameraTarget, coordShiftX, coordShiftY, coordShiftZ, coordRotation, sortOrder, parentModelId, sceneType } = req.body;
+        const { name, description, cameraPosition, cameraTarget, coordShiftX, coordShiftY, coordShiftZ, coordRotation, sortOrder, parentModelId, sceneType, sceneBounds } = req.body;
 
         const existing = await prisma.facilityScene.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ error: '場景不存在' });
@@ -99,6 +99,7 @@ router.put('/scenes/:id', authenticate, async (req: Request, res: Response) => {
                 ...(coordRotation !== undefined && { coordRotation }),
                 ...(sortOrder !== undefined && { sortOrder }),
                 ...('parentModelId' in req.body && { parentModelId: parentModelId || null }),
+                ...('sceneBounds' in req.body && { sceneBounds: sceneBounds || null }),
                 ...(sceneType !== undefined && { sceneType }),
             }
         });

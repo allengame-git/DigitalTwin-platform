@@ -56,7 +56,7 @@ interface FacilityState {
     // Scene actions
     fetchScenes: (projectId: string, force?: boolean) => Promise<void>;
     createScene: (data: { projectId: string; parentSceneId?: string; parentModelId?: string; name: string; description?: string }) => Promise<FacilityScene>;
-    updateScene: (id: string, data: Partial<Pick<FacilityScene, 'name' | 'description' | 'cameraPosition' | 'cameraTarget' | 'coordShiftX' | 'coordShiftY' | 'coordShiftZ' | 'coordRotation' | 'sortOrder' | 'sceneType' | 'parentModelId'>>) => Promise<void>;
+    updateScene: (id: string, data: Partial<Pick<FacilityScene, 'name' | 'description' | 'cameraPosition' | 'cameraTarget' | 'coordShiftX' | 'coordShiftY' | 'coordShiftZ' | 'coordRotation' | 'sortOrder' | 'sceneType' | 'parentModelId' | 'sceneBounds'>>) => Promise<void>;
     deleteScene: (id: string) => Promise<void>;
 
     // Navigation

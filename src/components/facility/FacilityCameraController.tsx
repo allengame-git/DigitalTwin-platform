@@ -17,6 +17,7 @@ export function FacilityCameraController() {
     const flyRef = useRef<FlyTarget | null>(null);
     const lastFlyModelId = useRef<string | null>(null);
     const flyCompleteCallback = useRef<(() => void) | null>(null);
+    const autoFitDoneForScene = useRef<string | null>(null);
 
     const currentScene = useFacilityStore(state => state.getCurrentScene());
     const flyToModelId = useFacilityStore(state => state.flyToModelId);
@@ -55,6 +56,66 @@ export function FacilityCameraController() {
             startTime: performance.now(),
         };
     }, [currentScene?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // 子場景無 cameraPosition 時，等模型 bbox 就緒後自動 fit-all
+    useEffect(() => {
+        if (!currentScene) return;
+        if (currentScene.cameraPosition) return; // 有預設相機位置，不需要 auto-fit
+        if (autoFitDoneForScene.current === currentScene.id) return; // 已 fit 過
+
+        const centerKeys = Object.keys(modelBboxCenters);
+        if (centerKeys.length === 0) return; // 模型 bbox 還沒就緒
+
+        autoFitDoneForScene.current = currentScene.id;
+
+        // 計算所有模型 bbox 中心的平均作為目標點
+        const vals = Object.values(modelBboxCenters);
+        const avg = vals.reduce(
+            (acc, c) => ({ x: acc.x + c.x, y: acc.y + c.y, z: acc.z + c.z }),
+            { x: 0, y: 0, z: 0 }
+        );
+        const targetTo = new THREE.Vector3(avg.x / vals.length, avg.y / vals.length, avg.z / vals.length);
+
+        // 估算場景範圍
+        let maxDist = 50;
+        for (const c of vals) {
+            const dx = c.x - targetTo.x;
+            const dy = c.y - targetTo.y;
+            const dz = c.z - targetTo.z;
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (dist > maxDist) maxDist = dist;
+        }
+        // 也考慮模型 scale
+        for (const m of models) {
+            const s = Math.max(m.scale.x, m.scale.y, m.scale.z) * 5;
+            if (s > maxDist) maxDist = s;
+        }
+
+        const dist = Math.max(400, maxDist * 2.5);
+        const camTo = targetTo.clone().add(new THREE.Vector3(0, dist * 0.6, dist));
+
+        const ctrl = controls as any;
+        const isTransition = transitionState === 'loading' || transitionState === 'fadeIn';
+
+        if (isTransition) {
+            // transition 黑幕遮蓋中 → 瞬間設定
+            camera.position.copy(camTo);
+            if (ctrl?.target) {
+                ctrl.target.copy(targetTo);
+                ctrl.update?.();
+            }
+        } else {
+            // 一般場景切換 → 飛行動畫
+            flyRef.current = {
+                camFrom: camera.position.clone(),
+                camTo,
+                targetFrom: ctrl?.target?.clone() ?? new THREE.Vector3(),
+                targetTo,
+                duration: 800,
+                startTime: performance.now(),
+            };
+        }
+    }, [currentScene?.id, modelBboxCenters, models, camera, controls, transitionState]);
 
     // Sidebar 點擊模型時飛向目標（含 transition fly-to）
     useEffect(() => {

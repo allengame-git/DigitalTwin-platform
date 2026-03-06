@@ -81,7 +81,7 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
 
     // 主場景編輯
     const [isEditingRoot, setIsEditingRoot] = useState(false);
-    const [editRootForm, setEditRootForm] = useState({ name: '', description: '', sceneType: 'normal' as string });
+    const [editRootForm, setEditRootForm] = useState({ name: '', description: '', sceneType: 'normal' as string, boundsWidth: '', boundsDepth: '', boundsHeight: '' });
     // 建立主場景
     const [isCreatingRoot, setIsCreatingRoot] = useState(false);
     const [createRootForm, setCreateRootForm] = useState({ name: '', description: '' });
@@ -90,7 +90,7 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
     const [addSubForm, setAddSubForm] = useState({ name: '', description: '', parentModelId: '' });
     // 編輯子場景
     const [editingSubId, setEditingSubId] = useState<string | null>(null);
-    const [editSubForm, setEditSubForm] = useState({ name: '', description: '', parentModelId: '' });
+    const [editSubForm, setEditSubForm] = useState({ name: '', description: '', parentModelId: '', boundsWidth: '', boundsDepth: '', boundsHeight: '' });
     // 刪除確認
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
     // 平面圖
@@ -136,7 +136,13 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
         if (!rootScene || !editRootForm.name.trim()) { setError('場景名稱為必填'); return; }
         setIsSaving(true); setError(null);
         try {
-            await updateScene(rootScene.id, { name: editRootForm.name.trim(), description: editRootForm.description.trim(), sceneType: editRootForm.sceneType as 'lobby' | 'normal' });
+            const boundsW = parseFloat(editRootForm.boundsWidth);
+            const boundsD = parseFloat(editRootForm.boundsDepth);
+            const boundsH = parseFloat(editRootForm.boundsHeight);
+            const sceneBounds = (boundsW > 0 && boundsD > 0 && boundsH > 0)
+                ? { width: boundsW, depth: boundsD, height: boundsH }
+                : null;
+            await updateScene(rootScene.id, { name: editRootForm.name.trim(), description: editRootForm.description.trim(), sceneType: editRootForm.sceneType as 'lobby' | 'normal', sceneBounds });
             setIsEditingRoot(false);
         } catch (e: any) {
             setError(e?.response?.data?.error || '更新失敗');
@@ -165,10 +171,17 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
         if (!editSubForm.name.trim()) { setError('名稱為必填'); return; }
         setIsSaving(true); setError(null);
         try {
+            const bW = parseFloat(editSubForm.boundsWidth);
+            const bD = parseFloat(editSubForm.boundsDepth);
+            const bH = parseFloat(editSubForm.boundsHeight);
+            const subBounds = (bW > 0 && bD > 0 && bH > 0)
+                ? { width: bW, depth: bD, height: bH }
+                : null;
             await updateScene(id, {
                 name: editSubForm.name.trim(),
                 description: editSubForm.description.trim(),
                 parentModelId: editSubForm.parentModelId || null,
+                sceneBounds: subBounds,
             });
             setEditingSubId(null);
         } catch (e: any) {
@@ -240,6 +253,17 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                     </select>
                                 </div>
                             )}
+                            <div className="dm-form-group" style={{ marginBottom: 8 }}>
+                                <label className="dm-form-label">場景範圍（選填，空白=自動計算）</label>
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                    <input className="dm-form-input" type="number" min="0" step="any" placeholder="寬 (m)" value={editRootForm.boundsWidth} onChange={e => setEditRootForm(f => ({ ...f, boundsWidth: e.target.value }))} style={{ width: 90 }} />
+                                    <span style={{ fontSize: 12, color: '#9ca3af' }}>x</span>
+                                    <input className="dm-form-input" type="number" min="0" step="any" placeholder="深 (m)" value={editRootForm.boundsDepth} onChange={e => setEditRootForm(f => ({ ...f, boundsDepth: e.target.value }))} style={{ width: 90 }} />
+                                    <span style={{ fontSize: 12, color: '#9ca3af' }}>x</span>
+                                    <input className="dm-form-input" type="number" min="0" step="any" placeholder="高 (m)" value={editRootForm.boundsHeight} onChange={e => setEditRootForm(f => ({ ...f, boundsHeight: e.target.value }))} style={{ width: 90 }} />
+                                    <span style={{ fontSize: 11, color: '#9ca3af' }}>m</span>
+                                </div>
+                            </div>
                             <div style={{ display: 'flex', gap: 8 }}>
                                 <button className="dm-btn-confirm" style={{ padding: '4px 12px', fontSize: 12 }} onClick={handleEditRootSave} disabled={isSaving}>儲存</button>
                                 <button className="dm-btn-cancel" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => setIsEditingRoot(false)}>取消</button>
@@ -262,7 +286,7 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                 </div>
                             )}
                             <div className="dm-file-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-                                <button className="dm-file-btn" onClick={() => { setIsEditingRoot(true); setEditRootForm({ name: rootScene.name, description: rootScene.description || '', sceneType: rootScene.sceneType || 'normal' }); }}>編輯內容</button>
+                                <button className="dm-file-btn" onClick={() => { setIsEditingRoot(true); setEditRootForm({ name: rootScene.name, description: rootScene.description || '', sceneType: rootScene.sceneType || 'normal', boundsWidth: rootScene.sceneBounds?.width?.toString() || '', boundsDepth: rootScene.sceneBounds?.depth?.toString() || '', boundsHeight: rootScene.sceneBounds?.height?.toString() || '' }); }}>編輯內容</button>
                                 <button className="dm-file-btn" onClick={() => { setPlanUploadSceneId(rootScene.id); planInputRef.current?.click(); }} disabled={isPlanUploading}>{isPlanUploading ? '上傳中...' : (rootScene.planImageUrl || rootScene.autoPlanImageUrl) ? '更換平面圖' : '上傳平面圖'}</button>
                             </div>
                         </div>
@@ -317,6 +341,17 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                                 <label className="dm-form-label">關聯模型</label>
                                                 <ModelSelect value={editSubForm.parentModelId} onChange={v => setEditSubForm(f => ({ ...f, parentModelId: v }))} />
                                             </div>
+                                            <div className="dm-form-group" style={{ marginBottom: 8 }}>
+                                                <label className="dm-form-label">場景範圍（選填，空白=自動計算）</label>
+                                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                    <input className="dm-form-input" type="number" min="0" step="any" placeholder="寬 (m)" value={editSubForm.boundsWidth} onChange={e => setEditSubForm(f => ({ ...f, boundsWidth: e.target.value }))} style={{ width: 90 }} />
+                                                    <span style={{ fontSize: 12, color: '#9ca3af' }}>x</span>
+                                                    <input className="dm-form-input" type="number" min="0" step="any" placeholder="深 (m)" value={editSubForm.boundsDepth} onChange={e => setEditSubForm(f => ({ ...f, boundsDepth: e.target.value }))} style={{ width: 90 }} />
+                                                    <span style={{ fontSize: 12, color: '#9ca3af' }}>x</span>
+                                                    <input className="dm-form-input" type="number" min="0" step="any" placeholder="高 (m)" value={editSubForm.boundsHeight} onChange={e => setEditSubForm(f => ({ ...f, boundsHeight: e.target.value }))} style={{ width: 90 }} />
+                                                    <span style={{ fontSize: 11, color: '#9ca3af' }}>m</span>
+                                                </div>
+                                            </div>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <button className="dm-btn-confirm" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => handleEditSubSave(sub.id)} disabled={isSaving}>儲存</button>
                                                 <button className="dm-btn-cancel" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => setEditingSubId(null)}>取消</button>
@@ -345,7 +380,7 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                                 </div>
                                             )}
                                             <div className="dm-file-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-                                                <button className="dm-file-btn" onClick={() => { setEditingSubId(sub.id); setEditSubForm({ name: sub.name, description: sub.description || '', parentModelId: sub.parentModelId || '' }); }}>編輯</button>
+                                                <button className="dm-file-btn" onClick={() => { setEditingSubId(sub.id); setEditSubForm({ name: sub.name, description: sub.description || '', parentModelId: sub.parentModelId || '', boundsWidth: sub.sceneBounds?.width?.toString() || '', boundsDepth: sub.sceneBounds?.depth?.toString() || '', boundsHeight: sub.sceneBounds?.height?.toString() || '' }); }}>編輯</button>
                                                 <button className="dm-file-btn" onClick={() => { setPlanUploadSceneId(sub.id); planInputRef.current?.click(); }} disabled={isPlanUploading}>{(sub.planImageUrl || sub.autoPlanImageUrl) ? '更換平面圖' : '上傳平面圖'}</button>
                                                 <button className="dm-file-btn dm-file-btn-delete" onClick={() => setDeleteConfirmId(sub.id)}>刪除</button>
                                             </div>
