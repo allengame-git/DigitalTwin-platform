@@ -54,7 +54,7 @@ interface FacilityState {
     error: string | null;
 
     // Scene actions
-    fetchScenes: (projectId: string) => Promise<void>;
+    fetchScenes: (projectId: string, force?: boolean) => Promise<void>;
     createScene: (data: { projectId: string; parentSceneId?: string; parentModelId?: string; name: string; description?: string }) => Promise<FacilityScene>;
     updateScene: (id: string, data: Partial<Pick<FacilityScene, 'name' | 'description' | 'cameraPosition' | 'cameraTarget' | 'coordShiftX' | 'coordShiftY' | 'coordShiftZ' | 'coordRotation' | 'sortOrder' | 'sceneType' | 'parentModelId'>>) => Promise<void>;
     deleteScene: (id: string) => Promise<void>;
@@ -167,9 +167,9 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     transitionModelId: null,
 
     // ===== Scene Actions =====
-    fetchScenes: async (projectId: string) => {
-        // 同一專案不重複重置（避免重新進入頁面時場景閃爍重載）
-        if (get().loadedProjectId === projectId) return;
+    fetchScenes: async (projectId: string, force = false) => {
+        // 同一專案不重複重置（避免重新進入頁面時場景閃爍重載），force=true 強制刷新
+        if (!force && get().loadedProjectId === projectId) return;
         try {
             const res = await axios.get<FacilityScene[]>(`${API_BASE}/api/facility/scenes`, {
                 params: { projectId },

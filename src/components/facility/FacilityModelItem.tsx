@@ -24,43 +24,56 @@ const easingFns: Record<string, (t: number) => number> = {
 
 // ── Keyframe interpolation ──────────────────────────────────────
 
-// Global curve cache — one curve from ALL position keyframes, reused per frame
-let _globalCurveKey = '';
-let _globalCurve: THREE.CatmullRomCurve3 | null = null;
-let _globalCurveArcLengths: number[] = []; // arc-length at each control point [0, ..., 1]
+// Per-animation curve cache — keyed by animation content, supports multiple simultaneous animations
+const _curveCache = new Map<string, { curve: THREE.CatmullRomCurve3; arcLengths: number[] }>();
 
 function getGlobalCurve(
     posKeyframes: { position: { x: number; y: number; z: number } }[],
 ): THREE.CatmullRomCurve3 | null {
     if (posKeyframes.length < 2) return null;
     const key = posKeyframes.map(k => `${k.position.x},${k.position.y},${k.position.z}`).join('|');
-    if (key === _globalCurveKey && _globalCurve) return _globalCurve;
+    const cached = _curveCache.get(key);
+    if (cached) return cached.curve;
+
     const points = posKeyframes.map(k => new THREE.Vector3(k.position.x, k.position.y, k.position.z));
-    _globalCurve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
-    _globalCurveKey = key;
+    const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
 
     // 預計算每個控制點在曲線上的 arc-length 比例 (0~1)
-    // getLengths(n) 回傳 n+1 個累積弧長值，恰好對應 t=0/n, 1/n, ..., n/n（即每個控制點）
     const n = points.length - 1;
-    const cumulativeLengths = _globalCurve.getLengths(n);
+    const cumulativeLengths = curve.getLengths(n);
     const totalLength = cumulativeLengths[n];
-    _globalCurveArcLengths = cumulativeLengths.map(l => totalLength > 0 ? l / totalLength : 0);
+    const arcLengths = cumulativeLengths.map(l => totalLength > 0 ? l / totalLength : 0);
 
-    return _globalCurve;
+    _curveCache.set(key, { curve, arcLengths });
+    // 限制快取數量，避免記憶體無限增長
+    if (_curveCache.size > 50) {
+        const firstKey = _curveCache.keys().next().value;
+        if (firstKey) _curveCache.delete(firstKey);
+    }
+
+    return curve;
+}
+
+function getCurveArcLengths(
+    posKeyframes: { position: { x: number; y: number; z: number } }[],
+): number[] {
+    const key = posKeyframes.map(k => `${k.position.x},${k.position.y},${k.position.z}`).join('|');
+    return _curveCache.get(key)?.arcLengths ?? [];
 }
 
 /**
- * 從全域曲線上取第 segIdx 段的 alpha 位置與切線。
+ * 從曲線上取第 segIdx 段的 alpha 位置與切線。
  * 使用 getPointAt (arc-length parameterization) 確保等速移動。
  * 段落邊界用預計算的 arc-length 映射，保證端點與控制點重合。
  */
 function sampleGlobalCurve(
+    curve: THREE.CatmullRomCurve3,
+    arcLengths: number[],
     segIdx: number,
     alpha: number,
 ): { point: THREE.Vector3; tangent: THREE.Vector3 } {
-    const curve = _globalCurve!;
-    const arcStart = _globalCurveArcLengths[segIdx];
-    const arcEnd = _globalCurveArcLengths[segIdx + 1];
+    const arcStart = arcLengths[segIdx];
+    const arcEnd = arcLengths[segIdx + 1];
     const arcT = arcStart + alpha * (arcEnd - arcStart);
     const clampedT = Math.max(0, Math.min(1, arcT));
     return {
@@ -116,10 +129,11 @@ function interpolateKeyframes(
         const segMode = prev.pathMode ?? animPathMode;
 
         if (segMode === 'catmullrom') {
-            // 從全域曲線取樣 — arc-length 等速 + 端點與控制點重合
+            // 從曲線取樣 — arc-length 等速 + 端點與控制點重合
             const curve = getGlobalCurve(posKeyframes);
             if (curve) {
-                const { point, tangent } = sampleGlobalCurve(segIdx, alpha);
+                const arcLengths = getCurveArcLengths(posKeyframes);
+                const { point, tangent } = sampleGlobalCurve(curve, arcLengths, segIdx, alpha);
                 result.position = point;
                 if (autoOrient) {
                     result.rotation = new THREE.Euler(0, Math.atan2(tangent.x, tangent.z), 0);
@@ -561,6 +575,7 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
     });
 
     // 高亮：hover=黃色，selected=藍色，兩者同時以 hover 優先
+    // 直接修改 emissive 屬性，不 clone 材質，避免 GPU 記憶體洩漏
     useEffect(() => {
         const emissiveColor = isHovered ? '#ffaa00' : isSelected ? '#2255ff' : '#000000';
         const emissiveIntensity = isHovered ? 0.3 : isSelected ? 0.25 : 0;
@@ -568,21 +583,12 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
         clonedScene.traverse((node) => {
             if ((node as THREE.Mesh).isMesh) {
                 const mesh = node as THREE.Mesh;
-                if (Array.isArray(mesh.material)) {
-                    mesh.material = mesh.material.map(mat => {
-                        if (mat instanceof THREE.MeshStandardMaterial) {
-                            const m = mat.clone();
-                            m.emissive.set(emissiveColor);
-                            m.emissiveIntensity = emissiveIntensity;
-                            return m;
-                        }
-                        return mat;
-                    });
-                } else if (mesh.material instanceof THREE.MeshStandardMaterial) {
-                    const m = (mesh.material as THREE.MeshStandardMaterial).clone();
-                    m.emissive.set(emissiveColor);
-                    m.emissiveIntensity = emissiveIntensity;
-                    mesh.material = m;
+                const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+                for (const mat of mats) {
+                    if (mat instanceof THREE.MeshStandardMaterial) {
+                        mat.emissive.set(emissiveColor);
+                        mat.emissiveIntensity = emissiveIntensity;
+                    }
                 }
             }
         });
