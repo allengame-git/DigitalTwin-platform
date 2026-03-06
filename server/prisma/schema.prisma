@@ -388,6 +388,8 @@ model FacilityAnimation {
   duration      Float         @default(5)            // seconds
   easing        String        @default("linear")     // "linear" | "easeIn" | "easeOut" | "easeInOut"
   gltfClipName  String?                              // GLB 內嵌動畫名稱
+  pathMode      String        @default("linear")     // "linear" | "catmullrom"
+  autoOrient    Boolean       @default(false)        // 自動沿路徑切線方向旋轉
   keyframes     Json          @default("[]")         // [{ time, position, rotation, scale }]
   sortOrder     Int           @default(0)
   createdAt     DateTime      @default(now())

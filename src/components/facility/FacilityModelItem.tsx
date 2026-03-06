@@ -23,11 +23,59 @@ const easingFns: Record<string, (t: number) => number> = {
 };
 
 // ── Keyframe interpolation ──────────────────────────────────────
+
+// Global curve cache — one curve from ALL position keyframes, reused per frame
+let _globalCurveKey = '';
+let _globalCurve: THREE.CatmullRomCurve3 | null = null;
+let _globalCurveArcLengths: number[] = []; // arc-length at each control point [0, ..., 1]
+
+function getGlobalCurve(
+    posKeyframes: { position: { x: number; y: number; z: number } }[],
+): THREE.CatmullRomCurve3 | null {
+    if (posKeyframes.length < 2) return null;
+    const key = posKeyframes.map(k => `${k.position.x},${k.position.y},${k.position.z}`).join('|');
+    if (key === _globalCurveKey && _globalCurve) return _globalCurve;
+    const points = posKeyframes.map(k => new THREE.Vector3(k.position.x, k.position.y, k.position.z));
+    _globalCurve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
+    _globalCurveKey = key;
+
+    // 預計算每個控制點在曲線上的 arc-length 比例 (0~1)
+    // getLengths(n) 回傳 n+1 個累積弧長值，恰好對應 t=0/n, 1/n, ..., n/n（即每個控制點）
+    const n = points.length - 1;
+    const cumulativeLengths = _globalCurve.getLengths(n);
+    const totalLength = cumulativeLengths[n];
+    _globalCurveArcLengths = cumulativeLengths.map(l => totalLength > 0 ? l / totalLength : 0);
+
+    return _globalCurve;
+}
+
+/**
+ * 從全域曲線上取第 segIdx 段的 alpha 位置與切線。
+ * 使用 getPointAt (arc-length parameterization) 確保等速移動。
+ * 段落邊界用預計算的 arc-length 映射，保證端點與控制點重合。
+ */
+function sampleGlobalCurve(
+    segIdx: number,
+    alpha: number,
+): { point: THREE.Vector3; tangent: THREE.Vector3 } {
+    const curve = _globalCurve!;
+    const arcStart = _globalCurveArcLengths[segIdx];
+    const arcEnd = _globalCurveArcLengths[segIdx + 1];
+    const arcT = arcStart + alpha * (arcEnd - arcStart);
+    const clampedT = Math.max(0, Math.min(1, arcT));
+    return {
+        point: curve.getPointAt(clampedT),
+        tangent: curve.getTangentAt(clampedT),
+    };
+}
+
 function interpolateKeyframes(
     keyframes: AnimationKeyframe[],
     time: number,
     duration: number,
     easing: string,
+    animPathMode: 'linear' | 'catmullrom' = 'linear',
+    autoOrient = false,
 ): { position?: THREE.Vector3; rotation?: THREE.Euler; scale?: THREE.Vector3 } | null {
     if (keyframes.length === 0) return null;
     if (keyframes.length === 1) {
@@ -41,53 +89,113 @@ function interpolateKeyframes(
 
     // Clamp time
     const t = Math.max(0, Math.min(duration, time));
-
-    // Find surrounding keyframes
-    let prev = keyframes[0];
-    let next = keyframes[keyframes.length - 1];
-    for (let i = 0; i < keyframes.length - 1; i++) {
-        if (t >= keyframes[i].time && t <= keyframes[i + 1].time) {
-            prev = keyframes[i];
-            next = keyframes[i + 1];
-            break;
-        }
-    }
-
-    const segment = next.time - prev.time;
-    const rawAlpha = segment > 0 ? (t - prev.time) / segment : 0;
     const ease = easingFns[easing] || easingFns.linear;
-    const alpha = ease(rawAlpha);
 
     const result: { position?: THREE.Vector3; rotation?: THREE.Euler; scale?: THREE.Vector3 } = {};
 
-    // Position lerp
-    if (prev.position && next.position) {
-        result.position = new THREE.Vector3().lerpVectors(
-            new THREE.Vector3(prev.position.x, prev.position.y, prev.position.z),
-            new THREE.Vector3(next.position.x, next.position.y, next.position.z),
-            alpha,
-        );
+    // ── Position interpolation (per-segment pathMode) ──
+    const posKeyframes = keyframes.filter(k => k.position) as (AnimationKeyframe & { position: { x: number; y: number; z: number } })[];
+
+    if (posKeyframes.length >= 2) {
+        // Find current segment
+        let segIdx = 0;
+        for (let i = 0; i < posKeyframes.length - 1; i++) {
+            if (t >= posKeyframes[i].time && t <= posKeyframes[i + 1].time) {
+                segIdx = i;
+                break;
+            }
+            if (i === posKeyframes.length - 2) segIdx = i;
+        }
+        const prev = posKeyframes[segIdx];
+        const next = posKeyframes[segIdx + 1];
+        const segTime = next.time - prev.time;
+        const rawAlpha = segTime > 0 ? (t - prev.time) / segTime : 0;
+        const alpha = ease(rawAlpha);
+
+        // Per-segment pathMode: keyframe-level overrides animation-level
+        const segMode = prev.pathMode ?? animPathMode;
+
+        if (segMode === 'catmullrom') {
+            // 從全域曲線取樣 — arc-length 等速 + 端點與控制點重合
+            const curve = getGlobalCurve(posKeyframes);
+            if (curve) {
+                const { point, tangent } = sampleGlobalCurve(segIdx, alpha);
+                result.position = point;
+                if (autoOrient) {
+                    result.rotation = new THREE.Euler(0, Math.atan2(tangent.x, tangent.z), 0);
+                }
+            }
+        } else {
+            // Linear lerp
+            result.position = new THREE.Vector3().lerpVectors(
+                new THREE.Vector3(prev.position.x, prev.position.y, prev.position.z),
+                new THREE.Vector3(next.position.x, next.position.y, next.position.z),
+                alpha,
+            );
+            if (autoOrient) {
+                const dir = new THREE.Vector3(
+                    next.position.x - prev.position.x, 0, next.position.z - prev.position.z,
+                );
+                if (dir.lengthSq() > 0.0001) {
+                    result.rotation = new THREE.Euler(0, Math.atan2(dir.x, dir.z), 0);
+                }
+            }
+        }
     }
 
-    // Rotation slerp via quaternion
-    if (prev.rotation && next.rotation) {
-        const q1 = new THREE.Quaternion().setFromEuler(
-            new THREE.Euler(prev.rotation.x * DEG2RAD, prev.rotation.y * DEG2RAD, prev.rotation.z * DEG2RAD),
-        );
-        const q2 = new THREE.Quaternion().setFromEuler(
-            new THREE.Euler(next.rotation.x * DEG2RAD, next.rotation.y * DEG2RAD, next.rotation.z * DEG2RAD),
-        );
-        const q = new THREE.Quaternion().slerpQuaternions(q1, q2, alpha);
-        result.rotation = new THREE.Euler().setFromQuaternion(q);
+    // ── Rotation slerp (skip if autoOrient already set rotation) ──
+    if (!autoOrient) {
+        const rotKeyframes = keyframes.filter(k => k.rotation);
+        if (rotKeyframes.length >= 2) {
+            let prev = rotKeyframes[0];
+            let next = rotKeyframes[rotKeyframes.length - 1];
+            for (let i = 0; i < rotKeyframes.length - 1; i++) {
+                if (t >= rotKeyframes[i].time && t <= rotKeyframes[i + 1].time) {
+                    prev = rotKeyframes[i];
+                    next = rotKeyframes[i + 1];
+                    break;
+                }
+            }
+            const segment = next.time - prev.time;
+            const rawAlpha = segment > 0 ? (t - prev.time) / segment : 0;
+            const alpha = ease(rawAlpha);
+            const q1 = new THREE.Quaternion().setFromEuler(
+                new THREE.Euler(prev.rotation!.x * DEG2RAD, prev.rotation!.y * DEG2RAD, prev.rotation!.z * DEG2RAD),
+            );
+            const q2 = new THREE.Quaternion().setFromEuler(
+                new THREE.Euler(next.rotation!.x * DEG2RAD, next.rotation!.y * DEG2RAD, next.rotation!.z * DEG2RAD),
+            );
+            const q = new THREE.Quaternion().slerpQuaternions(q1, q2, alpha);
+            result.rotation = new THREE.Euler().setFromQuaternion(q);
+        } else if (rotKeyframes.length === 1) {
+            const r = rotKeyframes[0].rotation!;
+            result.rotation = new THREE.Euler(r.x * DEG2RAD, r.y * DEG2RAD, r.z * DEG2RAD);
+        }
     }
 
-    // Scale lerp
-    if (prev.scale && next.scale) {
+    // ── Scale lerp ──
+    const scaleKeyframes = keyframes.filter(k => k.scale);
+    if (scaleKeyframes.length >= 2) {
+        let prev = scaleKeyframes[0];
+        let next = scaleKeyframes[scaleKeyframes.length - 1];
+        for (let i = 0; i < scaleKeyframes.length - 1; i++) {
+            if (t >= scaleKeyframes[i].time && t <= scaleKeyframes[i + 1].time) {
+                prev = scaleKeyframes[i];
+                next = scaleKeyframes[i + 1];
+                break;
+            }
+        }
+        const segment = next.time - prev.time;
+        const rawAlpha = segment > 0 ? (t - prev.time) / segment : 0;
+        const alpha = ease(rawAlpha);
         result.scale = new THREE.Vector3().lerpVectors(
-            new THREE.Vector3(prev.scale.x, prev.scale.y, prev.scale.z),
-            new THREE.Vector3(next.scale.x, next.scale.y, next.scale.z),
+            new THREE.Vector3(prev.scale!.x, prev.scale!.y, prev.scale!.z),
+            new THREE.Vector3(next.scale!.x, next.scale!.y, next.scale!.z),
             alpha,
         );
+    } else if (scaleKeyframes.length === 1) {
+        const s = scaleKeyframes[0].scale!;
+        result.scale = new THREE.Vector3(s.x, s.y, s.z);
     }
 
     return result;
@@ -353,7 +461,7 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
             }
 
             if (shouldAnimate) {
-                const result = interpolateKeyframes(anim.keyframes, currentTime, anim.duration, anim.easing);
+                const result = interpolateKeyframes(anim.keyframes, currentTime, anim.duration, anim.easing, anim.pathMode ?? 'linear', anim.autoOrient ?? false);
                 if (result) {
                     if (result.position) groupRef.current.position.copy(result.position);
                     if (result.rotation) groupRef.current.rotation.copy(result.rotation);
@@ -481,8 +589,30 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
         if (!anim) return null;
         const posKfs = anim.keyframes.filter(kf => kf.position);
         if (posKfs.length < 2) return null;
-        const points = posKfs.map(kf => new THREE.Vector3(kf.position!.x, kf.position!.y, kf.position!.z));
-        return { points, keyframes: posKfs, animKeyframes: anim.keyframes };
+        const controlPoints = posKfs.map(kf => new THREE.Vector3(kf.position!.x, kf.position!.y, kf.position!.z));
+        const animDefault = anim.pathMode ?? 'linear';
+
+        // 建一條全域曲線（給曲線段取樣用）
+        const globalCurve = new THREE.CatmullRomCurve3(controlPoints, false, 'centripetal');
+        const n = controlPoints.length - 1; // segment count
+
+        // Per-segment: 曲線段從全域曲線取樣，直線段直接連接
+        // 視覺化只需正確形狀，getPoint 即可（弧長等速在插值引擎處理）
+        const linePoints: THREE.Vector3[] = [controlPoints[0].clone()];
+        for (let i = 0; i < n; i++) {
+            const segMode = posKfs[i].pathMode ?? animDefault;
+            if (segMode === 'catmullrom') {
+                const samples = 20;
+                for (let s = 1; s <= samples; s++) {
+                    const curveT = (i + s / samples) / n;
+                    linePoints.push(globalCurve.getPoint(Math.max(0, Math.min(1, curveT))));
+                }
+            } else {
+                linePoints.push(controlPoints[i + 1].clone());
+            }
+        }
+
+        return { linePoints, controlPoints, keyframes: posKfs, animKeyframes: anim.keyframes };
     }, [animationMode, selectedAnimationId, animations]);
 
     // 隱藏模型：不渲染但保留 ref 註冊
@@ -559,11 +689,11 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
             {pathVizData && (
                 <>
                     <Line
-                        points={pathVizData.points}
+                        points={pathVizData.linePoints}
                         color="#7c3aed"
                         lineWidth={2}
                     />
-                    {pathVizData.points.map((pt, i) => {
+                    {pathVizData.controlPoints.map((pt, i) => {
                         const kfIndex = pathVizData.animKeyframes.indexOf(pathVizData.keyframes[i]);
                         const isEditingKf = editingKeyframeIndex === kfIndex;
                         return (

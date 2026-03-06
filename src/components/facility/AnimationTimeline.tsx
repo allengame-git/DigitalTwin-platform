@@ -36,8 +36,15 @@ function TimelineTrack({ animation, isFocusedTrack }: { animation: FacilityAnima
     const isActive = selectedAnimationId === animation.id;
     const duration = animation.duration;
 
+    // ── Keyframe 拖曳狀態 ──
+    const draggingRef = useRef<{ kfIndex: number; startX: number; didDrag: boolean } | null>(null);
+    const [dragTime, setDragTime] = useState<{ index: number; time: number } | null>(null);
+    const updateAnimation = useFacilityStore(state => state.updateAnimation);
+    const justFinishedDragRef = useRef(false);
+
     const handleTrackClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         if (!trackRef.current || !isActive) return;
+        if (justFinishedDragRef.current) { justFinishedDragRef.current = false; return; }
         const rect = trackRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const ratio = Math.max(0, Math.min(1, x / rect.width));
@@ -47,6 +54,73 @@ function TimelineTrack({ animation, isFocusedTrack }: { animation: FacilityAnima
             setPlaybackState('paused');
         }
     }, [isActive, duration, playbackState, setPlaybackTime, setPlaybackState]);
+
+    // pointer down: 記錄起始位置，還不算拖曳
+    const handleKfPointerDown = useCallback((e: React.PointerEvent, kfIndex: number) => {
+        if (!isActive || !trackRef.current) return;
+        e.stopPropagation();
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        draggingRef.current = { kfIndex, startX: e.clientX, didDrag: false };
+    }, [isActive]);
+
+    // pointer move: 超過 3px 閾值才啟動拖曳
+    const handleKfPointerMove = useCallback((e: React.PointerEvent) => {
+        if (!draggingRef.current || !trackRef.current) return;
+        const drag = draggingRef.current;
+        if (!drag.didDrag && Math.abs(e.clientX - drag.startX) < 3) return;
+        drag.didDrag = true;
+
+        const { kfIndex } = drag;
+        const rect = trackRef.current.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        let newTime = ratio * duration;
+
+        const kfs = animation.keyframes;
+        const MIN_GAP = 0.05;
+        const minTime = kfIndex > 0 ? kfs[kfIndex - 1].time + MIN_GAP : 0;
+        const maxTime = kfIndex < kfs.length - 1 ? kfs[kfIndex + 1].time - MIN_GAP : duration;
+        newTime = Math.round(Math.max(minTime, Math.min(maxTime, newTime)) * 10) / 10;
+        newTime = Math.max(minTime, Math.min(maxTime, newTime));
+
+        setDragTime({ index: kfIndex, time: newTime });
+        setPlaybackTime(newTime);
+        if (playbackState !== 'paused') setPlaybackState('paused');
+    }, [animation.keyframes, duration, playbackState, setPlaybackTime, setPlaybackState]);
+
+    // pointer up: 拖曳 → 寫 API；沒拖曳 → 選取 keyframe
+    const handleKfPointerUp = useCallback((e: React.PointerEvent) => {
+        if (!draggingRef.current || !trackRef.current) return;
+        const { kfIndex, didDrag } = draggingRef.current;
+
+        if (didDrag) {
+            // 完成拖曳 → 持久化
+            const rect = trackRef.current.getBoundingClientRect();
+            const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            let newTime = ratio * duration;
+            const kfs = animation.keyframes;
+            const MIN_GAP = 0.05;
+            const minTime = kfIndex > 0 ? kfs[kfIndex - 1].time + MIN_GAP : 0;
+            const maxTime = kfIndex < kfs.length - 1 ? kfs[kfIndex + 1].time - MIN_GAP : duration;
+            newTime = Math.round(Math.max(minTime, Math.min(maxTime, newTime)) * 10) / 10;
+            newTime = Math.max(minTime, Math.min(maxTime, newTime));
+
+            const updatedKfs = [...kfs];
+            updatedKfs[kfIndex] = { ...updatedKfs[kfIndex], time: newTime };
+            updateAnimation(animation.id, { keyframes: updatedKfs });
+            setPlaybackTime(newTime);
+            setEditingKeyframeIndex(kfIndex);
+            justFinishedDragRef.current = true;
+        } else {
+            // 沒拖曳 → 純點擊選取/取消選取
+            const isEditingThis = editingKeyframeIndex === kfIndex;
+            setEditingKeyframeIndex(isEditingThis ? null : kfIndex);
+            setPlaybackTime(animation.keyframes[kfIndex].time);
+            if (playbackState !== 'paused') setPlaybackState('paused');
+        }
+
+        setDragTime(null);
+        draggingRef.current = null;
+    }, [animation.id, animation.keyframes, duration, editingKeyframeIndex, playbackState, updateAnimation, setPlaybackTime, setPlaybackState, setEditingKeyframeIndex]);
 
     const scrubberLeft = isActive && duration > 0
         ? `${(playbackTime / duration) * 100}%`
@@ -83,35 +157,32 @@ function TimelineTrack({ animation, isFocusedTrack }: { animation: FacilityAnima
                 );
             })}
 
-            {/* 關鍵幀標記 */}
+            {/* 關鍵幀標記（可拖曳） */}
             {animation.keyframes.map((kf, i) => {
-                const left = duration > 0 ? (kf.time / duration) * 100 : 0;
+                const displayTime = (dragTime && dragTime.index === i) ? dragTime.time : kf.time;
+                const left = duration > 0 ? (displayTime / duration) * 100 : 0;
                 const isEditingThis = isActive && editingKeyframeIndex === i;
                 return (
                     <div
                         key={i}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (isActive) {
-                                setEditingKeyframeIndex(isEditingThis ? null : i);
-                                setPlaybackTime(kf.time);
-                                // 不論目前狀態，一律切到 paused 讓 useFrame 套用 interpolation
-                                if (playbackState !== 'paused') setPlaybackState('paused');
-                            }
-                        }}
-                        title={`${kf.time.toFixed(1)}s`}
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => handleKfPointerDown(e, i)}
+                        onPointerMove={handleKfPointerMove}
+                        onPointerUp={handleKfPointerUp}
+                        title={`${displayTime.toFixed(1)}s`}
                         style={{
                             position: 'absolute',
                             left: `${left}%`,
                             top: '50%',
                             transform: 'translate(-50%, -50%) rotate(45deg)',
-                            width: 8,
-                            height: 8,
+                            width: 10,
+                            height: 10,
                             background: isEditingThis ? '#7c3aed' : isFocusedTrack ? '#2563eb' : '#94a3b8',
                             border: isEditingThis ? '2px solid #a78bfa' : '1.5px solid ' + (isFocusedTrack ? '#93c5fd' : '#cbd5e1'),
                             borderRadius: 2,
-                            cursor: isActive ? 'pointer' : 'default',
+                            cursor: isActive ? 'grab' : 'default',
                             zIndex: 5,
+                            touchAction: 'none',
                         }}
                     />
                 );
@@ -155,10 +226,22 @@ function ModelTrackRow({ modelId, modelName, isFocused, onFocus }: {
     const animations = useFacilityStore(state => state.animations);
     const selectedAnimationId = useFacilityStore(state => state.selectedAnimationId);
     const selectAnimation = useFacilityStore(state => state.selectAnimation);
+    const selectedAnimPerModel = useFacilityStore(state => state.selectedAnimPerModel);
 
     const modelAnims = useMemo(() =>
         animations.filter(a => a.modelId === modelId),
     [animations, modelId]);
+
+    // 焦點切換時自動恢復記憶的動畫，或選第一個
+    useEffect(() => {
+        if (!isFocused || modelAnims.length === 0) return;
+        const remembered = selectedAnimPerModel[modelId];
+        if (remembered && modelAnims.some(a => a.id === remembered)) {
+            if (selectedAnimationId !== remembered) selectAnimation(remembered);
+        } else if (!selectedAnimationId || !modelAnims.some(a => a.id === selectedAnimationId)) {
+            selectAnimation(modelAnims[0].id);
+        }
+    }, [isFocused, modelId, modelAnims.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // 焦點模型的選取動畫
     const activeAnim = useMemo(() =>
@@ -288,6 +371,12 @@ export function AnimationTimeline() {
     const selectedAnim = useMemo(() =>
         animations.find(a => a.id === selectedAnimationId),
     [animations, selectedAnimationId]);
+
+    // 動畫名稱 local buffer（避免 IME 中文輸入被打斷）
+    const [editingAnimName, setEditingAnimName] = useState('');
+    useEffect(() => {
+        setEditingAnimName(selectedAnim?.name ?? '');
+    }, [selectedAnim?.id, selectedAnim?.name]);
 
     // 焦點模型的動畫
     const focusedModelAnims = useMemo(() =>
@@ -466,8 +555,10 @@ export function AnimationTimeline() {
                         <label style={propLabelStyle}>
                             名稱
                             <input
-                                value={selectedAnim.name}
-                                onChange={e => updateAnimation(selectedAnim.id, { name: e.target.value })}
+                                value={editingAnimName}
+                                onChange={e => setEditingAnimName(e.target.value)}
+                                onBlur={() => { if (editingAnimName !== selectedAnim.name) updateAnimation(selectedAnim.id, { name: editingAnimName }); }}
+                                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                                 style={{ ...inputStyle, width: 100 }}
                             />
                         </label>
@@ -501,6 +592,25 @@ export function AnimationTimeline() {
                             >
                                 {EASING_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                             </select>
+                        </label>
+                        <label style={propLabelStyle}>
+                            路徑
+                            <select
+                                value={selectedAnim.pathMode ?? 'linear'}
+                                onChange={e => updateAnimation(selectedAnim.id, { pathMode: e.target.value as 'linear' | 'catmullrom' })}
+                                style={{ ...inputStyle, width: 75 }}
+                            >
+                                <option value="linear">直線</option>
+                                <option value="catmullrom">曲線</option>
+                            </select>
+                        </label>
+                        <label style={{ ...propLabelStyle, flexDirection: 'row', gap: 4 }}>
+                            <input
+                                type="checkbox"
+                                checked={selectedAnim.autoOrient ?? false}
+                                onChange={e => updateAnimation(selectedAnim.id, { autoOrient: e.target.checked })}
+                            />
+                            自動朝向
                         </label>
                         <label style={{ ...propLabelStyle, flexDirection: 'row', gap: 4 }}>
                             <input
@@ -537,6 +647,21 @@ export function AnimationTimeline() {
                                 <button onClick={handleDeleteKeyframe} style={{ ...smallBtnStyle, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
                                     <Trash2 size={12} /> 刪除關鍵幀
                                 </button>
+                                <select
+                                    value={selectedAnim.keyframes[editingKeyframeIndex]?.pathMode ?? ''}
+                                    onChange={e => {
+                                        const kfs = [...selectedAnim.keyframes];
+                                        const val = e.target.value as 'linear' | 'catmullrom' | '';
+                                        kfs[editingKeyframeIndex] = { ...kfs[editingKeyframeIndex], pathMode: val || undefined };
+                                        updateAnimation(selectedAnim.id, { keyframes: kfs });
+                                    }}
+                                    style={{ ...inputStyle, width: 80, fontSize: 10 }}
+                                    title="此段到下一幀的路徑模式（空 = 跟隨動畫預設）"
+                                >
+                                    <option value="">預設</option>
+                                    <option value="linear">直線</option>
+                                    <option value="catmullrom">曲線</option>
+                                </select>
                             </>
                         )}
                         <span style={{ flex: 1 }} />

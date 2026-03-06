@@ -687,6 +687,7 @@ function ModelInfoModal({ model, onClose, onSaved }: ModelInfoModalProps) {
     const [newFieldType, setNewFieldType] = useState<'TEXT' | 'LINK'>('TEXT');
     const [isSavingField, setIsSavingField] = useState(false);
     const [fieldError, setFieldError] = useState<string | null>(null);
+    const [modalError, setModalError] = useState<string | null>(null);
 
     useEffect(() => {
         setIntro(model.introduction || '');
@@ -711,6 +712,7 @@ function ModelInfoModal({ model, onClose, onSaved }: ModelInfoModalProps) {
             onSaved(res.data);
         } catch (e) {
             console.error('intro save failed', e);
+            setModalError('設施介紹儲存失敗');
         } finally {
             setIsSavingIntro(false);
         }
@@ -736,6 +738,8 @@ function ModelInfoModal({ model, onClose, onSaved }: ModelInfoModalProps) {
     const handleDiagramFiles = async (files: FileList | null) => {
         if (!files || files.length === 0) return;
         setIsDiagramUploading(true);
+        setModalError(null);
+        const failedNames: string[] = [];
         for (const file of Array.from(files)) {
             const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
             const type = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) ? 'IMAGE' : 'DOCUMENT';
@@ -752,7 +756,11 @@ function ModelInfoModal({ model, onClose, onSaved }: ModelInfoModalProps) {
                 setDiagrams(prev => [...prev, res.data]);
             } catch (e) {
                 console.error('diagram upload failed', e);
+                failedNames.push(file.name);
             }
+        }
+        if (failedNames.length > 0) {
+            setModalError(`${failedNames.length} 個檔案上傳失敗：${failedNames.join('、')}`);
         }
         setIsDiagramUploading(false);
     };
@@ -765,6 +773,7 @@ function ModelInfoModal({ model, onClose, onSaved }: ModelInfoModalProps) {
             setDiagrams(prev => prev.filter(d => d.id !== id));
         } catch (e) {
             console.error('delete diagram failed', e);
+            setModalError('圖說刪除失敗');
         }
     };
 
@@ -801,6 +810,7 @@ function ModelInfoModal({ model, onClose, onSaved }: ModelInfoModalProps) {
             setCustomFields(prev => prev.filter(f => f.id !== id));
         } catch (e) {
             console.error('delete field failed', e);
+            setModalError('欄位刪除失敗');
         }
     };
 
@@ -829,6 +839,12 @@ function ModelInfoModal({ model, onClose, onSaved }: ModelInfoModalProps) {
 
                 {/* Body */}
                 <div style={{ padding: 24 }}>
+                    {modalError && (
+                        <div style={{ color: '#ef4444', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>{modalError}</span>
+                            <button onClick={() => setModalError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16, lineHeight: 1, padding: '0 4px' }}>×</button>
+                        </div>
+                    )}
                     {/* 設施介紹 */}
                     <div style={sectionStyle}>
                         <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>設施介紹</div>

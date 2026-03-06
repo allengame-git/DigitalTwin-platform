@@ -128,7 +128,7 @@ export default function FacilityInfoPanel() {
                                 <div style={{ marginBottom: 14 }}>
                                     <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>設施圖說</div>
                                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                        {diagrams.map(d => (
+                                        {diagrams.filter(d => d.content).map(d => (
                                             d.type === 'IMAGE' ? (
                                                 <button key={d.id} onClick={() => setLightboxSrc(resolveUrl(d.content))} style={{ border: 'none', padding: 0, cursor: 'zoom-in', borderRadius: 6, overflow: 'hidden' }}>
                                                     <img src={resolveUrl(d.content)} alt={d.label} style={{ width: 72, height: 56, objectFit: 'cover', display: 'block' }} />
@@ -148,7 +148,7 @@ export default function FacilityInfoPanel() {
                             {customFields.length > 0 && (
                                 <div>
                                     <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>自訂欄位</div>
-                                    {customFields.map(f => (
+                                    {customFields.filter(f => f.content).map(f => (
                                         <div key={f.id} style={{ marginBottom: 6 }}>
                                             <div style={{ fontSize: 11, color: '#94a3b8' }}>{f.label}</div>
                                             {f.type === 'LINK'

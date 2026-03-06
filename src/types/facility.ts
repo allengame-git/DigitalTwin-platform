@@ -71,6 +71,7 @@ export interface AnimationKeyframe {
     position?: { x: number; y: number; z: number };
     rotation?: { x: number; y: number; z: number };
     scale?: { x: number; y: number; z: number };
+    pathMode?: 'linear' | 'catmullrom';           // 到下一個 keyframe 的插值模式（覆蓋動畫預設）
 }
 
 export interface FacilityAnimation {
@@ -83,6 +84,8 @@ export interface FacilityAnimation {
     duration: number;
     easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
     gltfClipName?: string;
+    pathMode: 'linear' | 'catmullrom';
+    autoOrient: boolean;
     keyframes: AnimationKeyframe[];
     sortOrder: number;
     createdAt: string;

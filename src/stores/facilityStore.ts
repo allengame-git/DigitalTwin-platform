@@ -111,6 +111,7 @@ interface FacilityState {
     animations: FacilityAnimation[];
     animationMode: boolean;
     selectedAnimationId: string | null;
+    selectedAnimPerModel: Record<string, string>;  // modelId → animationId 記憶
     playbackState: 'stopped' | 'playing' | 'paused';
     playbackTime: number;       // 目前播放時間（秒）
     editingKeyframeIndex: number | null;  // 正在編輯的關鍵幀 index
@@ -535,6 +536,7 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     animations: [],
     animationMode: false,
     selectedAnimationId: null,
+    selectedAnimPerModel: {},
     playbackState: 'stopped',
     playbackTime: 0,
     editingKeyframeIndex: null,
@@ -620,18 +622,27 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     setAnimationMode: (enabled) => set(state => ({
         animationMode: enabled,
         selectedAnimationId: null,
+        selectedAnimPerModel: enabled ? {} : state.selectedAnimPerModel,
         playbackState: enabled ? 'paused' : 'stopped',
         playbackTime: enabled ? state.playbackTime : 0,
         editingKeyframeIndex: null,
         manualPlayingModelIds: [],
     })),
 
-    selectAnimation: (animId) => set({
-        selectedAnimationId: animId,
-        playbackState: 'stopped',
-        playbackTime: 0,
-        editingKeyframeIndex: null,
-    }),
+    selectAnimation: (animId) => {
+        const focusedId = get().focusedModelId;
+        const anim = animId ? get().animations.find(a => a.id === animId) : null;
+        const modelId = anim?.modelId ?? focusedId;
+        return set(state => ({
+            selectedAnimationId: animId,
+            playbackState: 'stopped',
+            playbackTime: 0,
+            editingKeyframeIndex: null,
+            selectedAnimPerModel: modelId && animId
+                ? { ...state.selectedAnimPerModel, [modelId]: animId }
+                : state.selectedAnimPerModel,
+        }));
+    },
 
     setPlaybackState: (state) => set({ playbackState: state }),
     setPlaybackTime: (time) => set({ playbackTime: time }),

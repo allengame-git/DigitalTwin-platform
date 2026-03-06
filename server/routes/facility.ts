@@ -838,7 +838,7 @@ router.get('/models/:id/animations', async (req: Request, res: Response) => {
 // POST /models/:id/animations
 router.post('/models/:id/animations', authenticate, async (req: Request, res: Response) => {
     try {
-        const { name, type, trigger, loop, duration, easing, gltfClipName, keyframes, sortOrder } = req.body;
+        const { name, type, trigger, loop, duration, easing, gltfClipName, pathMode, autoOrient, keyframes, sortOrder } = req.body;
         const animation = await prisma.facilityAnimation.create({
             data: {
                 modelId: req.params.id as string,
@@ -849,6 +849,8 @@ router.post('/models/:id/animations', authenticate, async (req: Request, res: Re
                 duration: duration ?? 5,
                 easing: easing || 'linear',
                 gltfClipName: gltfClipName || null,
+                pathMode: pathMode || 'linear',
+                autoOrient: autoOrient ?? false,
                 keyframes: keyframes || [],
                 sortOrder: sortOrder ?? 0,
             },
@@ -863,7 +865,7 @@ router.post('/models/:id/animations', authenticate, async (req: Request, res: Re
 // PUT /animations/:animId
 router.put('/animations/:animId', authenticate, async (req: Request, res: Response) => {
     try {
-        const { name, type, trigger, loop, duration, easing, gltfClipName, keyframes, sortOrder } = req.body;
+        const { name, type, trigger, loop, duration, easing, gltfClipName, pathMode, autoOrient, keyframes, sortOrder } = req.body;
         const data: Record<string, unknown> = {};
         if (name !== undefined) data.name = name;
         if (type !== undefined) data.type = type;
@@ -872,6 +874,8 @@ router.put('/animations/:animId', authenticate, async (req: Request, res: Respon
         if (duration !== undefined) data.duration = duration;
         if (easing !== undefined) data.easing = easing;
         if (gltfClipName !== undefined) data.gltfClipName = gltfClipName;
+        if (pathMode !== undefined) data.pathMode = pathMode;
+        if (autoOrient !== undefined) data.autoOrient = autoOrient;
         if (keyframes !== undefined) data.keyframes = keyframes;
         if (sortOrder !== undefined) data.sortOrder = sortOrder;
 
