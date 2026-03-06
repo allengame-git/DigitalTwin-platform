@@ -597,13 +597,26 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                     delete (mesh.userData as Record<string, unknown>)._origRaycast;
                 }
 
+                const ud = mesh.userData as Record<string, unknown>;
                 const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
                 for (const mat of mats) {
                     if (mat instanceof THREE.MeshStandardMaterial) {
                         mat.emissive.set(emissiveColor);
                         mat.emissiveIntensity = emissiveIntensity;
-                        mat.transparent = ghostMode ? true : mat.transparent;
-                        mat.opacity = ghostMode ? 0.3 : 1;
+                        if (ghostMode) {
+                            if (ud._origOpacity === undefined) {
+                                ud._origOpacity = mat.opacity;
+                                ud._origTransparent = mat.transparent;
+                            }
+                            mat.transparent = true;
+                            mat.opacity = 0.3;
+                        } else if (ud._origOpacity !== undefined) {
+                            mat.opacity = ud._origOpacity as number;
+                            mat.transparent = ud._origTransparent as boolean;
+                            delete ud._origOpacity;
+                            delete ud._origTransparent;
+                        }
+                        mat.needsUpdate = true;
                     }
                 }
             }
