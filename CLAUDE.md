@@ -139,6 +139,40 @@ server/
 - `FRONTEND_URL` (CORS origin, default `http://localhost:5173`)
 - `PORT` (default 3001)
 
+## 3D 渲染注意事項（CRITICAL）
+
+這是 Three.js / React Three Fiber 數位孿生平台，以下子系統緊密耦合，修改任一個都必須檢查其他系統：
+
+- **陰影系統**：DirectionalLight position/target、shadow camera bounds、shadow map size、bias/normalBias
+- **燈光系統**：自適應燈光（`FacilityEnvironment.tsx` 的 `useSceneLighting`），所有參數由 `range = max(width, depth)` 驅動
+- **相機系統**：`FacilityCameraController.tsx` 的 auto-fit、flyTo、cameraPosition/cameraTarget
+- **地面/格線**：跟隨場景中心 `[cx, cz]`，不是固定在原點
+- **地形貼圖**：載入器生命週期、場景重入時的狀態清理
+
+### 已知陷阱
+
+1. **DirectionalLight target 必須跟隨場景中心** — 預設 target 是 (0,0,0)，模型若遠離原點，陰影方向會完全錯誤。必須用 `lightRef.current.target.position.set(cx, cy, cz)` + `updateMatrixWorld()`。
+2. **不要加 fog** — 設施導覽模組的場景範圍變化大（10m~10km），fog 的 near/far 很難適配所有場景，會導致模型完全不可見。
+3. **陰影相機範圍不能隨便縮小** — 減小 shadow camera 的 left/right/top/bottom 會讓陰影跳到錯誤位置或消失。調整時必須同時驗證陰影在模型下方的位置。
+4. **useLoader 替換為 useState+useEffect 要注意重入** — 場景切換再切回時，如果沒有正確清理/重新載入，地形會渲染為灰/白色。
+5. **DB 記錄刪除要檢查相依功能** — 例如清理衛星影像記錄會同時清掉圖例設定，因為它們存在同一張表或有 FK 關聯。
+6. **`safeResolvePath()` 的路徑問題** — DB 中的 URL 以 `/uploads/...` 開頭（絕對路徑），`path.resolve(__dirname, '..', url)` 會忽略前面的 segments，必須先 strip 前導 `/`。
+
+## Bug 修復指南
+
+- 修復前，先追蹤所有被變更程式碼路徑的副作用（共享狀態、DB 記錄、重新渲染循環）
+- 優先做最小範圍的修改，不要順便重構周邊程式碼
+- 3D 渲染相關修復後，心裡檢查：陰影位置對嗎？霧會擋住模型嗎？場景切換再切回正常嗎？
+- 修改 DB 記錄或清理快取時，檢查從相同記錄讀取的相依功能
+
+## Facility 模組架構
+
+- `FacilityEnvironment.tsx`：自適應燈光，`useSceneLighting()` 從 `sceneBounds` 或 `modelBboxCenters` 計算所有燈光參數
+- `FacilityCameraController.tsx`：相機控制，子場景 auto-fit（當 `cameraPosition` 為 null 時自動飛到模型中心）
+- `FacilityPage`：sidebar + canvas，編輯模式在 sidebar 底部切換
+- `TransformInputPanel`：右下角的移動/旋轉/縮放面板，Enter 或 blur 時呼叫 API 同步
+- `useFacilityStore`：Zustand store，`updateModelTransform` → `PUT /api/facility/models/:id/transform`
+
 ## Conventions
 
 - Commit messages: `feat:`, `fix:`, `docs:`, `refactor:` prefixes. Messages may be in English or Chinese.

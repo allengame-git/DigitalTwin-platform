@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
+import * as THREE from 'three';
 import { Environment } from '@react-three/drei';
 import { useFacilityStore } from '../../stores/facilityStore';
 
@@ -9,6 +10,15 @@ function useSceneLighting() {
     const modelBboxCenters = useFacilityStore(state => state.modelBboxCenters);
 
     return useMemo(() => {
+        const centers = Object.values(modelBboxCenters);
+
+        // 計算場景中心
+        let cx = 0, cy = 0, cz = 0;
+        if (centers.length > 0) {
+            for (const c of centers) { cx += c.x; cy += c.y; cz += c.z; }
+            cx /= centers.length; cy /= centers.length; cz /= centers.length;
+        }
+
         // 1. 優先使用手動設定的 sceneBounds
         let range: number;
         if (currentScene?.sceneBounds) {
@@ -16,7 +26,6 @@ function useSceneLighting() {
             range = Math.max(b.width, b.depth);
         } else {
             // 2. 自動根據模型 bbox 計算
-            const centers = Object.values(modelBboxCenters);
             if (centers.length > 0) {
                 let minX = Infinity, maxX = -Infinity;
                 let minZ = Infinity, maxZ = -Infinity;
@@ -45,33 +54,44 @@ function useSceneLighting() {
 
         return {
             range,
-            lightPosition: [range * 0.3, range * 0.5, -range * 0.2] as [number, number, number],
+            sceneCenter: [cx, cy, cz] as [number, number, number],
+            // 光源位置 = 場景中心 + 偏移
+            lightPosition: [cx + range * 0.3, cy + range * 0.5, cz - range * 0.2] as [number, number, number],
             shadowCameraSize: range * 0.7,
             shadowCameraFar: range * 2,
             shadowNormalBias: Math.max(0.02, range * 0.00005),
             groundSize: range * 2.5,
             gridSize: range * 1.5,
             gridDivisions,
-            fogNear: range * 1.5,
-            fogFar: range * 6,
         };
     }, [currentScene?.sceneBounds, modelBboxCenters, models]);
 }
 
 export function FacilityEnvironment() {
     const lighting = useSceneLighting();
+    const lightRef = useRef<THREE.DirectionalLight>(null);
+
+    // 讓光源 target 指向場景中心（而非預設原點）
+    useEffect(() => {
+        if (lightRef.current) {
+            lightRef.current.target.position.set(...lighting.sceneCenter);
+            lightRef.current.target.updateMatrixWorld();
+        }
+    }, [lighting.sceneCenter]);
+
+    const [cx, , cz] = lighting.sceneCenter;
 
     return (
         <>
             <color attach="background" args={['#e8ecf1']} />
-            <fog attach="fog" args={['#e8ecf1', lighting.fogNear, lighting.fogFar]} />
 
             {/* IBL 環境光 — 讓 PBR 材質顯色正確 */}
             <Environment preset="city" environmentIntensity={0.8} />
 
             <ambientLight intensity={0.8} />
-            {/* 主太陽光：位置與影子範圍隨場景自適應 */}
+            {/* 主太陽光：跟隨場景中心，影子範圍自適應 */}
             <directionalLight
+                ref={lightRef}
                 position={lighting.lightPosition}
                 intensity={3.0}
                 castShadow
@@ -91,11 +111,11 @@ export function FacilityEnvironment() {
 
             <gridHelper
                 args={[lighting.gridSize, lighting.gridDivisions, '#cccccc', '#e0e0e0']}
-                position={[0, -0.01, 0]}
+                position={[cx, -0.01, cz]}
             />
 
-            {/* 透明地面 — 只用來接收模型陰影 */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
+            {/* 透明地面 — 只用來接收模型陰影，跟隨場景中心 */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, -0.02, cz]} receiveShadow>
                 <planeGeometry args={[lighting.groundSize, lighting.groundSize]} />
                 <shadowMaterial transparent opacity={0.35} />
             </mesh>

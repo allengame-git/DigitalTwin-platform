@@ -2,7 +2,7 @@
 
 本文件記錄專案目前的完成狀態、座標系統說明，以及後續待辦事項，供接手的 AI Agent 或開發人員參考。
 
-**最後更新**: 2026-03-06（自適應燈光系統 + 子場景 auto-fit + ghostMode + I1~I4-NEW 安全修復）
+**最後更新**: 2026-03-08（燈光 target 修復 + fog 移除 + CLAUDE.md 防迴歸更新 + 安全審計第三輪發現）
 **當前分支**: `1-geology-module`
 **主分支**: `main`（此分支尚未 merge 回 main）
 
@@ -426,7 +426,12 @@ clearViewPreset()        // CameraController 消費後清除
 | shadow normalBias | `max(0.02, range * 0.00005)` |
 | 地面大小 | `range * 2.5` |
 | grid 大小 | `range * 1.5`，格線數 `clamp(range/10, 20, 200)` |
-| fog near/far | `range * 1.5` / `range * 6` |
+| fog | **已移除**（導覽時模型不可見） |
+
+**2026-03-08 修復**：
+- **光源 target 跟隨場景中心**: `lightRef.current.target.position.set(cx, cy, cz)` + `updateMatrixWorld()`。DirectionalLight 預設 target=(0,0,0)，模型離原點時陰影方向完全錯誤。
+- **地面/Grid 跟隨場景中心**: `position={[cx, -0.01, cz]}`，不再固定在原點。
+- **fog 移除**: 場景範圍 10m~10km 差異太大，fog 的 near/far 無法適配所有場景，在導覽時導致模型完全不可見。
 
 **場景管理 UI**：主場景/子場景編輯表單新增 3 欄位（寬/深/高），空白=自動。
 
@@ -499,6 +504,28 @@ clearViewPreset()        // CameraController 消費後清除
 |---|------|------|--------|
 | I1 | **認證系統 in-memory** — server 重啟遺失使用者 | 遷移至 Prisma User model | 中（Production 前必修） |
 | I3 | **其他模組 GET 路由無認證** — borehole/terrain/geology-model 等仍公開 | 統一加 `authenticate` 或記錄為公開 API | 中 |
+
+#### 第三輪安全發現（2026-03-08，尚未修復）
+
+| # | 問題 | 說明 | 優先級 |
+|---|------|------|--------|
+| V3-1 | **`safeResolvePath()` 永遠回傳 null** | DB 中 URL 以 `/uploads/...` 開頭（絕對路徑），`path.resolve(__dirname, '..', url)` 會忽略前面 segments。需先 strip 前導 `/` 再 resolve | 高 |
+| V3-2 | **terrain.ts 檔案刪除無路徑驗證** | `DELETE /api/terrain/:id` 直接用 DB URL 拼接 `fs.unlink`，未呼叫 `safeResolvePath` | 高 |
+| V3-3 | **geology-model.ts 遞迴刪除無邊界** | `DELETE /api/geology-model/:id` 用 `fs.rm(dir, { recursive: true })`，DB URL 若被篡改可刪除任意目錄 | 高 |
+| V3-4 | **lithology.ts / project.ts POST/PUT/DELETE 缺 authenticate** | 異動操作完全公開，任何人可修改岩性定義或刪除專案 | 中 |
+| V3-5 | **auth.ts 硬編碼預設帳號** | `admin@example.com`/`admin123` 永遠可登入，應限制 `NODE_ENV !== 'production'` | 中 |
+
+**V3-1 修復方式**（建議）：
+```typescript
+// server/lib/safePath.ts
+export function safeResolvePath(baseDir: string, dbUrl: string): string | null {
+    // Strip leading / from DB URL before resolving
+    const cleanUrl = dbUrl.replace(/^\/+/, '');
+    const resolved = path.resolve(baseDir, cleanUrl);
+    if (!resolved.startsWith(path.resolve(baseDir))) return null;
+    return resolved;
+}
+```
 
 #### Suggestions（建議改善）
 
