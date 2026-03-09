@@ -10,12 +10,28 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
     ChevronLeft,
+    ChevronDown,
+    ChevronRight,
     Settings,
     AlertTriangle,
+    Layers,
+    GitBranch,
+    Compass,
+    ImageIcon,
+    Mountain,
+    Droplets,
+    Box,
+    Activity,
+    Palette,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useUploadStore } from '../stores/uploadStore';
 import { useProjectStore } from '../stores/projectStore';
+import { useBoreholeStore } from '../stores/boreholeStore';
+import { useFaultPlaneStore } from '../stores/faultPlaneStore';
+import { useAttitudeStore } from '../stores/attitudeStore';
+import { useTerrainStore } from '../stores/terrainStore';
+import { useWaterLevelStore } from '../stores/waterLevelStore';
 import { setOrigin } from '../utils/coordinates';
 import { BoreholeUploadSection } from '../components/data/BoreholeUploadSection';
 import { FaultPlaneUploadSection } from '../components/data/FaultPlaneUploadSection';
@@ -26,6 +42,7 @@ import { ImageryUploadSection } from '../components/data/ImageryUploadSection';
 import { GeologyModelSection } from '../components/data/GeologyModelSection';
 import { GeophysicsUploadSection } from '../components/data/GeophysicsUploadSection';
 import LithologySection from '../components/data/LithologySection';
+import { DataPageTOC } from '../components/data/DataPageTOC';
 import { useLithologyStore } from '../stores/lithologyStore';
 
 
@@ -48,6 +65,40 @@ export const DataManagementPage: React.FC = () => {
         activeProject.originX !== 0 &&
         activeProject.originY !== 0 &&
         lithologies.length > 0;
+
+    // Collapsible sections
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+    const toggleSection = (id: string) => {
+        setCollapsedSections(prev => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+    };
+
+    // Section counts from stores
+    const boreholeCount = useBoreholeStore(s => s.boreholes.length);
+    const faultPlaneCount = useFaultPlaneStore(s => s.faultPlanes.length);
+    const attitudeCount = useAttitudeStore(s => s.attitudes.length);
+    const imageryCount = useUploadStore(s => s.imageryFiles.length);
+    const terrainCount = useTerrainStore(s => s.terrains.length);
+    const waterLevelCount = useWaterLevelStore(s => s.waterLevels.length);
+    const geologyModelCount = useUploadStore(s => s.geologyModels.length);
+    const geophysicsCount = useUploadStore(s => s.geophysicsFiles.length);
+
+    // TOC items
+    const tocItems = [
+        { id: 'section-settings', label: '專案設定', icon: <Settings size={14} />, group: 'setup' },
+        { id: 'section-lithology', label: '岩性', icon: <Palette size={14} />, group: 'setup', count: lithologies.length },
+        { id: 'section-borehole', label: '鑽孔資料', icon: <Layers size={14} />, group: 'geology', count: boreholeCount },
+        { id: 'section-faultplane', label: '斷層面資料', icon: <GitBranch size={14} />, group: 'geology', count: faultPlaneCount },
+        { id: 'section-attitude', label: '位態資料', icon: <Compass size={14} />, group: 'geology', count: attitudeCount },
+        { id: 'section-imagery', label: '航照圖', icon: <ImageIcon size={14} />, group: 'surface', count: imageryCount },
+        { id: 'section-terrain', label: '地形資料', icon: <Mountain size={14} />, group: 'surface', count: terrainCount },
+        { id: 'section-waterlevel', label: '地下水位', icon: <Droplets size={14} />, group: 'surface', count: waterLevelCount },
+        { id: 'section-geomodel', label: '3D 地質模型', icon: <Box size={14} />, group: 'model', count: geologyModelCount },
+        { id: 'section-geophysics', label: '地球物理', icon: <Activity size={14} />, group: 'model', count: geophysicsCount },
+    ];
 
     // Toast Notification State
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -207,10 +258,20 @@ export const DataManagementPage: React.FC = () => {
                     letter-spacing: -0.025em;
                 }
 
-                .dm-content {
-                    padding: 32px 24px;
-                    max-width: 1200px;
+                .dm-layout {
+                    display: flex;
+                    max-width: 1440px;
                     margin: 0 auto;
+                    padding: 32px 24px;
+                    gap: 32px;
+                }
+
+                .dm-content {
+                    flex: 1;
+                    min-width: 0;
+                    padding: 0;
+                    max-width: none;
+                    margin: 0;
                 }
 
                 /* Sections */
@@ -532,6 +593,123 @@ export const DataManagementPage: React.FC = () => {
                     );
                     animation: progress-shimmer 1.5s infinite linear;
                 }
+
+                /* TOC */
+                .dm-toc {
+                    position: sticky;
+                    top: 80px;
+                    width: 200px;
+                    flex-shrink: 0;
+                    align-self: flex-start;
+                    max-height: calc(100vh - 100px);
+                    overflow-y: auto;
+                }
+                .dm-toc-group { margin-bottom: 20px; }
+                .dm-toc-group-label {
+                    font-size: 11px;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    padding: 0 12px;
+                    margin-bottom: 6px;
+                    display: flex;
+                    align-items: center;
+                }
+                .dm-toc-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    width: 100%;
+                    padding: 8px 12px;
+                    border: none;
+                    background: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-family: var(--font-sans);
+                    color: var(--gray-500);
+                    text-align: left;
+                    transition: all 0.15s;
+                }
+                .dm-toc-item:hover { background: var(--gray-100); color: var(--text-primary); }
+                .dm-toc-item.active { background: var(--gray-100); color: var(--text-primary); font-weight: 600; }
+                .dm-toc-item-icon { display: flex; align-items: center; color: inherit; opacity: 0.6; }
+                .dm-toc-item-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .dm-toc-item-count { font-size: 11px; color: var(--gray-400); min-width: 20px; text-align: right; }
+
+                /* Section wrappers with group colors */
+                .dm-section-wrapper {
+                    position: relative;
+                    margin-bottom: 24px;
+                }
+                .dm-section-wrapper .dm-section {
+                    margin-bottom: 0;
+                }
+                .dm-section-wrapper[data-group="setup"] .dm-section { border-left: 3px solid var(--group-setup); }
+                .dm-section-wrapper[data-group="geology"] .dm-section { border-left: 3px solid var(--group-geology); }
+                .dm-section-wrapper[data-group="surface"] .dm-section { border-left: 3px solid var(--group-surface); }
+                .dm-section-wrapper[data-group="model"] .dm-section { border-left: 3px solid var(--group-model); }
+
+                /* Collapsed bar */
+                .dm-collapsed-bar {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 14px 24px;
+                    background: var(--bg-card);
+                    border: 1px solid var(--gray-200);
+                    border-radius: 12px;
+                    cursor: pointer;
+                    font-family: var(--font-sans);
+                    font-weight: 600;
+                    font-size: 14px;
+                    color: var(--text-primary);
+                    transition: all 0.2s;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                }
+                .dm-collapsed-bar:hover {
+                    background: var(--gray-50);
+                    border-color: var(--gray-300);
+                }
+                .dm-section-wrapper[data-group="setup"] .dm-collapsed-bar { border-left: 3px solid var(--group-setup); }
+                .dm-section-wrapper[data-group="geology"] .dm-collapsed-bar { border-left: 3px solid var(--group-geology); }
+                .dm-section-wrapper[data-group="surface"] .dm-collapsed-bar { border-left: 3px solid var(--group-surface); }
+                .dm-section-wrapper[data-group="model"] .dm-collapsed-bar { border-left: 3px solid var(--group-model); }
+
+                .dm-collapse-count {
+                    font-family: var(--font-mono);
+                    font-size: 12px;
+                    padding: 2px 8px;
+                    border-radius: 9999px;
+                    background: var(--gray-100);
+                    color: var(--gray-500);
+                    font-weight: 500;
+                    margin-left: auto;
+                }
+
+                .dm-expand-toggle {
+                    position: absolute;
+                    top: 28px;
+                    right: 24px;
+                    cursor: pointer;
+                    color: var(--gray-400);
+                    z-index: 2;
+                    padding: 4px;
+                    border-radius: 4px;
+                    background: none;
+                    border: none;
+                    display: flex;
+                    align-items: center;
+                }
+                .dm-expand-toggle:hover {
+                    background: var(--gray-100);
+                    color: var(--gray-600);
+                }
+
+                @media (max-width: 1400px) {
+                    .dm-toc { display: none; }
+                    .dm-layout { max-width: 1200px; }
+                }
             `}</style>
             {/* Same header... */}
             <header className="dm-header">
@@ -549,140 +727,293 @@ export const DataManagementPage: React.FC = () => {
                 </div>
             </header>
 
-            <main className="dm-content">
-                {/* Project Settings Section */}
-                {activeProject && (
-                    <section className="dm-section">
-                        <div className="dm-section-header">
-                            <div className="dm-section-icon">
-                                <Settings size={20} />
+            <div className="dm-layout">
+                <DataPageTOC items={tocItems} collapsedSections={collapsedSections} onToggleSection={toggleSection} />
+                <main className="dm-content">
+                    {/* 專案設定 */}
+                    {activeProject && (
+                        <div id="section-settings" className="dm-section-wrapper" data-group="setup">
+                            {collapsedSections.has('settings') ? (
+                                <div className="dm-collapsed-bar" onClick={() => toggleSection('settings')}>
+                                    <Settings size={16} />
+                                    <span>專案設定</span>
+                                    <ChevronRight size={14} />
+                                </div>
+                            ) : (
+                                <div style={{ position: 'relative' }}>
+                                    <button className="dm-expand-toggle" onClick={() => toggleSection('settings')} title="收合">
+                                        <ChevronDown size={14} />
+                                    </button>
+                                    <section className="dm-section">
+                                        <div className="dm-section-header">
+                                            <div className="dm-section-icon">
+                                                <Settings size={20} />
+                                            </div>
+                                            <div>
+                                                <div className="dm-section-title">專案設定 (TWD97 座標原點)</div>
+                                                <div className="dm-section-desc">設定此專案的場景中心座標，所有 3D 模型將以此為基準進行定位。</div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', maxWidth: '600px' }}>
+                                            <div style={{ flex: 1 }}>
+                                                <label className="dm-form-label">
+                                                    原點 X (東距) <span className="required">*</span>
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    className="dm-form-input dm-mono"
+                                                    value={originForm.x}
+                                                    onChange={e => setOriginForm(prev => ({ ...prev, x: e.target.value }))}
+                                                    placeholder="224000"
+                                                />
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <label className="dm-form-label">
+                                                    原點 Y (北距) <span className="required">*</span>
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    className="dm-form-input dm-mono"
+                                                    value={originForm.y}
+                                                    onChange={e => setOriginForm(prev => ({ ...prev, y: e.target.value }))}
+                                                    placeholder="2429000"
+                                                />
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <label className="dm-form-label">
+                                                    北方角度 (度) <span className="required">*</span>
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    className="dm-form-input dm-mono"
+                                                    value={originForm.northAngle}
+                                                    onChange={e => setOriginForm(prev => ({ ...prev, northAngle: e.target.value }))}
+                                                    placeholder="0 (正北)"
+                                                />
+                                            </div>
+                                            <button
+                                                className="dm-btn dm-btn-primary"
+                                                onClick={handleOriginSubmit}
+                                                disabled={isSavingOrigin}
+                                                style={{ height: '42px', minWidth: '80px' }}
+                                            >
+                                                {isSavingOrigin ? '儲存中...' : '儲存設定'}
+                                            </button>
+                                        </div>
+                                    </section>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 岩性設定 */}
+                    <div id="section-lithology" className="dm-section-wrapper" data-group="setup">
+                        {collapsedSections.has('lithology') ? (
+                            <div className="dm-collapsed-bar" onClick={() => toggleSection('lithology')}>
+                                <Palette size={16} />
+                                <span>岩性</span>
+                                <span className="dm-collapse-count">{lithologies.length}</span>
+                                <ChevronRight size={14} />
+                            </div>
+                        ) : (
+                            <div style={{ position: 'relative' }}>
+                                <button className="dm-expand-toggle" onClick={() => toggleSection('lithology')} title="收合">
+                                    <ChevronDown size={14} />
+                                </button>
+                                <LithologySection />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Required setup message */}
+                    {!isSetupComplete && (
+                        <div style={{
+                            background: '#fffbeb',
+                            border: '1px solid #fcd34d',
+                            borderRadius: '12px',
+                            padding: '20px',
+                            marginBottom: '24px',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '16px'
+                        }}>
+                            <div style={{ background: '#fef3c7', padding: '8px', borderRadius: '8px', color: '#b45309' }}>
+                                <AlertTriangle size={24} />
                             </div>
                             <div>
-                                <div className="dm-section-title">專案設定 (TWD97 座標原點)</div>
-                                <div className="dm-section-desc">設定此專案的場景中心座標，所有 3D 模型將以此為基準進行定位。</div>
+                                <div style={{ fontWeight: 600, color: '#92400e', marginBottom: '4px', fontSize: '16px' }}>
+                                    請先完成專案設定
+                                </div>
+                                <div style={{ color: '#b45309', fontSize: '14px', lineHeight: '1.5' }}>
+                                    需設定 TWD97 座標原點並載入岩性資料後，才可使用以下資料管理功能。
+                                </div>
                             </div>
                         </div>
+                    )}
 
-                        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', maxWidth: '600px' }}>
-                            <div style={{ flex: 1 }}>
-                                <label className="dm-form-label">
-                                    原點 X (東距) <span className="required">*</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    className="dm-form-input"
-                                    value={originForm.x}
-                                    onChange={e => setOriginForm(prev => ({ ...prev, x: e.target.value }))}
-                                    placeholder="224000"
-                                />
+                    {/* 鑽孔資料 */}
+                    <div id="section-borehole" className="dm-section-wrapper" data-group="geology"
+                         style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                        {collapsedSections.has('borehole') ? (
+                            <div className="dm-collapsed-bar" onClick={() => toggleSection('borehole')}>
+                                <Layers size={16} />
+                                <span>鑽孔資料</span>
+                                <span className="dm-collapse-count">{boreholeCount}</span>
+                                <ChevronRight size={14} />
                             </div>
-                            <div style={{ flex: 1 }}>
-                                <label className="dm-form-label">
-                                    原點 Y (北距) <span className="required">*</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    className="dm-form-input"
-                                    value={originForm.y}
-                                    onChange={e => setOriginForm(prev => ({ ...prev, y: e.target.value }))}
-                                    placeholder="2429000"
-                                />
+                        ) : (
+                            <div style={{ position: 'relative' }}>
+                                <button className="dm-expand-toggle" onClick={() => toggleSection('borehole')} title="收合">
+                                    <ChevronDown size={14} />
+                                </button>
+                                <BoreholeUploadSection />
                             </div>
-                            <div style={{ flex: 1 }}>
-                                <label className="dm-form-label">
-                                    北方角度 (度) <span className="required">*</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    className="dm-form-input"
-                                    value={originForm.northAngle}
-                                    onChange={e => setOriginForm(prev => ({ ...prev, northAngle: e.target.value }))}
-                                    placeholder="0 (正北)"
-                                />
-                            </div>
-                            <button
-                                className="dm-btn dm-btn-primary"
-                                onClick={handleOriginSubmit}
-                                disabled={isSavingOrigin}
-                                style={{ height: '42px', minWidth: '80px' }}
-                            >
-                                {isSavingOrigin ? '儲存中...' : '儲存設定'}
-                            </button>
-                        </div>
-                    </section>
-                )}
-
-                {/* 岩性設定 - 必須完成設定 */}
-                <LithologySection />
-
-                {/* Required setup message */}
-                {/* Required setup message (Moved logic to inside the conditional render for cleaner code) */}
-                {!isSetupComplete && (
-                    <div style={{
-                        background: '#fffbeb',
-                        border: '1px solid #fcd34d',
-                        borderRadius: '12px',
-                        padding: '20px',
-                        marginBottom: '24px',
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '16px'
-                    }}>
-                        <div style={{ background: '#fef3c7', padding: '8px', borderRadius: '8px', color: '#b45309' }}>
-                            <AlertTriangle size={24} />
-                        </div>
-                        <div>
-                            <div style={{ fontWeight: 600, color: '#92400e', marginBottom: '4px', fontSize: '16px' }}>
-                                請先完成專案設定
-                            </div>
-                            <div style={{ color: '#b45309', fontSize: '14px', lineHeight: '1.5' }}>
-                                需設定 TWD97 座標原點並載入岩性資料後，才可使用以下資料管理功能。
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* 鑽孔資料 */}
-                <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
-                    <BoreholeUploadSection />
-                </div>
-
-                {/* 斷層面資料 */}
-                <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
-                    <FaultPlaneUploadSection />
-                </div>
-
-                {/* 位態資料 */}
-                <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
-                    <AttitudeUploadSection />
-                </div>
-
-                {/* 航照圖管理 */}
-                <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
-                    <ImageryUploadSection showToast={showToast} />
-
-                    {/* GeoTIFF / DEM 地形資料管理 */}
-                    <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
-                        <TerrainUploadSection />
+                        )}
                     </div>
 
-                    {/* 地下水位面 */}
-                    <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
-                        <WaterLevelUploadSection />
+                    {/* 斷層面資料 */}
+                    <div id="section-faultplane" className="dm-section-wrapper" data-group="geology"
+                         style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                        {collapsedSections.has('faultplane') ? (
+                            <div className="dm-collapsed-bar" onClick={() => toggleSection('faultplane')}>
+                                <GitBranch size={16} />
+                                <span>斷層面資料</span>
+                                <span className="dm-collapse-count">{faultPlaneCount}</span>
+                                <ChevronRight size={14} />
+                            </div>
+                        ) : (
+                            <div style={{ position: 'relative' }}>
+                                <button className="dm-expand-toggle" onClick={() => toggleSection('faultplane')} title="收合">
+                                    <ChevronDown size={14} />
+                                </button>
+                                <FaultPlaneUploadSection />
+                            </div>
+                        )}
                     </div>
-                </div>
 
-                {/* 3D 地質模型 */}
-                <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
-                    <GeologyModelSection showToast={showToast} />
-                </div>
+                    {/* 位態資料 */}
+                    <div id="section-attitude" className="dm-section-wrapper" data-group="geology"
+                         style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                        {collapsedSections.has('attitude') ? (
+                            <div className="dm-collapsed-bar" onClick={() => toggleSection('attitude')}>
+                                <Compass size={16} />
+                                <span>位態資料</span>
+                                <span className="dm-collapse-count">{attitudeCount}</span>
+                                <ChevronRight size={14} />
+                            </div>
+                        ) : (
+                            <div style={{ position: 'relative' }}>
+                                <button className="dm-expand-toggle" onClick={() => toggleSection('attitude')} title="收合">
+                                    <ChevronDown size={14} />
+                                </button>
+                                <AttitudeUploadSection />
+                            </div>
+                        )}
+                    </div>
 
-                {/* 地球物理探查資料 */}
-                <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
-                    <GeophysicsUploadSection showToast={showToast} />
-                </div>
+                    {/* 航照圖 */}
+                    <div id="section-imagery" className="dm-section-wrapper" data-group="surface"
+                         style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                        {collapsedSections.has('imagery') ? (
+                            <div className="dm-collapsed-bar" onClick={() => toggleSection('imagery')}>
+                                <ImageIcon size={16} />
+                                <span>航照圖</span>
+                                <span className="dm-collapse-count">{imageryCount}</span>
+                                <ChevronRight size={14} />
+                            </div>
+                        ) : (
+                            <div style={{ position: 'relative' }}>
+                                <button className="dm-expand-toggle" onClick={() => toggleSection('imagery')} title="收合">
+                                    <ChevronDown size={14} />
+                                </button>
+                                <ImageryUploadSection showToast={showToast} />
+                            </div>
+                        )}
+                    </div>
 
-            </main>
+                    {/* 地形資料 */}
+                    <div id="section-terrain" className="dm-section-wrapper" data-group="surface"
+                         style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                        {collapsedSections.has('terrain') ? (
+                            <div className="dm-collapsed-bar" onClick={() => toggleSection('terrain')}>
+                                <Mountain size={16} />
+                                <span>地形資料</span>
+                                <span className="dm-collapse-count">{terrainCount}</span>
+                                <ChevronRight size={14} />
+                            </div>
+                        ) : (
+                            <div style={{ position: 'relative' }}>
+                                <button className="dm-expand-toggle" onClick={() => toggleSection('terrain')} title="收合">
+                                    <ChevronDown size={14} />
+                                </button>
+                                <TerrainUploadSection />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 地下水位 */}
+                    <div id="section-waterlevel" className="dm-section-wrapper" data-group="surface"
+                         style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                        {collapsedSections.has('waterlevel') ? (
+                            <div className="dm-collapsed-bar" onClick={() => toggleSection('waterlevel')}>
+                                <Droplets size={16} />
+                                <span>地下水位</span>
+                                <span className="dm-collapse-count">{waterLevelCount}</span>
+                                <ChevronRight size={14} />
+                            </div>
+                        ) : (
+                            <div style={{ position: 'relative' }}>
+                                <button className="dm-expand-toggle" onClick={() => toggleSection('waterlevel')} title="收合">
+                                    <ChevronDown size={14} />
+                                </button>
+                                <WaterLevelUploadSection />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 3D 地質模型 */}
+                    <div id="section-geomodel" className="dm-section-wrapper" data-group="model"
+                         style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                        {collapsedSections.has('geomodel') ? (
+                            <div className="dm-collapsed-bar" onClick={() => toggleSection('geomodel')}>
+                                <Box size={16} />
+                                <span>3D 地質模型</span>
+                                <span className="dm-collapse-count">{geologyModelCount}</span>
+                                <ChevronRight size={14} />
+                            </div>
+                        ) : (
+                            <div style={{ position: 'relative' }}>
+                                <button className="dm-expand-toggle" onClick={() => toggleSection('geomodel')} title="收合">
+                                    <ChevronDown size={14} />
+                                </button>
+                                <GeologyModelSection showToast={showToast} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 地球物理 */}
+                    <div id="section-geophysics" className="dm-section-wrapper" data-group="model"
+                         style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
+                        {collapsedSections.has('geophysics') ? (
+                            <div className="dm-collapsed-bar" onClick={() => toggleSection('geophysics')}>
+                                <Activity size={16} />
+                                <span>地球物理</span>
+                                <span className="dm-collapse-count">{geophysicsCount}</span>
+                                <ChevronRight size={14} />
+                            </div>
+                        ) : (
+                            <div style={{ position: 'relative' }}>
+                                <button className="dm-expand-toggle" onClick={() => toggleSection('geophysics')} title="收合">
+                                    <ChevronDown size={14} />
+                                </button>
+                                <GeophysicsUploadSection showToast={showToast} />
+                            </div>
+                        )}
+                    </div>
+
+                </main>
+            </div>
 
             {/* Toast Notification */}
             {toast && (
