@@ -7,7 +7,6 @@
 
 import React from 'react';
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
-import { AuthProvider } from '../contexts/AuthContext';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { publicRoutes } from './publicRoutes';
 import { useProjectStore } from '../stores/projectStore';
@@ -77,14 +76,12 @@ const NotFoundPage: React.FC = () => (
     </div>
 );
 
-// Layout with AuthProvider
+// Layout (Zustand doesn't need a Provider)
 const RootLayout: React.FC = () => {
     return (
-        <AuthProvider>
-            <React.Suspense fallback={<LoadingScreen />}>
-                <Outlet />
-            </React.Suspense>
-        </AuthProvider>
+        <React.Suspense fallback={<LoadingScreen />}>
+            <Outlet />
+        </React.Suspense>
     );
 };
 

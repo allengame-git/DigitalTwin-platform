@@ -7,7 +7,7 @@
 
 import React, { useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuthStore } from '../stores/authStore';
 import { useProjectStore } from '../stores/projectStore';
 import { RoleBasedUI } from '../components/auth/RoleBasedUI';
 
@@ -20,7 +20,8 @@ const ROLE_LABELS: Record<string, string> = {
 export const ProjectDashboardPage: React.FC = () => {
     const { projectCode } = useParams<{ projectCode: string }>();
     const navigate = useNavigate();
-    const { user, logout } = useAuth();
+    const user = useAuthStore(state => state.user);
+    const logout = useAuthStore(state => state.logout);
     const { projects, fetchProjects, getProjectByCode, setActiveProject } = useProjectStore();
 
     // 載入專案列表

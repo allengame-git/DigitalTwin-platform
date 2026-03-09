@@ -11,7 +11,7 @@ import React, { useState } from 'react';
 import { useLayerStore, LayerType } from '../../stores/layerStore';
 import { useViewerStore } from '../../stores/viewerStore';
 import { ModelVersionSelector } from '../controls/ModelVersionSelector';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { setOrigin } from '../../utils/coordinates';
 import { TerrainLegendControl } from '../controls/TerrainLegendControl';
@@ -42,7 +42,7 @@ export const LayerPanel: React.FC<LayerPanelProps> = ({
 }) => {
     const [collapsed, setCollapsed] = useState(defaultCollapsed);
     const [activeTab, setActiveTab] = useState<TabType>('layers');
-    const { user } = useAuth();
+    const user = useAuthStore(state => state.user);
 
     const canAccessSettings = user?.role === 'admin' || user?.role === 'engineer';
 

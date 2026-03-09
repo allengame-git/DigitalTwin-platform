@@ -9,12 +9,13 @@
 import React, { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuthStore } from '../stores/authStore';
 import { useProjectStore } from '../stores/projectStore';
 import FacilityUploadSection from '../components/data/FacilityUploadSection';
 
 export const FacilityDataPage: React.FC = () => {
-    const { user, logout } = useAuth();
+    const user = useAuthStore(state => state.user);
+    const logout = useAuthStore(state => state.logout);
     const { projectCode } = useParams<{ projectCode: string }>();
     const { activeProjectId, projects, fetchProjects, getProjectByCode, setActiveProject } = useProjectStore();
 

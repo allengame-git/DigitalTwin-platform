@@ -6,7 +6,7 @@
 
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuthStore } from '../stores/authStore';
 import { RoleBasedUI, EngineerOnly, AdminOnly } from '../components/auth/RoleBasedUI';
 import { useProjectStore, Project } from '../stores/projectStore';
 
@@ -18,7 +18,8 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export const DashboardPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const user = useAuthStore(state => state.user);
+  const logout = useAuthStore(state => state.logout);
   const navigate = useNavigate();
   const { projects, loading, fetchProjects, createProject } = useProjectStore();
   const [showProjectModal, setShowProjectModal] = React.useState(false);

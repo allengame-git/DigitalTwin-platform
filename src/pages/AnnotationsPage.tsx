@@ -9,7 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAnnotationStore } from '../stores/annotationStore';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuthStore } from '../stores/authStore';
 import { usePageTracking } from '../hooks/usePageTracking';
 import {
   AnnotationToolbar,
@@ -25,7 +25,7 @@ export const AnnotationsPage: React.FC = () => {
   usePageTracking({ pageName: '審查標註' });
   const { projectCode } = useParams<{ projectCode: string }>();
 
-  const { user } = useAuth();
+  const user = useAuthStore(state => state.user);
   const {
     annotations,
     selectedAnnotation,

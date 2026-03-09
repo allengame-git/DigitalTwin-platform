@@ -26,7 +26,7 @@ import {
     ChevronUp,
     File
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuthStore } from '../stores/authStore';
 import {
     useUploadStore,
     UploadedFile,
@@ -51,7 +51,7 @@ import { twd97ToWorld } from '../utils/coordinates';
 
 
 export const DataManagementPage: React.FC = () => {
-    const { user } = useAuth();
+    const user = useAuthStore(state => state.user);
     const { projectCode } = useParams<{ projectCode: string }>();
     const navigate = useNavigate();
     const {

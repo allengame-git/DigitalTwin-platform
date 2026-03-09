@@ -7,7 +7,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuthStore } from '../stores/authStore';
 
 type InviteStatus = 'loading' | 'valid' | 'invalid' | 'expired' | 'used' | 'success' | 'error';
 
@@ -21,7 +21,7 @@ interface InviteInfo {
 export const InvitePage: React.FC = () => {
     const { token } = useParams<{ token: string }>();
     const navigate = useNavigate();
-    const { loginWithInvite } = useAuth();
+    const loginWithInvite = useAuthStore(state => state.loginWithInvite);
     const [status, setStatus] = useState<InviteStatus>('loading');
     const [error, setError] = useState<string>('');
 

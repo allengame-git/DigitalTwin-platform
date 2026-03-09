@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 
 interface LogoutModalProps {
     isOpen: boolean;
@@ -19,7 +19,8 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
     onClose,
     onConfirm,
 }) => {
-    const { logout, user } = useAuth();
+    const logout = useAuthStore(state => state.logout);
+    const user = useAuthStore(state => state.user);
 
     if (!isOpen) return null;
 

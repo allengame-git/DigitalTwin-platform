@@ -1,9 +1,9 @@
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuthStore } from '../stores/authStore';
 
 const PlaceholderPage: React.FC<{ title: string; icon: string }> = ({ title, icon }) => {
-    const { user } = useAuth();
+    const user = useAuthStore(state => state.user);
     const { projectCode } = useParams<{ projectCode: string }>();
 
     return (

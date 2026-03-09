@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 
 interface SessionWarningProps {
     isOpen: boolean;
@@ -17,7 +17,9 @@ export const SessionWarning: React.FC<SessionWarningProps> = ({
     isOpen,
     onClose,
 }) => {
-    const { extendSession, logout, user } = useAuth();
+    const extendSession = useAuthStore(state => state.extendSession);
+    const logout = useAuthStore(state => state.logout);
+    const user = useAuthStore(state => state.user);
     const [timeLeft, setTimeLeft] = useState(5 * 60); // 5 minutes in seconds
     const [isExtending, setIsExtending] = useState(false);
 

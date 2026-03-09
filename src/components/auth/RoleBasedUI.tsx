@@ -6,7 +6,7 @@
  */
 
 import React, { ReactNode } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 import type { UserRole } from '../../types/auth';
 import { hasPermission, type FeatureKey } from '../../config/permissions';
 
@@ -28,7 +28,7 @@ export const RoleBasedUI: React.FC<RoleBasedUIProps> = ({
     fallback = null,
     hideForRoles,
 }) => {
-    const { user } = useAuth();
+    const user = useAuthStore(state => state.user);
 
     // No user, show fallback
     if (!user) {
@@ -137,7 +137,8 @@ export function withRoleBasedUI<P extends object>(
  * Hook for checking role-based conditions
  */
 export function useRoleCheck() {
-    const { user, hasRole } = useAuth();
+    const user = useAuthStore(state => state.user);
+    const hasRole = useAuthStore(state => state.hasRole);
 
     return {
         isAdmin: user?.role === 'admin',
