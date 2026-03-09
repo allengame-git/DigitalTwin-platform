@@ -28,6 +28,7 @@ import cleanupRoutes from './routes/cleanup';
 import facilityRoutes from './routes/facility';
 import adminRoutes from './routes/admin';
 import { requestIdMiddleware, requestLogger, errorLogger } from './middleware/errorLogger';
+import { verifyCsrf } from './middleware/csrf';
 import path from 'path';
 
 // Middleware
@@ -71,6 +72,7 @@ app.use('/api/terrain', terrainRoutes);
 app.use('/api/water-level', waterLevelRoutes);
 app.use('/api/cleanup', cleanupRoutes);
 app.use('/api/facility', facilityRoutes);
+app.use('/api/admin', verifyCsrf);
 app.use('/api/admin', adminRoutes);
 
 // Health check
