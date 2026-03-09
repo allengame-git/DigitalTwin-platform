@@ -12,6 +12,8 @@ export interface User {
     email: string;
     name: string;
     role: UserRole;
+    status?: 'active' | 'locked' | 'disabled' | 'pending_reset';
+    mustChangePassword?: boolean;
     createdAt: string;
     lastLoginAt: string | null;
 }
@@ -36,11 +38,68 @@ export interface AuthTokens {
 export interface LoginResponse {
     user: User;
     tokens: AuthTokens;
+    csrfToken?: string;
 }
 
 export interface RefreshResponse {
     accessToken: string;
     expiresIn: number;
+}
+
+export type AccountStatus = 'active' | 'locked' | 'disabled' | 'pending_reset';
+
+export interface AdminUser extends User {
+    status: AccountStatus;
+    activeSessions: number;
+    failedLoginCount: number;
+    updatedAt: string;
+}
+
+export interface CreateUserRequest {
+    email: string;
+    name: string;
+    role: UserRole;
+}
+
+export interface CreateUserResponse {
+    user: AdminUser;
+    temporaryPassword: string;
+}
+
+export interface AuditLogEntry {
+    id: string;
+    userId: string | null;
+    action: string;
+    ipAddress: string | null;
+    userAgent: string | null;
+    details: Record<string, unknown> | null;
+    createdAt: string;
+    user?: { name: string; email: string } | null;
+}
+
+export interface AuditLogFilters {
+    page?: number;
+    limit?: number;
+    startDate?: string;
+    endDate?: string;
+    action?: string;
+    userId?: string;
+}
+
+export interface PaginatedResponse<T> {
+    data: T[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
+export interface UserSession {
+    id: string;
+    userAgent: string | null;
+    ipAddress: string | null;
+    createdAt: string;
+    lastActivityAt: string;
+    expiresAt: string;
 }
 
 /**

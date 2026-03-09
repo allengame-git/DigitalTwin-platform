@@ -21,10 +21,17 @@ async function fetchApi<T>(
     endpoint: string,
     options: RequestInit = {}
 ): Promise<T> {
+    // 讀取 CSRF cookie
+    const csrfToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrf-token='))
+        ?.split('=')[1];
+
     const response = await fetch(`${API_BASE}${endpoint}`, {
         credentials: 'include', // For httpOnly cookies
         headers: {
             'Content-Type': 'application/json',
+            ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
             ...(options.headers || {}),
         },
         ...options,
@@ -81,6 +88,16 @@ export async function validateInvite(token: string): Promise<LoginResponse> {
     return fetchApi<LoginResponse>('/invite/validate', {
         method: 'POST',
         body: JSON.stringify({ token }),
+    });
+}
+
+/**
+ * Change password
+ */
+export async function changePassword(oldPassword: string, newPassword: string): Promise<{ message: string }> {
+    return fetchApi<{ message: string }>('/auth/change-password', {
+        method: 'PUT',
+        body: JSON.stringify({ oldPassword, newPassword }),
     });
 }
 
