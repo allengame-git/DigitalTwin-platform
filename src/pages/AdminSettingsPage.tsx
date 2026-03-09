@@ -5,11 +5,12 @@
  * @see specs/4-user-roles-system/spec.md
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { useAuthStore } from '../stores/authStore';
+import { useAdminStore } from '../stores/adminStore';
 import { usePageTracking } from '../hooks/usePageTracking';
+import type { AuditLogEntry } from '../types/auth';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -25,6 +26,7 @@ const settingSections: SettingSection[] = [
     { id: 'notifications', title: '通知設定', description: 'Email 通知、系統提醒' },
     { id: 'integration', title: '整合設定', description: 'API 金鑰、第三方服務連接' },
     { id: 'storage', title: '儲存空間管理', description: '清理未使用的上傳檔案與垃圾桶' },
+    { id: 'audit', title: '稽核日誌', description: '認證事件與帳號操作記錄' },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -33,9 +35,23 @@ const ROLE_LABELS: Record<string, string> = {
     reviewer: '審查委員',
 };
 
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+    LOGIN_SUCCESS: '登入成功',
+    LOGIN_FAILED: '登入失敗',
+    LOGOUT: '登出',
+    TOKEN_REFRESH: 'Token 刷新',
+    PASSWORD_CHANGE: '密碼變更',
+    PASSWORD_RESET: '密碼重設',
+    ACCOUNT_CREATE: '建立帳號',
+    ACCOUNT_UPDATE: '更新帳號',
+    ACCOUNT_DISABLE: '停用帳號',
+    ACCOUNT_UNLOCK: '解鎖帳號',
+    SESSION_REVOKED: 'Session 撤銷',
+};
+
 export const AdminSettingsPage: React.FC = () => {
     usePageTracking({ pageName: '系統設定' });
-    const { user } = useAuth();
+    const user = useAuthStore(state => state.user);
     const [activeSection, setActiveSection] = useState('general');
 
     // Storage Management States
@@ -47,6 +63,14 @@ export const AdminSettingsPage: React.FC = () => {
     const [scanError, setScanError] = useState('');
     const [confirmAction, setConfirmAction] = useState<'cleanup' | 'purge' | null>(null);
     const [resultMessage, setResultMessage] = useState('');
+
+    // Audit Log States
+    const { fetchAuditLogs, auditLogs, auditLogsTotal, auditLogsLoading } = useAdminStore();
+    const [auditPage, setAuditPage] = useState(1);
+    const [auditStartDate, setAuditStartDate] = useState('');
+    const [auditEndDate, setAuditEndDate] = useState('');
+    const [auditAction, setAuditAction] = useState('');
+    const auditLimit = 50;
 
     const formatBytes = (bytes: number, decimals = 2) => {
         if (!+bytes) return '0 Bytes';
@@ -141,6 +165,18 @@ export const AdminSettingsPage: React.FC = () => {
             fetchTrashStatus();
         }
     }, [activeSection]);
+
+    useEffect(() => {
+        if (activeSection === 'audit') {
+            fetchAuditLogs({
+                page: auditPage,
+                limit: auditLimit,
+                ...(auditStartDate && { startDate: auditStartDate }),
+                ...(auditEndDate && { endDate: auditEndDate }),
+                ...(auditAction && { action: auditAction }),
+            });
+        }
+    }, [activeSection, auditPage, auditStartDate, auditEndDate, auditAction]);
 
     return (
         <div className="admin-settings-page">
@@ -413,6 +449,82 @@ export const AdminSettingsPage: React.FC = () => {
                     font-weight: 600;
                     color: #0f172a;
                 }
+
+                .audit-filters {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr 1fr;
+                    gap: 16px;
+                    margin-bottom: 24px;
+                }
+
+                .audit-filter-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                }
+
+                .audit-table-wrap {
+                    overflow-x: auto;
+                    margin-bottom: 16px;
+                }
+
+                .admin-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 14px;
+                }
+
+                .admin-table th {
+                    text-align: left;
+                    padding: 10px 12px;
+                    background: #f1f5f9;
+                    color: #475569;
+                    font-weight: 500;
+                    border-bottom: 1px solid #e2e8f0;
+                    white-space: nowrap;
+                }
+
+                .admin-table td {
+                    padding: 10px 12px;
+                    border-bottom: 1px solid #f1f5f9;
+                    color: #334155;
+                }
+
+                .admin-table tbody tr:hover {
+                    background: #f8fafc;
+                }
+
+                .audit-badge {
+                    display: inline-block;
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-weight: 500;
+                    white-space: nowrap;
+                }
+
+                .audit-badge--success {
+                    background: #dcfce7;
+                    color: #166534;
+                }
+
+                .audit-badge--danger {
+                    background: #fee2e2;
+                    color: #991b1b;
+                }
+
+                .audit-badge--neutral {
+                    background: #f1f5f9;
+                    color: #475569;
+                }
+
+                .audit-pagination {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 16px;
+                    padding-top: 8px;
+                }
             `}</style>
 
             <header className="admin-header">
@@ -471,36 +583,48 @@ export const AdminSettingsPage: React.FC = () => {
                     {activeSection === 'security' && (
                         <>
                             <h2>安全性設定</h2>
-                            <p>Session 超時、密碼規則、登入限制</p>
+                            <p>目前系統安全性規則（唯讀顯示）</p>
 
                             <div className="settings-form">
                                 <div className="form-toggle">
                                     <div>
-                                        <div className="form-toggle-label">強制雙因素驗證</div>
-                                        <div className="form-toggle-desc">要求所有使用者啟用雙因素驗證</div>
+                                        <div className="form-toggle-label">登入失敗鎖定</div>
+                                        <div className="form-toggle-desc">連續 5 次登入失敗後，帳號自動鎖定 15 分鐘</div>
                                     </div>
-                                    <div className="toggle-switch"></div>
+                                    <div className="toggle-switch active" style={{ cursor: 'default' }}></div>
                                 </div>
 
                                 <div className="form-toggle">
                                     <div>
-                                        <div className="form-toggle-label">登入失敗鎖定</div>
-                                        <div className="form-toggle-desc">5 次登入失敗後暫時鎖定帳號</div>
+                                        <div className="form-toggle-label">密碼強度規則</div>
+                                        <div className="form-toggle-desc">最少 8 字元，需含大寫字母、小寫字母、數字</div>
                                     </div>
-                                    <div className="toggle-switch active"></div>
+                                    <div className="toggle-switch active" style={{ cursor: 'default' }}></div>
                                 </div>
 
-                                <div className="form-group">
-                                    <label className="form-label">Session 超時 (分鐘)</label>
-                                    <input
-                                        type="number"
-                                        className="form-input"
-                                        defaultValue="480"
-                                    />
-                                    <span className="form-hint">工程師與管理員的 Session 有效時間</span>
+                                <div className="form-toggle">
+                                    <div>
+                                        <div className="form-toggle-label">Session 併發限制</div>
+                                        <div className="form-toggle-desc">同帳號最多 3 個同時登入的 Session</div>
+                                    </div>
+                                    <div className="toggle-switch active" style={{ cursor: 'default' }}></div>
                                 </div>
 
-                                <button className="save-btn">儲存變更</button>
+                                <div className="form-toggle">
+                                    <div>
+                                        <div className="form-toggle-label">Session 超時</div>
+                                        <div className="form-toggle-desc">工程師/管理員 8 小時，審查委員 1 小時</div>
+                                    </div>
+                                    <div className="toggle-switch active" style={{ cursor: 'default' }}></div>
+                                </div>
+
+                                <div className="form-toggle">
+                                    <div>
+                                        <div className="form-toggle-label">CSRF 保護</div>
+                                        <div className="form-toggle-desc">Double Submit Cookie 模式，所有 mutating 操作需驗證</div>
+                                    </div>
+                                    <div className="toggle-switch active" style={{ cursor: 'default' }}></div>
+                                </div>
                             </div>
                         </>
                     )}
@@ -621,6 +745,116 @@ export const AdminSettingsPage: React.FC = () => {
                                     <p style={{ fontSize: 13 }}>載入中...</p>
                                 )}
                             </div>
+                        </>
+                    )}
+
+                    {activeSection === 'audit' && (
+                        <>
+                            <h2>稽核日誌</h2>
+                            <p>認證事件與帳號操作記錄</p>
+
+                            <div className="audit-filters">
+                                <div className="audit-filter-group">
+                                    <label className="form-label">開始日期</label>
+                                    <input
+                                        type="date"
+                                        className="form-input"
+                                        value={auditStartDate}
+                                        onChange={(e) => { setAuditStartDate(e.target.value); setAuditPage(1); }}
+                                    />
+                                </div>
+                                <div className="audit-filter-group">
+                                    <label className="form-label">結束日期</label>
+                                    <input
+                                        type="date"
+                                        className="form-input"
+                                        value={auditEndDate}
+                                        onChange={(e) => { setAuditEndDate(e.target.value); setAuditPage(1); }}
+                                    />
+                                </div>
+                                <div className="audit-filter-group">
+                                    <label className="form-label">事件類型</label>
+                                    <select
+                                        className="form-input"
+                                        value={auditAction}
+                                        onChange={(e) => { setAuditAction(e.target.value); setAuditPage(1); }}
+                                    >
+                                        <option value="">全部</option>
+                                        {Object.entries(AUDIT_ACTION_LABELS).map(([value, label]) => (
+                                            <option key={value} value={value}>{label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {auditLogsLoading ? (
+                                <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>載入中...</div>
+                            ) : (
+                                <>
+                                    <div className="audit-table-wrap">
+                                        <table className="admin-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>時間</th>
+                                                    <th>事件</th>
+                                                    <th>使用者</th>
+                                                    <th>IP</th>
+                                                    <th>詳情</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {auditLogs.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={5} style={{ textAlign: 'center', color: '#94a3b8', padding: 24 }}>
+                                                            無符合條件的日誌記錄
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    auditLogs.map((log: AuditLogEntry) => (
+                                                        <tr key={log.id}>
+                                                            <td style={{ whiteSpace: 'nowrap' }}>
+                                                                {new Date(log.createdAt).toLocaleString('zh-TW')}
+                                                            </td>
+                                                            <td>
+                                                                <span className={`audit-badge audit-badge--${log.action.includes('FAILED') || log.action.includes('DISABLE') ? 'danger' : log.action.includes('SUCCESS') || log.action.includes('CREATE') || log.action.includes('UNLOCK') ? 'success' : 'neutral'}`}>
+                                                                    {AUDIT_ACTION_LABELS[log.action] || log.action}
+                                                                </span>
+                                                            </td>
+                                                            <td>{log.user?.name || log.userId || '-'}</td>
+                                                            <td style={{ fontFamily: 'monospace', fontSize: 13 }}>{log.ipAddress || '-'}</td>
+                                                            <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                {log.details ? JSON.stringify(log.details) : '-'}
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div className="audit-pagination">
+                                        <button
+                                            className="save-btn"
+                                            disabled={auditPage <= 1}
+                                            onClick={() => setAuditPage(p => p - 1)}
+                                            style={{ padding: '8px 16px' }}
+                                        >
+                                            上一頁
+                                        </button>
+                                        <span style={{ fontSize: 14, color: '#64748b' }}>
+                                            第 {auditPage} 頁 / 共 {Math.max(1, Math.ceil(auditLogsTotal / auditLimit))} 頁（{auditLogsTotal} 筆）
+                                        </span>
+                                        <button
+                                            className="save-btn"
+                                            disabled={auditPage >= Math.ceil(auditLogsTotal / auditLimit)}
+                                            onClick={() => setAuditPage(p => p + 1)}
+                                            style={{ padding: '8px 16px' }}
+                                        >
+                                            下一頁
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </>
                     )}
 
