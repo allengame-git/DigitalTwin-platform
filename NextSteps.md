@@ -2,7 +2,7 @@
 
 本文件記錄專案目前的完成狀態、座標系統說明，以及後續待辦事項，供接手的 AI Agent 或開發人員參考。
 
-**最後更新**: 2026-03-09（地質資料管理頁面 UI 重構 — 浮動 TOC/收合 Section/Sub-component 抽取/群組色帶/字體升級）
+**最後更新**: 2026-03-09（設施資料管理頁面 UI 統一 — 共用 CSS 抽取/sidebar 導航/Lucide icons/按鈕標準化）
 **當前分支**: `main`
 
 ---
@@ -81,6 +81,11 @@
   - 航照圖/地質模型/地球物理抽為獨立 sub-component（1894→1060 行）
   - 4 群組色帶（slate/amber/cyan/violet）+ 統計 badge
   - DM Sans + JetBrains Mono 字體，配色微調
+- `FacilityDataPage`：UI 統一至共用設計系統（2026-03-09）：
+  - 共用 CSS：`src/styles/data-management.css` 抽取自 DataManagementPage inline style，兩頁共 import
+  - 左側 `dm-toc` sidebar 導航（5 Tab + Lucide icons），取代原本水平 Tab bar
+  - `FacilityUploadSection` 統一按鈕 class（`dm-btn-primary/secondary/danger`）、Lucide icons 取代 emoji、刪除 Modal 標準化
+  - Tab 狀態由頁面持有，透過 `activeTab` prop 傳入 FacilityUploadSection
 
 #### 5c. 設施導覽 3D 頁面（FacilityPage）
 - 無頂部 Toolbar：FacilityToolbar 已從頁面移除

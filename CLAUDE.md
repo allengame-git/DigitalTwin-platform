@@ -113,9 +113,12 @@ JWT (HS256) with refresh tokens in HTTP-only cookies. Prisma-persisted users/ses
 - **Seed**: `npx prisma db seed` → `admin@llrwd.tw` / `Admin@2026` (mustChangePassword)
 - **CSRF**: admin routes 掛載 `verifyCsrf`，前端 `fetchApi` 自動從 cookie 讀取 csrf-token 注入 header
 
-### DataManagementPage 架構
+### 資料管理頁面架構（共用設計系統）
 
-頁面 layout：左側 DataPageTOC（200px sticky）+ 右側 content。10 個 section 分 4 群組（基礎設定/地質資料/地表資料/模型資料），各有色帶標識。航照圖/地質模型/地球物理三個大區塊已抽為獨立 sub-component（`src/components/data/`），各帶自己的 state/handlers/modals。所有 `dm-` CSS class 定義在 DataManagementPage 的 `<style>` block 中，cascade 到子元件。字體：DM Sans + JetBrains Mono（Google Fonts，`index.html` 引入）。
+所有 `dm-` CSS class 定義在 `src/styles/data-management.css`（獨立 CSS 檔），DataManagementPage 與 FacilityDataPage 共同 import。字體：DM Sans + JetBrains Mono（Google Fonts，`index.html` 引入）。
+
+- **DataManagementPage**（地質）：左側 DataPageTOC（200px sticky scroll spy）+ 右側 content。10 個 section 分 4 群組色帶（slate/amber/cyan/violet），航照圖/地質模型/地球物理抽為獨立 sub-component。
+- **FacilityDataPage**（設施）：左側 `dm-toc` sidebar（5 Tab：場景管理/模型上傳/模型資訊/場景地形/模型管理）+ 右側 `FacilityUploadSection`。Tab 狀態由頁面持有，透過 `activeTab` prop 傳入。
 
 ## Project Structure (key directories)
 

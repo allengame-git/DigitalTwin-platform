@@ -8,6 +8,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { UploadCloud, X, Building2, Package } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useFacilityStore } from '../../stores/facilityStore';
 import type { FacilityScene } from '../../types/facility';
@@ -265,8 +266,8 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                 </div>
                             </div>
                             <div style={{ display: 'flex', gap: 8 }}>
-                                <button className="dm-btn-confirm" style={{ padding: '4px 12px', fontSize: 12 }} onClick={handleEditRootSave} disabled={isSaving}>儲存</button>
-                                <button className="dm-btn-cancel" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => setIsEditingRoot(false)}>取消</button>
+                                <button className="dm-btn dm-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={handleEditRootSave} disabled={isSaving}>儲存</button>
+                                <button className="dm-btn dm-btn-secondary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => setIsEditingRoot(false)}>取消</button>
                             </div>
                         </div>
                     ) : (
@@ -306,12 +307,12 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                 <input className="dm-form-input" value={createRootForm.description} onChange={e => setCreateRootForm(f => ({ ...f, description: e.target.value }))} />
                             </div>
                             <div style={{ display: 'flex', gap: 8 }}>
-                                <button className="dm-btn-confirm" onClick={handleCreateRoot} disabled={isSaving}>{isSaving ? '建立中...' : '建立主場景'}</button>
-                                <button className="dm-btn-cancel" onClick={() => { setIsCreatingRoot(false); setError(null); }}>取消</button>
+                                <button className="dm-btn dm-btn-primary" onClick={handleCreateRoot} disabled={isSaving}>{isSaving ? '建立中...' : '建立主場景'}</button>
+                                <button className="dm-btn dm-btn-secondary" onClick={() => { setIsCreatingRoot(false); setError(null); }}>取消</button>
                             </div>
                         </div>
                     ) : (
-                        <button className="dm-btn-confirm" style={{ marginTop: 8 }} onClick={() => setIsCreatingRoot(true)}>+ 建立主場景</button>
+                        <button className="dm-btn dm-btn-primary" style={{ marginTop: 8 }} onClick={() => setIsCreatingRoot(true)}>+ 建立主場景</button>
                     )}
                 </div>
             )}
@@ -353,8 +354,8 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                                 </div>
                                             </div>
                                             <div style={{ display: 'flex', gap: 8 }}>
-                                                <button className="dm-btn-confirm" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => handleEditSubSave(sub.id)} disabled={isSaving}>儲存</button>
-                                                <button className="dm-btn-cancel" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => setEditingSubId(null)}>取消</button>
+                                                <button className="dm-btn dm-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => handleEditSubSave(sub.id)} disabled={isSaving}>儲存</button>
+                                                <button className="dm-btn dm-btn-secondary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => setEditingSubId(null)}>取消</button>
                                             </div>
                                         </div>
                                     ) : (
@@ -406,12 +407,12 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                                 <ModelSelect value={addSubForm.parentModelId} onChange={v => setAddSubForm(f => ({ ...f, parentModelId: v }))} />
                             </div>
                             <div style={{ display: 'flex', gap: 8 }}>
-                                <button className="dm-btn-confirm" onClick={handleAddSubScene} disabled={isSaving}>{isSaving ? '新增中...' : '新增子場景'}</button>
-                                <button className="dm-btn-cancel" onClick={() => { setShowAddSub(false); setError(null); }}>取消</button>
+                                <button className="dm-btn dm-btn-primary" onClick={handleAddSubScene} disabled={isSaving}>{isSaving ? '新增中...' : '新增子場景'}</button>
+                                <button className="dm-btn dm-btn-secondary" onClick={() => { setShowAddSub(false); setError(null); }}>取消</button>
                             </div>
                         </div>
                     ) : (
-                        <button className="dm-btn-confirm" onClick={() => setShowAddSub(true)}>+ 新增子場景</button>
+                        <button className="dm-btn dm-btn-primary" onClick={() => setShowAddSub(true)}>+ 新增子場景</button>
                     )}
                 </>
             )}
@@ -431,13 +432,16 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
             {deleteConfirmId && (
                 <div className="dm-modal-overlay">
                     <div className="dm-modal dm-modal-delete">
-                        <div className="dm-modal-header"><h3 className="dm-modal-title">確認刪除子場景</h3></div>
+                        <div className="dm-modal-header">
+                            <h3 className="dm-modal-title" style={{ color: '#dc2626' }}>確認刪除</h3>
+                            <button onClick={() => setDeleteConfirmId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
+                        </div>
                         <div className="dm-modal-body">
                             <p>確定刪除「{subScenes.find(s => s.id === deleteConfirmId)?.name}」？場景內的模型資料將一併移除，此操作無法復原。</p>
-                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-                                <button className="dm-btn-cancel" onClick={() => setDeleteConfirmId(null)}>取消</button>
-                                <button style={{ background: '#dc2626', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer' }} onClick={() => handleDeleteSub(deleteConfirmId)}>確認刪除</button>
-                            </div>
+                        </div>
+                        <div className="dm-modal-footer">
+                            <button className="dm-btn dm-btn-secondary" onClick={() => setDeleteConfirmId(null)}>取消</button>
+                            <button className="dm-btn dm-btn-danger" onClick={() => handleDeleteSub(deleteConfirmId)}>確認刪除</button>
                         </div>
                     </div>
                 </div>
@@ -535,7 +539,7 @@ const ModelUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
     return (
         <div>
             {error && <div className="dm-error" style={{ marginBottom: 8 }}>{error}</div>}
-            {success && <div style={{ color: '#16a34a', background: '#f0fdf4', padding: '8px 12px', borderRadius: 6, marginBottom: 8, fontSize: 13 }}>{success}</div>}
+            {success && <div style={{ color: 'var(--success)', background: '#f0fdf4', padding: '8px 12px', borderRadius: 6, marginBottom: 8, fontSize: 13 }}>{success}</div>}
 
             {/* Scene selector */}
             <div className="dm-form-group">
@@ -571,7 +575,7 @@ const ModelUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
                     accept=".glb,.gltf"
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }}
                 />
-                <div className="dm-upload-icon">⬆️</div>
+                <div className="dm-upload-icon"><UploadCloud size={48} strokeWidth={1} /></div>
                 {selectedFile ? (
                     <div className="dm-upload-text" style={{ color: '#2563eb' }}>{selectedFile.name}</div>
                 ) : (
@@ -612,7 +616,7 @@ const ModelUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
             )}
 
             <button
-                className="dm-btn-confirm"
+                className="dm-btn dm-btn-primary"
                 style={{ marginTop: 12 }}
                 onClick={handleSubmit}
                 disabled={isUploading}
@@ -1200,7 +1204,7 @@ const ModelManager: React.FC<{ projectId: string }> = ({ projectId }) => {
     return (
         <div>
             {error && <div className="dm-error" style={{ marginBottom: 8 }}>{error}</div>}
-            {successMsg && <div style={{ color: '#16a34a', background: '#f0fdf4', padding: '8px 12px', borderRadius: 6, marginBottom: 8, fontSize: 13 }}>{successMsg}</div>}
+            {successMsg && <div style={{ color: 'var(--success)', background: '#f0fdf4', padding: '8px 12px', borderRadius: 6, marginBottom: 8, fontSize: 13 }}>{successMsg}</div>}
 
             <div className="dm-form-group">
                 <label className="dm-form-label">場景</label>
@@ -1280,7 +1284,7 @@ const ModelManager: React.FC<{ projectId: string }> = ({ projectId }) => {
 
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
                                     <button
-                                        className="dm-btn-confirm"
+                                        className="dm-btn dm-btn-primary"
                                         onClick={() => handleSave(model.id)}
                                         disabled={isSaving}
                                     >
@@ -1303,19 +1307,15 @@ const ModelManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                 <div className="dm-modal-overlay">
                     <div className="dm-modal dm-modal-delete">
                         <div className="dm-modal-header">
-                            <h3 className="dm-modal-title">確認刪除模型</h3>
+                            <h3 className="dm-modal-title" style={{ color: '#dc2626' }}>確認刪除</h3>
+                            <button onClick={() => setDeleteConfirmId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
                         </div>
                         <div className="dm-modal-body">
                             <p>確定刪除「{models.find(m => m.id === deleteConfirmId)?.name}」？此操作無法復原，相關資訊條目也將一併移除。</p>
-                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-                                <button className="dm-btn-cancel" onClick={() => setDeleteConfirmId(null)}>取消</button>
-                                <button
-                                    style={{ background: '#dc2626', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer' }}
-                                    onClick={() => handleDelete(deleteConfirmId)}
-                                >
-                                    確認刪除
-                                </button>
-                            </div>
+                        </div>
+                        <div className="dm-modal-footer">
+                            <button className="dm-btn dm-btn-secondary" onClick={() => setDeleteConfirmId(null)}>取消</button>
+                            <button className="dm-btn dm-btn-danger" onClick={() => handleDelete(deleteConfirmId)}>確認刪除</button>
                         </div>
                     </div>
                 </div>
@@ -1547,13 +1547,13 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>地形資料</div>
 
                 {terrainError && <div className="dm-error" style={{ marginBottom: 8 }}>{terrainError}</div>}
-                {terrainSuccess && <div style={{ color: '#16a34a', background: '#f0fdf4', padding: '6px 10px', borderRadius: 6, marginBottom: 8, fontSize: 12 }}>{terrainSuccess}</div>}
+                {terrainSuccess && <div style={{ color: 'var(--success)', background: '#f0fdf4', padding: '6px 10px', borderRadius: 6, marginBottom: 8, fontSize: 12 }}>{terrainSuccess}</div>}
 
                 {/* CSV */}
                 <div className="dm-form-group">
                     <label className="dm-form-label">地形 CSV（x, y, elevation）*</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <button className="dm-btn-cancel" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => csvInputRef.current?.click()}>選擇 CSV</button>
+                        <button className="dm-btn dm-btn-secondary" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => csvInputRef.current?.click()}>選擇 CSV</button>
                         {csvFile ? <span style={{ fontSize: 12, color: '#059669' }}>{csvFile.name}</span> : <span style={{ fontSize: 12, color: '#9ca3af' }}>未選取</span>}
                         {csvFile && <button onClick={() => setCsvFile(null)} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>移除</button>}
                     </div>
@@ -1564,7 +1564,7 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
                 <div className="dm-form-group">
                     <label className="dm-form-label">衛星影像（可選）</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <button className="dm-btn-cancel" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => satInputRef.current?.click()}>選擇影像</button>
+                        <button className="dm-btn dm-btn-secondary" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => satInputRef.current?.click()}>選擇影像</button>
                         {satelliteFile ? <span style={{ fontSize: 12, color: '#059669' }}>{satelliteFile.name}</span> : <span style={{ fontSize: 12, color: '#9ca3af' }}>未選取</span>}
                         {satelliteFile && <button onClick={() => setSatelliteFile(null)} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>移除</button>}
                     </div>
@@ -1598,7 +1598,7 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
                     </>
                 )}
 
-                <button className="dm-btn-confirm" onClick={handleTerrainSubmit} disabled={isUploading}>
+                <button className="dm-btn dm-btn-primary" onClick={handleTerrainSubmit} disabled={isUploading}>
                     {isUploading ? '上傳中...' : '上傳地形'}
                 </button>
             </div>
@@ -1634,7 +1634,7 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
                             e.target.value = '';
                         }}
                     />
-                    <div className="dm-upload-icon">📦</div>
+                    <div className="dm-upload-icon"><Package size={48} strokeWidth={1} /></div>
                     <div className="dm-upload-text">拖曳或點擊選取 GLB / GLTF 模型</div>
                     <div className="dm-upload-hint">支援多選，每檔上限 200 MB</div>
                 </div>
@@ -1730,7 +1730,7 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
                 {/* 上傳按鈕 */}
                 {pendingCount > 0 && (
                     <button
-                        className="dm-btn-confirm"
+                        className="dm-btn dm-btn-primary"
                         onClick={handleGlbUploadAll}
                         disabled={isGlbUploading || !sceneId}
                         title={!sceneId ? '請先選擇目標場景' : ''}
@@ -1781,18 +1781,16 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
             {deleteConfirmModelId && (
                 <div className="dm-modal-overlay">
                     <div className="dm-modal dm-modal-delete">
-                        <div className="dm-modal-header"><h3 className="dm-modal-title">確認刪除模型</h3></div>
+                        <div className="dm-modal-header">
+                            <h3 className="dm-modal-title" style={{ color: '#dc2626' }}>確認刪除</h3>
+                            <button onClick={() => setDeleteConfirmModelId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
+                        </div>
                         <div className="dm-modal-body">
                             <p>確定刪除「{sceneModels.find(m => m.id === deleteConfirmModelId)?.name}」？此操作無法復原。</p>
-                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-                                <button className="dm-btn-cancel" onClick={() => setDeleteConfirmModelId(null)}>取消</button>
-                                <button
-                                    style={{ background: '#dc2626', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer' }}
-                                    onClick={() => handleDeleteModel(deleteConfirmModelId)}
-                                >
-                                    確認刪除
-                                </button>
-                            </div>
+                        </div>
+                        <div className="dm-modal-footer">
+                            <button className="dm-btn dm-btn-secondary" onClick={() => setDeleteConfirmModelId(null)}>取消</button>
+                            <button className="dm-btn dm-btn-danger" onClick={() => handleDeleteModel(deleteConfirmModelId)}>確認刪除</button>
                         </div>
                     </div>
                 </div>
@@ -1803,49 +1801,22 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function FacilityUploadSection({ projectId }: { projectId: string }) {
-    const [activeTab, setActiveTab] = useState<'scenes' | 'models' | 'info' | 'terrain' | 'manager'>('scenes');
+type FacilityTab = 'scenes' | 'models' | 'info' | 'terrain' | 'manager';
 
-    const tabs: { key: typeof activeTab; label: string }[] = [
-        { key: 'scenes', label: '場景管理' },
-        { key: 'models', label: '模型上傳' },
-        { key: 'info', label: '模型資訊' },
-        { key: 'terrain', label: '場景地形' },
-        { key: 'manager', label: '模型管理' },
-    ];
+interface FacilityUploadSectionProps {
+    projectId: string;
+    activeTab?: FacilityTab;
+}
 
+export default function FacilityUploadSection({ projectId, activeTab = 'scenes' }: FacilityUploadSectionProps) {
     return (
         <div className="dm-section">
             <div className="dm-section-header">
-                <div className="dm-section-icon">🏗️</div>
+                <div className="dm-section-icon"><Building2 size={20} /></div>
                 <div>
                     <h3 className="dm-section-title">設施導覽</h3>
                     <p className="dm-section-desc">管理設施場景、3D 模型、Rich Content 與地形資料</p>
                 </div>
-            </div>
-
-            {/* Tab navigation */}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid #e2e8f0', paddingBottom: 0 }}>
-                {tabs.map(t => (
-                    <button
-                        key={t.key}
-                        onClick={() => setActiveTab(t.key)}
-                        style={{
-                            padding: '8px 16px',
-                            fontSize: 13,
-                            fontWeight: activeTab === t.key ? 600 : 400,
-                            color: activeTab === t.key ? '#2563eb' : '#64748b',
-                            background: 'none',
-                            border: 'none',
-                            borderBottom: activeTab === t.key ? '2px solid #2563eb' : '2px solid transparent',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s',
-                            marginBottom: -1,
-                        }}
-                    >
-                        {t.label}
-                    </button>
-                ))}
             </div>
 
             {/* Tab content */}
