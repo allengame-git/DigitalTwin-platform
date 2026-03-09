@@ -13,6 +13,9 @@ const ChangePasswordPage: React.FC = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showOld, setShowOld] = useState(false);
+    const [showNew, setShowNew] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
 
     const checks = {
         length: newPassword.length >= 8,
@@ -84,40 +87,66 @@ const ChangePasswordPage: React.FC = () => {
                         <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
                             舊密碼
                         </label>
-                        <input
-                            type="password"
-                            value={oldPassword}
-                            onChange={e => setOldPassword(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '8px 12px',
-                                border: '1px solid #d1d5db',
-                                borderRadius: 4,
-                                fontSize: 14,
-                                boxSizing: 'border-box',
-                            }}
-                            required
-                        />
+                        <div style={{ position: 'relative' }}>
+                            <input
+                                type={showOld ? 'text' : 'password'}
+                                value={oldPassword}
+                                onChange={e => setOldPassword(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 36px 8px 12px',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: 4,
+                                    fontSize: 14,
+                                    boxSizing: 'border-box',
+                                }}
+                                required
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowOld(!showOld)}
+                                style={{
+                                    position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                                    background: 'none', border: 'none', cursor: 'pointer',
+                                    color: '#9ca3af', fontSize: 13, padding: '2px 4px',
+                                }}
+                            >
+                                {showOld ? '隱藏' : '顯示'}
+                            </button>
+                        </div>
                     </div>
 
                     <div style={{ marginBottom: 16 }}>
                         <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
                             新密碼
                         </label>
-                        <input
-                            type="password"
-                            value={newPassword}
-                            onChange={e => setNewPassword(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '8px 12px',
-                                border: '1px solid #d1d5db',
-                                borderRadius: 4,
-                                fontSize: 14,
-                                boxSizing: 'border-box',
-                            }}
-                            required
-                        />
+                        <div style={{ position: 'relative' }}>
+                            <input
+                                type={showNew ? 'text' : 'password'}
+                                value={newPassword}
+                                onChange={e => setNewPassword(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 36px 8px 12px',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: 4,
+                                    fontSize: 14,
+                                    boxSizing: 'border-box',
+                                }}
+                                required
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowNew(!showNew)}
+                                style={{
+                                    position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                                    background: 'none', border: 'none', cursor: 'pointer',
+                                    color: '#9ca3af', fontSize: 13, padding: '2px 4px',
+                                }}
+                            >
+                                {showNew ? '隱藏' : '顯示'}
+                            </button>
+                        </div>
                     </div>
 
                     {/* Password strength checklist */}
@@ -141,20 +170,33 @@ const ChangePasswordPage: React.FC = () => {
                         <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
                             確認新密碼
                         </label>
-                        <input
-                            type="password"
-                            value={confirmPassword}
-                            onChange={e => setConfirmPassword(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '8px 12px',
-                                border: `1px solid ${confirmPassword.length > 0 && !passwordMatch ? '#dc2626' : '#d1d5db'}`,
-                                borderRadius: 4,
-                                fontSize: 14,
-                                boxSizing: 'border-box',
-                            }}
-                            required
-                        />
+                        <div style={{ position: 'relative' }}>
+                            <input
+                                type={showConfirm ? 'text' : 'password'}
+                                value={confirmPassword}
+                                onChange={e => setConfirmPassword(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 36px 8px 12px',
+                                    border: `1px solid ${confirmPassword.length > 0 && !passwordMatch ? '#dc2626' : '#d1d5db'}`,
+                                    borderRadius: 4,
+                                    fontSize: 14,
+                                    boxSizing: 'border-box',
+                                }}
+                                required
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirm(!showConfirm)}
+                                style={{
+                                    position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                                    background: 'none', border: 'none', cursor: 'pointer',
+                                    color: '#9ca3af', fontSize: 13, padding: '2px 4px',
+                                }}
+                            >
+                                {showConfirm ? '隱藏' : '顯示'}
+                            </button>
+                        </div>
                         {confirmPassword.length > 0 && !passwordMatch && (
                             <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4 }}>
                                 密碼不一致

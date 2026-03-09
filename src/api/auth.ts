@@ -11,6 +11,7 @@ import type {
     RefreshResponse,
     User
 } from '../types/auth';
+import { useAuthStore } from '../stores/authStore';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -21,16 +22,17 @@ async function fetchApi<T>(
     endpoint: string,
     options: RequestInit = {}
 ): Promise<T> {
-    // 讀取 CSRF cookie
+    const token = useAuthStore.getState().accessToken;
     const csrfToken = document.cookie
         .split('; ')
         .find(row => row.startsWith('csrf-token='))
         ?.split('=')[1];
 
     const response = await fetch(`${API_BASE}${endpoint}`, {
-        credentials: 'include', // For httpOnly cookies
+        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
             ...(options.headers || {}),
         },

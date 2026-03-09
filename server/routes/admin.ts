@@ -117,7 +117,7 @@ router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
  * PUT /admin/users/:id — 更新帳號（name, role, status）
  */
 router.put('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { name, role, status } = req.body;
     const client = {
         ipAddress: req.ip || req.socket.remoteAddress || null,
@@ -163,7 +163,7 @@ router.put('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
  * POST /admin/users/:id/reset-password — 重設密碼
  */
 router.post('/users/:id/reset-password', async (req: AuthenticatedRequest, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const client = {
         ipAddress: req.ip || req.socket.remoteAddress || null,
         userAgent: req.headers['user-agent'] || null,
@@ -207,7 +207,7 @@ router.post('/users/:id/reset-password', async (req: AuthenticatedRequest, res: 
  * POST /admin/users/:id/unlock — 手動解鎖
  */
 router.post('/users/:id/unlock', async (req: AuthenticatedRequest, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const client = {
         ipAddress: req.ip || req.socket.remoteAddress || null,
         userAgent: req.headers['user-agent'] || null,
@@ -242,7 +242,7 @@ router.post('/users/:id/unlock', async (req: AuthenticatedRequest, res: Response
  * DELETE /admin/users/:id — 停用帳號（soft delete）
  */
 router.delete('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const client = {
         ipAddress: req.ip || req.socket.remoteAddress || null,
         userAgent: req.headers['user-agent'] || null,
@@ -279,7 +279,7 @@ router.delete('/users/:id', async (req: AuthenticatedRequest, res: Response) => 
  * GET /admin/users/:id/sessions — 該使用者的 active sessions
  */
 router.get('/users/:id/sessions', async (req: AuthenticatedRequest, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const sessions = await prisma.session.findMany({
         where: { userId: id, isRevoked: false, expiresAt: { gt: new Date() } },
@@ -308,7 +308,7 @@ router.get('/users/:id/sessions', async (req: AuthenticatedRequest, res: Respons
  * DELETE /admin/users/:id/sessions — 踢掉全部 session
  */
 router.delete('/users/:id/sessions', async (req: AuthenticatedRequest, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const client = {
         ipAddress: req.ip || req.socket.remoteAddress || null,
         userAgent: req.headers['user-agent'] || null,

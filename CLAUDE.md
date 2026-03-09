@@ -49,6 +49,7 @@ npm run start        # ts-node index.ts (production)
 docker start llrwd-postgres                    # PostgreSQL on port 5433
 cd server && npx prisma db push                # Sync schema to DB
 cd server && npx prisma generate               # Regenerate Prisma client
+cd server && npx prisma db seed                # Seed initial admin account
 cd server && npx prisma studio                 # DB admin UI
 
 # Python processing (from server/)
@@ -80,7 +81,7 @@ Three.js / R3F / Zustand                                      PostgreSQL    Pyth
 
 ### State Management
 
-~15 Zustand stores in `src/stores/`, one per domain (boreholeStore, layerStore, terrainStore, etc.). Each follows the pattern: state fields + async action methods. Layer visibility persisted to localStorage.
+~17 Zustand stores in `src/stores/`, one per domain (boreholeStore, layerStore, terrainStore, authStore, adminStore, etc.). Each follows the pattern: state fields + async action methods. Layer visibility persisted to localStorage.
 
 ### 3D Rendering
 
@@ -103,7 +104,14 @@ Express route (Multer) → save temp file → spawn Python subprocess → monito
 
 ### Auth
 
-JWT (HS256) with refresh tokens in HTTP-only cookies. Middleware in `server/middleware/auth.ts`.
+JWT (HS256) with refresh tokens in HTTP-only cookies. Prisma-persisted users/sessions/audit logs.
+
+- **Routes**: `server/routes/auth.ts` (login/logout/refresh/me/change-password), `server/routes/admin.ts` (users CRUD/sessions/audit)
+- **Middleware**: `server/middleware/auth.ts` (JWT verify + `authorize(role)`), `rateLimit.ts` (3 tiers), `csrf.ts` (Double Submit Cookie)
+- **Login**: 支援 email 或使用者名稱（自動判斷 `@`）；帳號鎖定 5 次失敗 → 15 分鐘；Session 併發控制 max 3
+- **Frontend**: `useAuthStore` (Zustand) 統一管理認證狀態，`useAdminStore` 管理 admin 操作
+- **Seed**: `npx prisma db seed` → `admin@llrwd.tw` / `Admin@2026` (mustChangePassword)
+- **CSRF**: admin routes 掛載 `verifyCsrf`，前端 `fetchApi` 自動從 cookie 讀取 csrf-token 注入 header
 
 ## Project Structure (key directories)
 
@@ -113,7 +121,8 @@ src/
 ├── components/overlay/   # UI panels over 3D: LayerPanel, BoreholeDetailPanel, ClippingToolPanel
 ├── components/controls/  # Interactive controls
 ├── components/data/      # Data upload sections
-├── stores/               # Zustand stores (~15)
+├── stores/               # Zustand stores (~17)
+├── api/                  # API clients (auth.ts, admin.ts + domain-specific)
 ├── pages/                # Route pages (GeologyPage, DataManagementPage, ProjectDashboard)
 ├── types/                # TypeScript interfaces
 ├── config/               # three.ts (LOD/rendering), lithologyConfig.ts, permissions.ts
@@ -123,8 +132,8 @@ server/
 ├── routes/               # 13 Express route modules
 ├── scripts/              # Python processors (geology, terrain, water level)
 ├── prisma/schema.prisma  # Full database schema
-├── middleware/            # auth.ts, errorLogger.ts
-├── lib/prisma.ts         # Prisma client singleton
+├── middleware/            # auth.ts, rateLimit.ts, csrf.ts, errorLogger.ts
+├── lib/                  # prisma.ts, auditLog.ts, passwordPolicy.ts, safePath.ts
 └── uploads/              # File storage (geology-models/, terrain/, imagery/, etc.)
 ```
 
@@ -135,7 +144,7 @@ server/
 **Backend** (`server/.env`):
 
 - `DATABASE_URL` — PostgreSQL connection (default: `postgresql://postgres:postgres@localhost:5433/llrwddb?sslmode=disable`)
-- `JWT_SECRET`, `JWT_REFRESH_SECRET`
+- `JWT_SECRET`, `JWT_REFRESH_SECRET` — **production 必填**, `NODE_ENV=production` 時缺失會 throw 啟動錯誤
 - `FRONTEND_URL` (CORS origin, default `http://localhost:5173`)
 - `PORT` (default 3001)
 
@@ -157,6 +166,8 @@ server/
 4. **useLoader 替換為 useState+useEffect 要注意重入** — 場景切換再切回時，如果沒有正確清理/重新載入，地形會渲染為灰/白色。
 5. **DB 記錄刪除要檢查相依功能** — 例如清理衛星影像記錄會同時清掉圖例設定，因為它們存在同一張表或有 FK 關聯。
 6. **`safeResolvePath()` 的路徑問題** — DB 中的 URL 以 `/uploads/...` 開頭（絕對路徑），`path.resolve(__dirname, '..', url)` 會忽略前面的 segments，必須先 strip 前導 `/`。
+7. **Express 5 的 `req.params` 型別是 `string | string[]`** — 不能直接 destructure `const { id } = req.params`，TypeScript 會報錯。必須用 `const id = req.params.id as string`。
+8. **Prisma 7 的 `Json` 欄位型別** — `Record<string, unknown>` 不能直接賦值給 Prisma 的 `InputJsonValue`，需要 cast：`(details as Prisma.InputJsonValue) ?? undefined`。
 
 ## Bug 修復指南
 

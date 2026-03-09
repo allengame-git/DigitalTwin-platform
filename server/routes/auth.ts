@@ -37,22 +37,26 @@ function getClientInfo(req: Request) {
  * POST /auth/login
  */
 router.post('/login', loginRateLimit, async (req: Request, res: Response) => {
-    const { email, password } = req.body;
+    const { email: identifier, password } = req.body;
     const client = getClientInfo(req);
 
-    if (!email || !password) {
-        res.status(400).json({ message: '請提供 email 和密碼' });
+    if (!identifier || !password) {
+        res.status(400).json({ message: '請提供帳號和密碼' });
         return;
     }
 
     try {
-        const user = await prisma.user.findUnique({ where: { email } });
+        // 支援 email 或使用者名稱登入
+        const isEmail = identifier.includes('@');
+        const user = isEmail
+            ? await prisma.user.findUnique({ where: { email: identifier } })
+            : await prisma.user.findFirst({ where: { name: identifier } });
 
         if (!user) {
             await writeAuditLog({
                 action: 'LOGIN_FAILED',
                 ...client,
-                details: { attemptedEmail: email, reason: 'user_not_found' },
+                details: { attemptedIdentifier: identifier, reason: 'user_not_found' },
             });
             res.status(401).json({ message: '帳號或密碼錯誤' });
             return;

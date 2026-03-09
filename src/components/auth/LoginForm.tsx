@@ -14,7 +14,7 @@ interface LoginFormProps {
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onCancel }) => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const { login, isLoading, error, clearError } = useAuthStore();
 
@@ -23,7 +23,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onCancel }) => 
     clearError();
 
     try {
-      await login({ email, password });
+      await login({ email: identifier, password });
       onSuccess?.();
     } catch {
       // Error is handled by store
@@ -192,18 +192,19 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onCancel }) => 
 
       <form className="login-form" onSubmit={handleSubmit}>
         <div className="form-group">
-          <label className="form-label" htmlFor="email">
-            電子郵件
+          <label className="form-label" htmlFor="identifier">
+            帳號（使用者名稱或電子郵件）
           </label>
           <input
-            id="email"
-            type="email"
+            id="identifier"
+            type="text"
             className="form-input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@company.com"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="使用者名稱 或 name@company.com"
             required
             disabled={isLoading}
+            autoComplete="username"
           />
         </div>
 
@@ -247,10 +248,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onCancel }) => 
       </form>
 
       <div className="demo-hint">
-        <strong>💡 Demo 測試帳號</strong>
-        管理員: <code>admin@example.com</code> / <code>admin123</code><br />
-        工程師: <code>engineer@example.com</code> / <code>engineer123</code><br />
-        審查委員: <code>reviewer@example.com</code> / <code>reviewer123</code>
+        <strong>提示</strong>
+        可使用電子郵件或使用者名稱登入
       </div>
     </div>
   );

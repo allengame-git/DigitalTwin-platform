@@ -217,10 +217,14 @@ export const AdminUsersPage: React.FC = () => {
                 .admin-filter { padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; background: white; cursor: pointer; }
                 .admin-btn { padding: 10px 20px; background: #0f172a; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
                 .admin-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-                .admin-table { width: 100%; background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+                .admin-table { width: 100%; background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: visible; }
                 .admin-table table { width: 100%; border-collapse: collapse; }
                 .admin-table th, .admin-table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid #f1f5f9; }
                 .admin-table th { background: #f8fafc; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+                .admin-table th:first-child { border-top-left-radius: 12px; }
+                .admin-table th:last-child { border-top-right-radius: 12px; }
+                .admin-table tr:last-child td:first-child { border-bottom-left-radius: 12px; }
+                .admin-table tr:last-child td:last-child { border-bottom-right-radius: 12px; }
                 .admin-table td { font-size: 14px; color: #334155; }
                 .user-name { font-weight: 500; }
                 .user-email { font-size: 12px; color: #94a3b8; margin-top: 2px; }
