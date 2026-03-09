@@ -8,7 +8,12 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { authenticate, authorize, generateAccessToken, generateRefreshToken, AuthenticatedRequest } from '../middleware/auth';
-import { SESSION_TIMEOUT } from '../models/Session';
+
+const SESSION_TIMEOUT: Record<string, number> = {
+    engineer: 8 * 60 * 60 * 1000,  // 8 hours
+    reviewer: 1 * 60 * 60 * 1000,  // 1 hour
+    admin: 8 * 60 * 60 * 1000,     // 8 hours
+};
 
 const router = Router();
 
