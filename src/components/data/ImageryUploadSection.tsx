@@ -181,7 +181,7 @@ export const ImageryUploadSection: React.FC<ImageryUploadSectionProps> = ({ show
 
                 {/* 上傳區域 (Same...) */}
                 <div
-                    className={`dm - upload - zone ${isDragging ? 'dragging' : ''} `}
+                    className={`dm-upload-zone ${isDragging ? 'dragging' : ''}`}
                     onDrop={handleDrop}
                     onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                     onDragLeave={() => setIsDragging(false)}
@@ -281,7 +281,7 @@ export const ImageryUploadSection: React.FC<ImageryUploadSectionProps> = ({ show
                                 <label className="dm-form-label">資料年份 <span className="required">*</span></label>
                                 <input
                                     type="number"
-                                    className={`dm - form - input ${formErrors.year ? 'error' : ''} `}
+                                    className={`dm-form-input ${formErrors.year ? 'error' : ''}`}
                                     value={formData.year}
                                     onChange={e => setFormData(prev => ({ ...prev, year: parseInt(e.target.value) || 0 }))}
                                     min="1900" max="2100" placeholder="例如：2024"
@@ -292,7 +292,7 @@ export const ImageryUploadSection: React.FC<ImageryUploadSectionProps> = ({ show
                                 <label className="dm-form-label">資料名稱 <span className="required">*</span></label>
                                 <input
                                     type="text"
-                                    className={`dm - form - input ${formErrors.name ? 'error' : ''} `}
+                                    className={`dm-form-input ${formErrors.name ? 'error' : ''}`}
                                     value={formData.name}
                                     onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                                     placeholder="例如：廠區正射影像"
@@ -339,7 +339,7 @@ export const ImageryUploadSection: React.FC<ImageryUploadSectionProps> = ({ show
                                         <span>{uploadProgress}%</span>
                                     </div>
                                     <div className="dm-progress-container" style={{ marginTop: 0 }}>
-                                        <div className="dm-progress-bar" style={{ width: `${Math.max(2, uploadProgress)}% ` }}>
+                                        <div className="dm-progress-bar" style={{ width: `${Math.max(2, uploadProgress)}%` }}>
                                             <div className="dm-progress-shimmer"></div>
                                         </div>
                                     </div>

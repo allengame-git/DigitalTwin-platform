@@ -1,6 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTerrainStore, Terrain } from '../../stores/terrainStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { UploadCloud, Mountain, X, File } from 'lucide-react';
+
+const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 export const TerrainUploadSection: React.FC = () => {
     const { activeProjectId } = useProjectStore();
@@ -82,7 +89,7 @@ export const TerrainUploadSection: React.FC = () => {
     return (
         <div className="dm-section">
             <div className="dm-section-header">
-                <div className="dm-section-icon">🏔️</div>
+                <div className="dm-section-icon"><Mountain size={20} /></div>
                 <div>
                     <h3 className="dm-section-title">DEM 地形資料</h3>
                     <p className="dm-section-desc">上傳 GeoTIFF 或 CSV (X, Y, Z) 地形高程數據</p>
@@ -100,12 +107,12 @@ export const TerrainUploadSection: React.FC = () => {
                 <input
                     type="file"
                     ref={fileInputRef}
-                    hidden
+                    style={{ display: 'none' }}
                     accept=".tif,.tiff,.csv"
                     onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
                 />
-                <div className="dm-upload-icon">⬆️</div>
-                <div className="dm-upload-text">點擊或拖僅檔案至此處上傳</div>
+                <div className="dm-upload-icon"><UploadCloud size={48} strokeWidth={1} /></div>
+                <div className="dm-upload-text">拖放檔案或點擊選擇</div>
                 <div className="dm-upload-hint">支援 .tif, .tiff, .csv (X,Y,Z) 格式</div>
             </div>
 
@@ -119,7 +126,14 @@ export const TerrainUploadSection: React.FC = () => {
             <div className="dm-file-grid">
                 {Array.isArray(terrains) && terrains.length > 0 ? (
                     terrains.map(terrain => (
-                        <div key={terrain.id} className={`dm-file-card ${activeTerrainId === terrain.id ? 'active-card' : ''}`}>
+                        <div
+                            key={terrain.id}
+                            className="dm-file-card"
+                            style={{
+                                border: activeTerrainId === terrain.id ? '2px solid var(--primary)' : '1px solid #e2e8f0',
+                                background: activeTerrainId === terrain.id ? '#eff6ff' : 'white',
+                            }}
+                        >
                             <div className="dm-file-info">
                                 <div className="dm-file-name">{terrain.name}</div>
                                 <div className="dm-file-meta">
@@ -130,7 +144,8 @@ export const TerrainUploadSection: React.FC = () => {
                                 </div>
                                 <div className="dm-file-actions">
                                     <button
-                                        className={`dm-file-btn ${activeTerrainId === terrain.id ? 'dm-file-btn-active' : ''}`}
+                                        className="dm-btn dm-btn-secondary"
+                                        style={activeTerrainId === terrain.id ? { background: 'var(--primary)', color: 'white', borderColor: 'var(--primary)' } : { fontSize: '12px', padding: '4px 12px' }}
                                         onClick={() => setActiveTerrain(terrain.id)}
                                     >
                                         {activeTerrainId === terrain.id ? '使用中' : '啟用'}
@@ -155,14 +170,21 @@ export const TerrainUploadSection: React.FC = () => {
             </div>
 
             {/* Upload Modal */}
-            {showUploadModal && (
+            {showUploadModal && selectedFile && (
                 <div className="dm-modal-overlay">
                     <div className="dm-modal">
                         <div className="dm-modal-header">
                             <h3 className="dm-modal-title">上傳地形資料</h3>
-                            <button onClick={() => setShowUploadModal(false)}>✕</button>
+                            <button onClick={() => setShowUploadModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
                         </div>
                         <div className="dm-modal-body">
+                            <div className="dm-file-preview">
+                                <div className="dm-file-preview-icon"><File size={24} /></div>
+                                <div>
+                                    <div className="dm-file-preview-name">{selectedFile.name}</div>
+                                    <div className="dm-file-preview-size">{formatFileSize(selectedFile.size)}</div>
+                                </div>
+                            </div>
                             <div className="dm-form-group">
                                 <label className="dm-form-label">資料名稱</label>
                                 <input
@@ -218,12 +240,12 @@ export const TerrainUploadSection: React.FC = () => {
                                     </div>
                                 )}
                             </div>
-                            <div className="dm-modal-footer">
-                                <button className="dm-btn-cancel" onClick={() => setShowUploadModal(false)}>取消</button>
-                                <button className="dm-btn-confirm" onClick={handleSubmit} disabled={isLoading}>
-                                    {isLoading ? '處理中...' : '開始上傳'}
-                                </button>
-                            </div>
+                        </div>
+                        <div className="dm-modal-footer">
+                            <button className="dm-btn dm-btn-secondary" onClick={() => setShowUploadModal(false)}>取消</button>
+                            <button className="dm-btn dm-btn-primary" onClick={handleSubmit} disabled={isLoading}>
+                                {isLoading ? '處理中...' : '開始上傳'}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -238,50 +260,14 @@ export const TerrainUploadSection: React.FC = () => {
                         </div>
                         <div className="dm-modal-body">
                             <p>確定要刪除此地形資料嗎？此操作無法復原。</p>
-                            <div className="dm-modal-footer" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                                <button className="dm-btn-cancel" onClick={() => setShowDeleteConfirm(false)}>取消</button>
-                                <button className="dm-btn-delete-confirm" onClick={handleDelete} style={{ background: '#dc2626', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px' }}>確認刪除</button>
-                            </div>
+                        </div>
+                        <div className="dm-modal-footer">
+                            <button className="dm-btn dm-btn-secondary" onClick={() => setShowDeleteConfirm(false)}>取消</button>
+                            <button className="dm-btn dm-btn-danger" onClick={handleDelete}>確認刪除</button>
                         </div>
                     </div>
                 </div>
             )}
-
-            <style>{`
-                .active-card {
-                    border: 2px solid #3b82f6;
-                    background: #eff6ff;
-                }
-                .dm-file-btn-active {
-                    background: #3b82f6;
-                    color: white;
-                }
-                .dm-modal-footer {
-                    display: flex;
-                    justify-content: flex-end;
-                    gap: 12px;
-                    margin-top: 24px;
-                }
-                .dm-btn-cancel {
-                    padding: 8px 16px;
-                    background: #f1f5f9;
-                    border: none;
-                    border-radius: 6px;
-                    cursor: pointer;
-                }
-                .dm-btn-confirm {
-                    padding: 8px 16px;
-                    background: #3b82f6;
-                    color: white;
-                    border: none;
-                    border-radius: 6px;
-                    cursor: pointer;
-                }
-                .dm-btn-confirm:disabled {
-                    background: #94a3b8;
-                    cursor: not-allowed;
-                }
-            `}</style>
         </div>
     );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UploadCloud, Box, Trash2 } from 'lucide-react';
+import { UploadCloud, Box, X, File } from 'lucide-react';
 import { useUploadStore, GeologyModelMetadata } from '../../stores/uploadStore';
 
 interface GeologyModelSectionProps {
@@ -186,7 +186,7 @@ export const GeologyModelSection: React.FC<GeologyModelSectionProps> = ({ showTo
                         <UploadCloud size={48} strokeWidth={1} />
                     </div>
                     <div className="dm-upload-text">
-                        拖曳或點擊上傳 Tecplot 地質模型
+                        拖放檔案或點擊選擇
                     </div>
                     <div className="dm-upload-hint">
                         支援 Tecplot DAT 格式 (FETetrahedron)，最大 200MB
@@ -201,8 +201,8 @@ export const GeologyModelSection: React.FC<GeologyModelSectionProps> = ({ showTo
                                 key={model.id}
                                 className="dm-file-card"
                                 style={{
-                                    border: model.isActive ? '2px solid #22c55e' : '1px solid #e2e8f0',
-                                    background: model.isActive ? '#f0fdf4' : 'white',
+                                    border: model.isActive ? '2px solid var(--primary)' : '1px solid #e2e8f0',
+                                    background: model.isActive ? '#eff6ff' : 'white',
                                 }}
                             >
                                 <div className="dm-file-info" style={{ flex: 1 }}>
@@ -210,7 +210,7 @@ export const GeologyModelSection: React.FC<GeologyModelSectionProps> = ({ showTo
                                         <span className="dm-file-name">{model.name}</span>
                                         <span style={{ fontSize: '11px', color: '#6b7280', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>v{model.version}</span>
                                         {getStatusBadge(model.conversionStatus)}
-                                        {model.isActive && <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 500 }}>● 使用中</span>}
+                                        {model.isActive && <span style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 500 }}>● 使用中</span>}
                                     </div>
                                     <div className="dm-file-meta" style={{ marginTop: '4px' }}>
                                         {model.year}年 · {formatFileSize(model.size)}
@@ -249,11 +249,10 @@ export const GeologyModelSection: React.FC<GeologyModelSectionProps> = ({ showTo
                                         </button>
                                     )}
                                     <button
-                                        className="dm-btn dm-btn-secondary"
-                                        style={{ fontSize: '12px', padding: '4px 8px', color: '#dc2626' }}
+                                        className="dm-file-btn dm-file-btn-delete"
                                         onClick={() => handleGeoModelDeleteClick(model.id)}
                                     >
-                                        <Trash2 size={14} />
+                                        刪除
                                     </button>
                                 </div>
                             </div>
@@ -268,12 +267,15 @@ export const GeologyModelSection: React.FC<GeologyModelSectionProps> = ({ showTo
                     <div className="dm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                         <div className="dm-modal-header">
                             <h3 className="dm-modal-title">上傳 3D 地質模型</h3>
+                            <button onClick={handleCancelGeoModelUpload} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
                         </div>
                         <div className="dm-modal-body">
-                            <div style={{ padding: '12px', background: '#f1f5f9', borderRadius: '8px', marginBottom: '16px' }}>
-                                <div style={{ fontSize: 13, color: '#64748b' }}>已選擇檔案</div>
-                                <div style={{ fontWeight: 500, color: '#1f2937' }}>{geoModelFile.name}</div>
-                                <div style={{ fontSize: 12, color: '#94a3b8' }}>{formatFileSize(geoModelFile.size)}</div>
+                            <div className="dm-file-preview">
+                                <div className="dm-file-preview-icon"><File size={24} /></div>
+                                <div>
+                                    <div className="dm-file-preview-name">{geoModelFile.name}</div>
+                                    <div className="dm-file-preview-size">{formatFileSize(geoModelFile.size)}</div>
+                                </div>
                             </div>
 
 
@@ -367,14 +369,15 @@ export const GeologyModelSection: React.FC<GeologyModelSectionProps> = ({ showTo
                 <div className="dm-modal-overlay" onClick={() => setShowGeoModelDeleteConfirm(false)}>
                     <div className="dm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
                         <div className="dm-modal-header">
-                            <h3 className="dm-modal-title">確認刪除</h3>
+                            <h3 className="dm-modal-title" style={{ color: '#dc2626' }}>刪除確認</h3>
+                            <button onClick={() => setShowGeoModelDeleteConfirm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
                         </div>
                         <div className="dm-modal-body">
                             <p>確定要刪除此地質模型嗎？此操作無法復原。</p>
                         </div>
                         <div className="dm-modal-footer">
                             <button className="dm-btn dm-btn-secondary" onClick={() => setShowGeoModelDeleteConfirm(false)}>取消</button>
-                            <button className="dm-btn dm-btn-primary" style={{ background: '#dc2626' }} onClick={confirmGeoModelDelete}>刪除</button>
+                            <button className="dm-btn dm-btn-danger" onClick={confirmGeoModelDelete}>刪除</button>
                         </div>
                     </div>
                 </div>

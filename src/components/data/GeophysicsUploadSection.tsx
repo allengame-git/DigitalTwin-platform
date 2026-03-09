@@ -202,7 +202,7 @@ export const GeophysicsUploadSection: React.FC<GeophysicsUploadSectionProps> = (
                         ))}
                     </div>
                 ) : (
-                    <div className="dm-empty">尚無上傳的探查資料</div>
+                    <div className="dm-empty-state">尚無上傳的探查資料</div>
                 )}
             </section>
 
@@ -337,14 +337,15 @@ export const GeophysicsUploadSection: React.FC<GeophysicsUploadSectionProps> = (
                 <div className="dm-modal-overlay" onClick={() => setShowGeoDeleteConfirm(false)}>
                     <div className="dm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
                         <div className="dm-modal-header">
-                            <h3 className="dm-modal-title">確認刪除</h3>
+                            <h3 className="dm-modal-title" style={{ color: '#dc2626' }}>刪除確認</h3>
+                            <button onClick={() => setShowGeoDeleteConfirm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
                         </div>
                         <div className="dm-modal-body">
                             <p>確定要刪除此探查資料嗎？此操作無法復原。</p>
                         </div>
                         <div className="dm-modal-footer">
                             <button className="dm-btn dm-btn-secondary" onClick={() => setShowGeoDeleteConfirm(false)}>取消</button>
-                            <button className="dm-btn dm-btn-primary" style={{ background: '#dc2626' }} onClick={confirmGeoDelete}>刪除</button>
+                            <button className="dm-btn dm-btn-danger" onClick={confirmGeoDelete}>刪除</button>
                         </div>
                     </div>
                 </div>
@@ -356,7 +357,7 @@ export const GeophysicsUploadSection: React.FC<GeophysicsUploadSectionProps> = (
                     <div className="dm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                         <div className="dm-modal-header">
                             <h3 className="dm-modal-title">探查資料詳細內容</h3>
-                            <button onClick={() => setShowGeoDetail(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#6b7280' }}>✕</button>
+                            <button onClick={() => setShowGeoDetail(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
                         </div>
                         <div className="dm-modal-body">
                             <div style={{ marginBottom: '20px', textAlign: 'center', background: '#f1f5f9', borderRadius: '8px', overflow: 'hidden' }}>

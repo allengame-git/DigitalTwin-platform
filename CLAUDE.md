@@ -113,6 +113,10 @@ JWT (HS256) with refresh tokens in HTTP-only cookies. Prisma-persisted users/ses
 - **Seed**: `npx prisma db seed` → `admin@llrwd.tw` / `Admin@2026` (mustChangePassword)
 - **CSRF**: admin routes 掛載 `verifyCsrf`，前端 `fetchApi` 自動從 cookie 讀取 csrf-token 注入 header
 
+### DataManagementPage 架構
+
+頁面 layout：左側 DataPageTOC（200px sticky）+ 右側 content。10 個 section 分 4 群組（基礎設定/地質資料/地表資料/模型資料），各有色帶標識。航照圖/地質模型/地球物理三個大區塊已抽為獨立 sub-component（`src/components/data/`），各帶自己的 state/handlers/modals。所有 `dm-` CSS class 定義在 DataManagementPage 的 `<style>` block 中，cascade 到子元件。字體：DM Sans + JetBrains Mono（Google Fonts，`index.html` 引入）。
+
 ## Project Structure (key directories)
 
 ```
@@ -120,7 +124,7 @@ src/
 ├── components/scene/     # 3D scene: GeologyCanvas, BoreholeInstances, TerrainMesh, WaterLevelSurface, ClippingPlane
 ├── components/overlay/   # UI panels over 3D: LayerPanel, BoreholeDetailPanel, ClippingToolPanel
 ├── components/controls/  # Interactive controls
-├── components/data/      # Data upload sections
+├── components/data/      # Data upload sections (ImageryUploadSection, GeologyModelSection, GeophysicsUploadSection, DataPageTOC, etc.)
 ├── stores/               # Zustand stores (~17)
 ├── api/                  # API clients (auth.ts, admin.ts + domain-specific)
 ├── pages/                # Route pages (GeologyPage, DataManagementPage, ProjectDashboard)

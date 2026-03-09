@@ -8,7 +8,7 @@
 import React, { useState, useRef } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useWaterLevelStore, WaterLevel } from '../../stores/waterLevelStore';
-import { UploadCloud, Droplets, Trash2, X, File, Radio } from 'lucide-react';
+import { UploadCloud, Droplets, X, File } from 'lucide-react';
 
 export function WaterLevelUploadSection() {
     const { activeProjectId } = useProjectStore();
@@ -141,8 +141,8 @@ export function WaterLevelUploadSection() {
                             key={wl.id}
                             className="dm-file-card"
                             style={{
-                                border: wl.id === activeWaterLevelId ? '2px solid #2196F3' : '1px solid #e2e8f0',
-                                background: wl.id === activeWaterLevelId ? '#e3f2fd' : 'white',
+                                border: wl.id === activeWaterLevelId ? '2px solid var(--primary)' : '1px solid #e2e8f0',
+                                background: wl.id === activeWaterLevelId ? '#eff6ff' : 'white',
                                 display: 'flex',
                                 alignItems: 'center',
                                 padding: '12px 16px',
@@ -152,7 +152,7 @@ export function WaterLevelUploadSection() {
                         >
                             <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <Droplets size={16} color="#2196F3" />
+                                    <Droplets size={16} color="var(--primary)" />
                                     <span className="dm-file-name" style={{ marginBottom: 0 }}>{wl.name}</span>
                                     <span className="dm-badge" style={{
                                         background: wl.sourceType === 'well' ? '#dbeafe' : '#fef3c7',
@@ -161,7 +161,7 @@ export function WaterLevelUploadSection() {
                                         {wl.sourceType === 'well' ? '水井觀測' : '數值模擬'}
                                     </span>
                                     {wl.id === activeWaterLevelId && (
-                                        <span style={{ fontSize: 11, color: '#1976D2', fontWeight: 500 }}>
+                                        <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 500 }}>
                                             ● 使用中
                                         </span>
                                     )}
@@ -171,11 +171,10 @@ export function WaterLevelUploadSection() {
                                 </div>
                             </div>
                             <button
-                                className="dm-btn dm-btn-secondary"
-                                style={{ fontSize: 12, padding: '4px 8px', color: '#dc2626' }}
+                                className="dm-file-btn dm-file-btn-delete"
                                 onClick={e => { e.stopPropagation(); setDeleteId(wl.id); }}
                             >
-                                <Trash2 size={14} />
+                                刪除
                             </button>
                         </div>
                     ))}
@@ -240,9 +239,9 @@ export function WaterLevelUploadSection() {
                                             style={{
                                                 flex: 1,
                                                 padding: '8px 12px',
-                                                background: sourceType === opt.value ? '#2196F3' : '#f1f5f9',
+                                                background: sourceType === opt.value ? 'var(--primary)' : '#f1f5f9',
                                                 color: sourceType === opt.value ? '#fff' : '#374151',
-                                                border: sourceType === opt.value ? '1px solid #1976D2' : '1px solid #e2e8f0',
+                                                border: sourceType === opt.value ? '1px solid var(--primary-hover, #1d4ed8)' : '1px solid #e2e8f0',
                                                 borderRadius: 6,
                                                 cursor: 'pointer',
                                                 fontWeight: sourceType === opt.value ? 600 : 400,

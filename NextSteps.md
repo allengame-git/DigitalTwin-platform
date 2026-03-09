@@ -2,7 +2,7 @@
 
 本文件記錄專案目前的完成狀態、座標系統說明，以及後續待辦事項，供接手的 AI Agent 或開發人員參考。
 
-**最後更新**: 2026-03-09（正式帳號管理系統完成 — Prisma 持久化/Admin API/安全 middleware/前端頁面改寫）
+**最後更新**: 2026-03-09（地質資料管理頁面 UI 重構 — 浮動 TOC/收合 Section/Sub-component 抽取/群組色帶/字體升級）
 **當前分支**: `main`
 
 ---
@@ -75,7 +75,12 @@
 - `/project/:code/facility` → `FacilityPage`（3D 導覽）
 - `/project/:code/facility-data` → `FacilityDataPage`（資料管理，獨立頁面）
 - `ProjectDashboardPage`：儀表板拆為「地質資料管理」與「設施資料管理」兩個獨立卡片
-- `DataManagementPage`：已移除 FacilityUploadSection（僅保留地質相關）
+- `DataManagementPage`：已移除 FacilityUploadSection（僅保留地質相關），UI 重構完成：
+  - 浮動 TOC（`DataPageTOC`）+ IntersectionObserver scroll spy
+  - 10 個 section 均可收合（`collapsedSections` Set state）
+  - 航照圖/地質模型/地球物理抽為獨立 sub-component（1894→1060 行）
+  - 4 群組色帶（slate/amber/cyan/violet）+ 統計 badge
+  - DM Sans + JetBrains Mono 字體，配色微調
 
 #### 5c. 設施導覽 3D 頁面（FacilityPage）
 - 無頂部 Toolbar：FacilityToolbar 已從頁面移除

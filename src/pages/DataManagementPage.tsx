@@ -544,13 +544,168 @@ export const DataManagementPage: React.FC = () => {
                 .dm-table tr:last-child td { border-bottom: none; }
                 .dm-table tr:hover { background: var(--gray-50); }
 
+                /* File Actions & Buttons */
+                .dm-file-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-top: 8px;
+                }
+                .dm-file-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 4px 12px;
+                    border: 1px solid var(--gray-300);
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-weight: 500;
+                    background: white;
+                    color: var(--gray-600);
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+                .dm-file-btn:hover {
+                    background: var(--gray-50);
+                    border-color: var(--gray-400);
+                }
+                .dm-file-btn-delete {
+                    color: var(--danger);
+                    border-color: #fecaca;
+                    background: #fef2f2;
+                }
+                .dm-file-btn-delete:hover {
+                    background: #fee2e2;
+                    border-color: #fca5a5;
+                }
+
+                /* File List (horizontal cards) */
+                .dm-file-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                }
+                .dm-file-list .dm-file-card {
+                    display: flex;
+                    align-items: center;
+                }
+                .dm-file-list .dm-file-info {
+                    flex: 1;
+                }
+
+                /* File Preview (in modals) */
+                .dm-file-preview {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 12px;
+                    background: var(--gray-50);
+                    border: 1px solid var(--gray-200);
+                    border-radius: 8px;
+                    margin-bottom: 16px;
+                }
+                .dm-file-preview-icon {
+                    color: var(--gray-400);
+                    display: flex;
+                    align-items: center;
+                }
+                .dm-file-preview-name {
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: var(--gray-900);
+                }
+                .dm-file-preview-size {
+                    font-size: 12px;
+                    color: var(--gray-500);
+                    font-family: var(--font-mono);
+                }
+
+                /* Form Rows */
+                .dm-form-row {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 12px;
+                }
+                .dm-form-row:has(> :nth-child(3)) {
+                    grid-template-columns: 1fr 1fr 1fr;
+                }
+                .dm-form-textarea {
+                    min-height: 60px;
+                    resize: vertical;
+                }
+
+                /* Advanced Toggle */
+                .dm-advanced-toggle {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    width: 100%;
+                    padding: 10px 12px;
+                    border: 1px solid var(--gray-200);
+                    border-radius: 6px;
+                    background: var(--gray-50);
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: var(--gray-700);
+                    margin-bottom: 12px;
+                    transition: all 0.15s;
+                }
+                .dm-advanced-toggle:hover {
+                    background: var(--gray-100);
+                    border-color: var(--gray-300);
+                }
+                .dm-advanced-section {
+                    padding: 12px;
+                    background: var(--gray-50);
+                    border: 1px solid var(--gray-200);
+                    border-radius: 8px;
+                    margin-bottom: 16px;
+                }
+
+                /* Coords */
+                .dm-coords-hint {
+                    font-size: 12px;
+                    color: var(--gray-500);
+                    margin-bottom: 12px;
+                }
+                .dm-coords-status {
+                    display: inline-flex;
+                    align-items: center;
+                    color: var(--success);
+                    font-size: 11px;
+                    font-weight: 500;
+                }
+
+                /* Error & Loading */
+                .dm-error {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 12px 16px;
+                    background: #fef2f2;
+                    border: 1px solid #fecaca;
+                    border-radius: 8px;
+                    color: var(--danger);
+                    font-size: 14px;
+                    margin-bottom: 16px;
+                }
+                .dm-loading {
+                    text-align: center;
+                    padding: 16px;
+                    color: var(--gray-500);
+                    font-size: 14px;
+                }
+
                 /* Misc */
-                .dm-empty-state {
+                .dm-empty-state, .dm-empty {
                     text-align: center;
                     padding: 40px;
                     background: var(--gray-50);
                     border: 1px dashed var(--gray-300);
                     border-radius: 8px;
+                    color: var(--gray-500);
+                    font-size: 14px;
                 }
                 .dm-badge {
                     display: inline-flex;
@@ -563,6 +718,13 @@ export const DataManagementPage: React.FC = () => {
                 .dm-badge-blue { background: #dbeafe; color: #1e40af; }
                 .dm-badge-green { background: #dcfce7; color: #15803d; }
                 .dm-badge-gray { background: #f3f4f6; color: #374151; }
+
+                .dm-file-year {
+                    font-family: var(--font-mono);
+                    font-size: 12px;
+                }
+
+                .required { color: var(--danger); }
                 
                 @keyframes progress-shimmer {
                     0% { transform: translateX(-100%); }
