@@ -415,3 +415,85 @@ model FacilityModelInfo {
   @@index([modelId])
   @@map("facility_model_infos")
 }
+
+// ── 帳號管理 ──────────────────────────────────────────
+
+enum UserRole {
+  engineer
+  reviewer
+  public
+  admin
+}
+
+enum AccountStatus {
+  active
+  locked
+  disabled
+  pending_reset
+}
+
+model User {
+  id                 String        @id @default(uuid())
+  email              String        @unique
+  passwordHash       String
+  name               String
+  role               UserRole      @default(engineer)
+  status             AccountStatus @default(active)
+  mustChangePassword Boolean       @default(false)
+  passwordChangedAt  DateTime?
+  failedLoginCount   Int           @default(0)
+  lockedUntil        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  lastLoginAt        DateTime?
+  sessions           Session[]
+  auditLogs          AuditLog[]
+
+  @@map("users")
+}
+
+model Session {
+  id             String   @id @default(uuid())
+  userId         String
+  refreshToken   String   @unique
+  userAgent      String?
+  ipAddress      String?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  lastActivityAt DateTime @default(now())
+  isRevoked      Boolean  @default(false)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+enum AuditAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  TOKEN_REFRESH
+  PASSWORD_CHANGE
+  PASSWORD_RESET
+  ACCOUNT_CREATE
+  ACCOUNT_UPDATE
+  ACCOUNT_DISABLE
+  ACCOUNT_UNLOCK
+  SESSION_REVOKED
+}
+
+model AuditLog {
+  id        String      @id @default(uuid())
+  userId    String?
+  action    AuditAction
+  ipAddress String?
+  userAgent String?
+  details   Json?
+  createdAt DateTime    @default(now())
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
