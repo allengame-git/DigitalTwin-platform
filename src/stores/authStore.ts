@@ -16,6 +16,7 @@ interface AuthStore extends AuthState {
     accessToken: string | null;
     tokenExpiresAt: number | null;
     sessionExpiresAt: number | null;
+    mustChangePassword: boolean;
     _hasHydrated: boolean;
 
     // Actions
@@ -26,6 +27,9 @@ interface AuthStore extends AuthState {
     checkAuth: () => Promise<void>;
     setPublicUser: () => void;
     setHasHydrated: (state: boolean) => void;
+
+    // Password
+    changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
 
     // Session management
     isSessionExpiringSoon: () => boolean;
@@ -51,6 +55,7 @@ export const useAuthStore = create<AuthStore>()(
             accessToken: null,
             tokenExpiresAt: null,
             sessionExpiresAt: null,
+            mustChangePassword: false,
             _hasHydrated: false,
 
             login: async (credentials: LoginCredentials) => {
@@ -66,6 +71,7 @@ export const useAuthStore = create<AuthStore>()(
                         accessToken: response.tokens.accessToken,
                         tokenExpiresAt: Date.now() + response.tokens.expiresIn,
                         sessionExpiresAt: sessionExpiry,
+                        mustChangePassword: response.user.mustChangePassword || false,
                         error: null,
                     });
                 } catch (error) {
@@ -113,6 +119,7 @@ export const useAuthStore = create<AuthStore>()(
                         accessToken: null,
                         tokenExpiresAt: null,
                         sessionExpiresAt: null,
+                        mustChangePassword: false,
                     });
                 }
             },
@@ -203,6 +210,14 @@ export const useAuthStore = create<AuthStore>()(
                 }
             },
 
+            changePassword: async (oldPassword: string, newPassword: string) => {
+                await authApi.changePassword(oldPassword, newPassword);
+                set({
+                    mustChangePassword: false,
+                    user: get().user ? { ...get().user!, mustChangePassword: false } : null,
+                });
+            },
+
             clearError: () => set({ error: null }),
 
             hasRole: (roles: UserRole[]) => {
@@ -218,6 +233,7 @@ export const useAuthStore = create<AuthStore>()(
                 accessToken: state.accessToken,
                 tokenExpiresAt: state.tokenExpiresAt,
                 sessionExpiresAt: state.sessionExpiresAt,
+                mustChangePassword: state.mustChangePassword,
             }),
             onRehydrateStorage: () => (state) => {
                 state?.setHasHydrated(true);
