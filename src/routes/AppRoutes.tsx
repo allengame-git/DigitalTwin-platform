@@ -27,6 +27,7 @@ const AnnotationsPage = React.lazy(() => import('../pages/AnnotationsPage'));
 const ProjectDashboardPage = React.lazy(() => import('../pages/ProjectDashboardPage'));
 const FacilityPage = React.lazy(() => import('../pages/FacilityPage'));
 const FacilityDataPage = React.lazy(() => import('../pages/FacilityDataPage'));
+const ChangePasswordPage = React.lazy(() => import('../pages/ChangePasswordPage'));
 
 // Admin pages
 const AdminUsersPage = React.lazy(() => import('../pages/AdminUsersPage'));
@@ -103,6 +104,10 @@ const router = createBrowserRouter([
             {
                 path: '/unauthorized',
                 element: <UnauthorizedPage />,
+            },
+            {
+                path: '/change-password',
+                element: <ChangePasswordPage />,
             },
 
             // Dashboard (專案列表)

@@ -7,7 +7,7 @@
 
 import React, { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 import type { UserRole } from '../../types/auth';
 
 interface ProtectedRouteProps {
@@ -23,7 +23,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     redirectTo = '/login',
     fallback,
 }) => {
-    const { user, isAuthenticated, isLoading } = useAuth();
+    const user = useAuthStore(state => state.user);
+    const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+    const isLoading = useAuthStore(state => state.isLoading);
+    const mustChangePassword = useAuthStore(state => state.mustChangePassword);
     const location = useLocation();
 
     // Show loading state
@@ -60,6 +63,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     // Redirect to login if not authenticated
     if (!isAuthenticated || !user) {
         return <Navigate to={redirectTo} state={{ from: location }} replace />;
+    }
+
+    // Force password change if required
+    if (mustChangePassword && location.pathname !== '/change-password') {
+        return <Navigate to="/change-password" state={{ from: location }} replace />;
     }
 
     // Admin bypass - Admin has access to everything
