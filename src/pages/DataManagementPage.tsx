@@ -44,7 +44,6 @@ import { AttitudeUploadSection } from '../components/data/AttitudeUploadSection'
 import { TerrainUploadSection } from '../components/data/TerrainUploadSection';
 import { WaterLevelUploadSection } from '../components/data/WaterLevelUploadSection';
 import LithologySection from '../components/data/LithologySection';
-import FacilityUploadSection from '../components/data/FacilityUploadSection';
 import { useLithologyStore } from '../stores/lithologyStore';
 import { useCameraStore } from '../stores/cameraStore';
 import { twd97ToWorld } from '../utils/coordinates';
@@ -555,13 +554,28 @@ export const DataManagementPage: React.FC = () => {
                     --gray-700: #374151;
                     --gray-800: #1f2937;
                     --gray-900: #111827;
+                    --text-primary: #0f172a;
+                    --bg-page: #f1f5f9;
+                    --bg-card: #ffffff;
+                    --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+                    --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+                    --group-setup: #64748b;
+                    --group-geology: #d97706;
+                    --group-surface: #0891b2;
+                    --group-model: #7c3aed;
+                }
+
+                .dm-mono {
+                    font-family: var(--font-mono);
+                    font-size: 13px;
+                    letter-spacing: -0.01em;
                 }
 
                 .data-management-page {
                     min-height: 100vh;
-                    background: #f8fafc;
-                    color: var(--gray-800);
-                    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                    background: var(--bg-page);
+                    color: var(--text-primary);
+                    font-family: var(--font-sans);
                 }
 
                 /* Header */
@@ -606,8 +620,8 @@ export const DataManagementPage: React.FC = () => {
 
                 .dm-title {
                     font-size: 20px;
-                    font-weight: 600;
-                    color: var(--gray-900);
+                    font-weight: 700;
+                    color: var(--text-primary);
                     letter-spacing: -0.025em;
                 }
 
@@ -1336,12 +1350,6 @@ export const DataManagementPage: React.FC = () => {
                     </section>
                 </div>
 
-                {/* 設施導覽 */}
-                {activeProjectId && (
-                    <div style={{ opacity: isSetupComplete ? 1 : 0.5, pointerEvents: isSetupComplete ? 'auto' : 'none' }}>
-                        <FacilityUploadSection projectId={activeProjectId} />
-                    </div>
-                )}
             </main>
 
             {/* 上傳表單 Modal */}
