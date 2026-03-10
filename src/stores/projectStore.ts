@@ -7,6 +7,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useAuthStore } from './authStore';
 
 export interface Project {
     id: string;
@@ -46,6 +47,11 @@ interface ProjectStore {
 
 const API_BASE = '/api/project';
 
+function authHeaders(): Record<string, string> {
+    const token = useAuthStore.getState().accessToken;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export const useProjectStore = create<ProjectStore>()(
     persist(
         (set, get) => ({
@@ -59,7 +65,7 @@ export const useProjectStore = create<ProjectStore>()(
             fetchProjects: async () => {
                 set({ loading: true, error: null });
                 try {
-                    const res = await fetch(API_BASE);
+                    const res = await fetch(API_BASE, { headers: authHeaders() });
                     const data = await res.json();
                     if (data.success) {
                         set({ projects: data.data, loading: false });
@@ -77,7 +83,7 @@ export const useProjectStore = create<ProjectStore>()(
                 try {
                     const res = await fetch(API_BASE, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', ...authHeaders() },
                         body: JSON.stringify(projectData),
                     });
                     const data = await res.json();
@@ -103,7 +109,7 @@ export const useProjectStore = create<ProjectStore>()(
                 try {
                     const res = await fetch(`${API_BASE}/${id}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', ...authHeaders() },
                         body: JSON.stringify(projectData),
                     });
                     const data = await res.json();
@@ -131,7 +137,7 @@ export const useProjectStore = create<ProjectStore>()(
                 try {
                     const res = await fetch(`${API_BASE}/${id}`, {
                         method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', ...authHeaders() },
                         body: JSON.stringify({ confirmName }),
                     });
                     const data = await res.json();

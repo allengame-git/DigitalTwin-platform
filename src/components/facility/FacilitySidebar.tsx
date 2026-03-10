@@ -213,24 +213,25 @@ function TerrainSettingsSection() {
 
     const [expanded, setExpanded] = React.useState(true);
 
-    if (!currentScene?.terrainHeightmapUrl || !currentScene?.terrainBounds) return null;
-
-    const bounds = currentScene.terrainBounds as { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
-    const hasSatellite = currentScene.terrainTextureMode === 'satellite';
+    const hasTerrain = !!(currentScene?.terrainHeightmapUrl && currentScene?.terrainBounds);
+    const bounds = currentScene?.terrainBounds as { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null;
+    const hasSatellite = currentScene?.terrainTextureMode === 'satellite';
 
     // autoRange 時自動同步 bounds
     React.useEffect(() => {
-        if (terrainSettings.autoRange) {
+        if (hasTerrain && terrainSettings.autoRange && bounds) {
             setTerrainSettings({ minZ: bounds.minZ, maxZ: bounds.maxZ });
         }
-    }, [terrainSettings.autoRange, bounds.minZ, bounds.maxZ]);
+    }, [hasTerrain, terrainSettings.autoRange, bounds?.minZ, bounds?.maxZ]);
 
     // 初始化：有衛星影像時預設 satellite，否則 hillshade
     React.useEffect(() => {
-        if (hasSatellite && terrainSettings.textureMode !== 'satellite' && terrainSettings.textureMode !== 'colorRamp') {
+        if (hasTerrain && hasSatellite && terrainSettings.textureMode !== 'satellite' && terrainSettings.textureMode !== 'colorRamp') {
             setTerrainSettings({ textureMode: 'satellite' });
         }
-    }, [hasSatellite]);
+    }, [hasTerrain, hasSatellite]);
+
+    if (!hasTerrain) return null;
 
     const textureModes: { value: FacilityTerrainSettings['textureMode']; label: string }[] = [
         ...(hasSatellite ? [{ value: 'satellite' as const, label: '衛星影像' }] : []),

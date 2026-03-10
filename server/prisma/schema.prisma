@@ -367,6 +367,9 @@ model FacilityModel {
   scale       Json                @default("{\"x\":1,\"y\":1,\"z\":1}")
   sortOrder   Int                 @default(0)
   modelType   String              @default("primary")  // "primary" | "decorative"
+  planX       Float?              // 平面圖 X 百分比 (0~100)，null = 用 3D position 自動映射
+  planY       Float?              // 平面圖 Y 百分比 (0~100)
+  planVisible Boolean             @default(true) // false = 在平面圖隱藏
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
   scene       FacilityScene       @relation("SceneModels", fields: [sceneId], references: [id], onDelete: Cascade)

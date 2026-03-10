@@ -43,6 +43,9 @@ export const FacilityPage: React.FC = () => {
     const advanceTransition = useFacilityStore(state => state.advanceTransition);
     const startSceneTransition = useFacilityStore(state => state.startSceneTransition);
     const isLoading = useFacilityStore(state => state.isLoading);
+    const togglePlanView = useFacilityStore(state => state.togglePlanView);
+    const showPlanView = useFacilityStore(state => state.showPlanView);
+    const hasPlanImage = !!(currentScene?.planImageUrl || currentScene?.autoPlanImageUrl);
 
     // GLB 載入進度 (N6)
     const [loadProgress, setLoadProgress] = useState(100);
@@ -281,6 +284,41 @@ export const FacilityPage: React.FC = () => {
                             </button>
                         ))}
                     </div>
+                )}
+
+                {/* Lobby: 平面圖按鈕 — 左下角 */}
+                {isLobby && hasPlanImage && !showPlanView && (
+                    <button
+                        onClick={togglePlanView}
+                        title="開啟平面圖"
+                        style={{
+                            position: 'absolute',
+                            bottom: 24,
+                            left: 24,
+                            zIndex: 50,
+                            background: 'rgba(255,255,255,0.88)',
+                            border: '1px solid rgba(0,0,0,0.12)',
+                            borderRadius: 8,
+                            padding: '7px 14px',
+                            fontSize: 12,
+                            color: '#333',
+                            cursor: 'pointer',
+                            backdropFilter: 'blur(8px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.98)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.88)')}
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+                            <line x1="8" y1="2" x2="8" y2="18" />
+                            <line x1="16" y1="6" x2="16" y2="22" />
+                        </svg>
+                        平面圖
+                    </button>
                 )}
 
                 {/* Lobby mode: back to dashboard */}

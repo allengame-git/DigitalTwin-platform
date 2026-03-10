@@ -177,6 +177,8 @@ server/
 8. **Prisma 7 的 `Json` 欄位型別** — `Record<string, unknown>` 不能直接賦值給 Prisma 的 `InputJsonValue`，需要 cast：`(details as Prisma.InputJsonValue) ?? undefined`。
 9. **GeoTIFF 不能直接給前端** — Three.js TextureLoader 只支援 PNG/JPEG/WebP，衛星影像（.tif）必須在 Python 處理階段轉為 JPEG。地質模組的 `terrain_processor.py` 有完整的 `process_satellite()` 可參考。
 10. **`onBeforeCompile` 與材質快取** — Three.js 快取 shader program，若材質的 `map` 從有值變 null（或反之），shader 需重新編譯。用 `key` 強制 remount mesh 或手動 `material.dispose()` 清除快取。hillshade URL 可從 `heightmapUrl.replace('heightmap.png', 'texture.png')` 推導。
+11. **React hooks 順序 — 不可在 hooks 之前 early return** — `TerrainSettingsSection` 曾在 `useEffect` 之前 `return null`，切換到無地形場景時 hooks 數量改變觸發 "Rendered fewer hooks than expected" crash。修法：將所有 `return null` 移到 hooks 之後，用 boolean flag guard effect 邏輯。
+12. **`projectStore` 加 authenticate 後必須帶 token** — 安全修復統一加 `authenticate` middleware 後，`projectStore.ts` 的 `fetch()` 沒帶 `Authorization: Bearer` header → 401。所有 store 的 fetch 必須用 `useAuthStore.getState().accessToken` 取 token。
 
 ## Bug 修復指南
 
@@ -194,7 +196,12 @@ server/
 - `useFacilityStore`：Zustand store，`updateModelTransform` → `PUT /api/facility/models/:id/transform`
 - `FacilityTerrain.tsx`：地形渲染，支援衛星影像/山影圖/色階三種紋理模式，色階用 `onBeforeCompile` 注入 GLSL shader
 - `FacilitySidebar.tsx`：側邊欄包含地形設定（TerrainSettingsSection），可開關地形顯示、切換紋理模式
+- `PlanViewFloating.tsx`：浮動平面圖，含編輯模式（拖曳標記位置 + 眼睛可見性 toggle），`planX`/`planY`/`planVisible` 獨立於 3D position
+- `FacilityCanvas.tsx`：R3F Canvas 容器，外層包裹 `ErrorBoundary`（WebGL 錯誤不白屏）
+- `AnimationTimeline.tsx`：動畫時間軸編輯器，含匯出/匯入功能（JSON 格式 v1，position offset 自動對齊）
+- `FacilityUploadSection.tsx`：場景管理用遞迴 `SceneTreeNode` 支援 N 級巢狀，每層載入父場景模型供 ModelSelect
 - `facility_terrain_processor.py`：CSV→heightmap+hillshade+satellite(JPEG)，衛星影像用 rasterio reproject 對齊 DEM
+- `server/lib/pythonPath.ts`：跨平台 Python venv 路徑解析（macOS/Linux/Windows），`facility.ts` 和 `water-level.ts` 共用
 
 ## Conventions
 

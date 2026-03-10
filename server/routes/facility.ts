@@ -380,6 +380,39 @@ router.put('/models/:id/transform', authenticate, async (req: Request, res: Resp
     }
 });
 
+// PUT /models/:id/plan-marker — 更新平面圖標記位置/可見性
+router.put('/models/:id/plan-marker', authenticate, async (req: Request, res: Response) => {
+    try {
+        const id = req.params.id as string;
+        const { planX, planY, planVisible } = req.body;
+
+        const existing = await prisma.facilityModel.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: '模型不存在' });
+
+        // 驗證範圍
+        if (planX !== undefined && planX !== null && (typeof planX !== 'number' || planX < 0 || planX > 100)) {
+            return res.status(400).json({ error: 'planX 必須為 0~100 的數字或 null' });
+        }
+        if (planY !== undefined && planY !== null && (typeof planY !== 'number' || planY < 0 || planY > 100)) {
+            return res.status(400).json({ error: 'planY 必須為 0~100 的數字或 null' });
+        }
+
+        const model = await prisma.facilityModel.update({
+            where: { id },
+            data: {
+                ...(planX !== undefined && { planX }),
+                ...(planY !== undefined && { planY }),
+                ...(planVisible !== undefined && { planVisible }),
+            },
+        });
+
+        res.json(model);
+    } catch (error) {
+        console.error('[Facility] Update plan-marker error:', error);
+        res.status(500).json({ error: '更新平面圖標記失敗' });
+    }
+});
+
 // DELETE /models/:id
 router.delete('/models/:id', authenticate, async (req: Request, res: Response) => {
     try {

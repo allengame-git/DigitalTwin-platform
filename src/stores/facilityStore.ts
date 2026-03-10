@@ -91,6 +91,8 @@ interface FacilityState {
     updateModelTransform: (modelId: string, transform: Transform) => Promise<void>;
     updateModelMeta: (modelId: string, data: { name?: string; introduction?: string }) => Promise<void>;
 
+    setModels: (models: FacilityModel[]) => void;
+
     // Batch actions
     batchDeleteModels: (modelIds: string[]) => Promise<void>;
     toggleModelVisibility: (modelIds: string[]) => void;
@@ -430,6 +432,8 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
             console.error('[FacilityStore] updateModelMeta error:', err);
         }
     },
+
+    setModels: (models) => set({ models }),
 
     // ===== Batch Actions =====
     batchDeleteModels: async (modelIds) => {

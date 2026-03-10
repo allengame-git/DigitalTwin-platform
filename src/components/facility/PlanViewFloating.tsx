@@ -1,11 +1,12 @@
 /**
  * PlanViewFloating — 浮動平面圖視窗
  * 淺色風格、四周霧化邊緣、畫面置中 70%
+ * 支援編輯模式：拖曳標記位置、切換可見性
  * @module components/facility/PlanViewFloating
  */
 
-import { useState, useMemo, useCallback } from 'react';
-import { X, MapPin, DoorOpen, Map } from 'lucide-react';
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { X, MapPin, DoorOpen, Map, Pencil, Eye, EyeOff } from 'lucide-react';
 import { useFacilityStore } from '@/stores/facilityStore';
 import type { FacilityModel } from '@/types/facility';
 
@@ -17,10 +18,28 @@ function resolveUrl(url: string | null, bust = false): string | null {
     return bust ? `${base}?t=${Date.now()}` : base;
 }
 
+/** PUT /api/facility/models/:id/plan-marker */
+async function updatePlanMarker(
+    modelId: string,
+    body: { planX?: number | null; planY?: number | null; planVisible?: boolean },
+    token: string | null,
+) {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`/api/facility/models/${modelId}/plan-marker`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error('Failed to update plan marker');
+    return res.json();
+}
+
 export default function PlanViewFloating() {
     const scenes        = useFacilityStore(s => s.scenes);
     const currentSceneId = useFacilityStore(s => s.currentSceneId);
     const models        = useFacilityStore(s => s.models);
+    const setModels     = useFacilityStore(s => s.setModels);
     const selectedModelId = useFacilityStore(s => s.focusedModelId);
     const selectModel   = useFacilityStore(s => s.selectModel);
     const flyToModel    = useFacilityStore(s => s.flyToModel);
@@ -29,6 +48,12 @@ export default function PlanViewFloating() {
 
     const [hoveredId, setHoveredId]     = useState<string | null>(null);
     const [tooltipModel, setTooltipModel] = useState<FacilityModel | null>(null);
+    const [editMode, setEditMode]       = useState(false);
+
+    // Drag state
+    const [draggingId, setDraggingId]   = useState<string | null>(null);
+    const imageContainerRef             = useRef<HTMLDivElement>(null);
+    const debounceRef                   = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     const currentScene = useMemo(
         () => scenes.find(s => s.id === currentSceneId) ?? null,
@@ -37,10 +62,10 @@ export default function PlanViewFloating() {
 
     const planImage = resolveUrl(
         currentScene?.planImageUrl ?? currentScene?.autoPlanImageUrl ?? null,
-        !currentScene?.planImageUrl && !!currentScene?.autoPlanImageUrl  // auto-plan 加 cache-bust
+        !currentScene?.planImageUrl && !!currentScene?.autoPlanImageUrl
     );
 
-    // 計算座標 bounds → 標記百分比位置
+    // 計算座標 bounds → 標記百分比位置（fallback 用）
     const bounds = useMemo(() => {
         if (currentScene?.terrainBounds) {
             const b = currentScene.terrainBounds;
@@ -56,7 +81,11 @@ export default function PlanViewFloating() {
         return { minX: minX - padX, maxX: maxX + padX, minZ: minZ - padZ, maxZ: maxZ + padZ };
     }, [currentScene, models]);
 
+    /** 取得標記位置：優先用 planX/planY，否則 fallback 到 3D 映射 */
     const getMarkerPos = useCallback((model: FacilityModel) => {
+        if (model.planX != null && model.planY != null) {
+            return { x: model.planX, y: model.planY };
+        }
         if (!bounds) return { x: 50, y: 50 };
         const rangeX = bounds.maxX - bounds.minX;
         const rangeZ = bounds.maxZ - bounds.minZ;
@@ -64,6 +93,83 @@ export default function PlanViewFloating() {
         const y = rangeZ === 0 ? 50 : (1 - (model.position.z - bounds.minZ) / rangeZ) * 100;
         return { x: Math.max(3, Math.min(97, x)), y: Math.max(3, Math.min(97, y)) };
     }, [bounds]);
+
+    /** 篩選顯示的模型：decorative 不顯示，planVisible===false 不顯示（編輯模式例外） */
+    const visibleModels = useMemo(() => {
+        return models.filter(m => {
+            if (m.modelType === 'decorative') return false;
+            if (editMode) return true; // 編輯模式顯示全部（含隱藏的）
+            return m.planVisible !== false;
+        });
+    }, [models, editMode]);
+
+    /** 拖曳：pointer → 百分比座標 */
+    const pointerToPercent = useCallback((clientX: number, clientY: number) => {
+        const el = imageContainerRef.current;
+        if (!el) return null;
+        const rect = el.getBoundingClientRect();
+        const x = ((clientX - rect.left) / rect.width) * 100;
+        const y = ((clientY - rect.top) / rect.height) * 100;
+        return { x: Math.max(1, Math.min(99, x)), y: Math.max(1, Math.min(99, y)) };
+    }, []);
+
+    /** 更新本地 model 的 planX/planY（樂觀更新） */
+    const updateModelLocal = useCallback((modelId: string, patch: Partial<FacilityModel>) => {
+        setModels(models.map(m => m.id === modelId ? { ...m, ...patch } : m));
+    }, [models, setModels]);
+
+    /** 拖曳結束 → debounce 寫入 API */
+    const savePlanMarker = useCallback((modelId: string, planX: number, planY: number) => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(async () => {
+            try {
+                const { useAuthStore } = await import('@/stores/authStore');
+                const token = useAuthStore.getState().accessToken;
+                await updatePlanMarker(modelId, { planX, planY }, token);
+            } catch (e) {
+                console.error('Failed to save plan marker:', e);
+            }
+        }, 300);
+    }, []);
+
+    /** 切換可見性 */
+    const toggleVisibility = useCallback(async (model: FacilityModel) => {
+        const newVisible = model.planVisible === false ? true : false;
+        updateModelLocal(model.id, { planVisible: newVisible });
+        try {
+            const { useAuthStore } = await import('@/stores/authStore');
+            const token = useAuthStore.getState().accessToken;
+            await updatePlanMarker(model.id, { planVisible: newVisible }, token);
+        } catch (e) {
+            console.error('Failed to toggle visibility:', e);
+            updateModelLocal(model.id, { planVisible: model.planVisible }); // rollback
+        }
+    }, [updateModelLocal]);
+
+    const handlePointerDown = useCallback((e: React.PointerEvent, modelId: string) => {
+        if (!editMode) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setDraggingId(modelId);
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    }, [editMode]);
+
+    const handlePointerMove = useCallback((e: React.PointerEvent) => {
+        if (!draggingId) return;
+        const pos = pointerToPercent(e.clientX, e.clientY);
+        if (pos) {
+            updateModelLocal(draggingId, { planX: pos.x, planY: pos.y });
+        }
+    }, [draggingId, pointerToPercent, updateModelLocal]);
+
+    const handlePointerUp = useCallback(() => {
+        if (!draggingId) return;
+        const model = models.find(m => m.id === draggingId);
+        if (model && model.planX != null && model.planY != null) {
+            savePlanMarker(draggingId, model.planX, model.planY);
+        }
+        setDraggingId(null);
+    }, [draggingId, models, savePlanMarker]);
 
     if (!showPlanView || !planImage) return null;
 
@@ -103,8 +209,11 @@ export default function PlanViewFloating() {
                         flexDirection: 'column',
                     }}
                 >
-                    {/* 霧化容器：四周 mask 漸層消退 */}
+                    {/* 霧化容器 */}
                     <div
+                        ref={imageContainerRef}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
                         style={{
                             flex: 1,
                             position: 'relative',
@@ -118,7 +227,7 @@ export default function PlanViewFloating() {
                                 0 8px 24px rgba(0,0,0,0.08),
                                 inset 0 1px 0 rgba(255,255,255,0.9)
                             `,
-                            // 四周霧化遮罩：中央清晰，邊緣消退
+                            cursor: draggingId ? 'crosshair' : undefined,
                             WebkitMaskImage: `radial-gradient(
                                 ellipse 88% 88% at 50% 50%,
                                 black 52%,
@@ -151,92 +260,137 @@ export default function PlanViewFloating() {
                         />
 
                         {/* 模型標記 */}
-                        {bounds && models.map(model => {
+                        {visibleModels.map(model => {
                             const mp = getMarkerPos(model);
                             const isSel = model.id === selectedModelId;
                             const isHov = model.id === hoveredId;
                             const hasSub = scenes.some(s => s.parentModelId === model.id);
                             const active = isSel || isHov;
+                            const hidden = model.planVisible === false;
+                            const isDragging = model.id === draggingId;
 
                             return (
-                                <button
+                                <div
                                     key={model.id}
-                                    onClick={() => { selectModel(model.id); flyToModel(model.id); }}
-                                    onMouseEnter={() => { setHoveredId(model.id); setTooltipModel(model); }}
-                                    onMouseLeave={() => { setHoveredId(null); setTooltipModel(null); }}
-                                    title={model.name}
                                     style={{
                                         position: 'absolute',
                                         left: `${mp.x}%`,
                                         top: `${mp.y}%`,
                                         transform: 'translate(-50%, -50%)',
-                                        background: 'none',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        padding: 0,
                                         display: 'flex',
                                         alignItems: 'center',
-                                        justifyContent: 'center',
-                                        zIndex: 2,
+                                        gap: 2,
+                                        zIndex: isDragging ? 20 : 2,
+                                        opacity: hidden ? 0.35 : 1,
                                     }}
                                 >
-                                    {/* 選取脈衝環 */}
-                                    {isSel && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            width: 28, height: 28,
-                                            borderRadius: '50%',
-                                            border: '1.5px solid rgba(37,99,235,0.5)',
-                                            animation: 'fpulse 1.6s ease-out infinite',
-                                        }} />
-                                    )}
-
-                                    {/* 標記底圓 */}
-                                    <div style={{
-                                        width: active ? 32 : 26,
-                                        height: active ? 32 : 26,
-                                        borderRadius: '50%',
-                                        background: isSel
-                                            ? 'rgba(37,99,235,0.9)'
-                                            : isHov
-                                                ? 'rgba(37,99,235,0.75)'
-                                                : 'rgba(255,255,255,0.88)',
-                                        border: isSel
-                                            ? '2px solid #1d4ed8'
-                                            : '1.5px solid rgba(37,99,235,0.4)',
-                                        boxShadow: isSel
-                                            ? '0 2px 12px rgba(37,99,235,0.45)'
-                                            : '0 1px 6px rgba(0,0,0,0.12)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'all 0.18s ease',
-                                        position: 'relative',
-                                    }}>
-                                        {hasSub ? (
-                                            <DoorOpen
-                                                size={active ? 15 : 12}
-                                                style={{
-                                                    color: isSel ? 'white' : '#2563eb',
-                                                    transition: 'all 0.18s',
-                                                }}
-                                            />
-                                        ) : (
-                                            <MapPin
-                                                size={active ? 15 : 12}
-                                                style={{
-                                                    color: isSel ? 'white' : '#2563eb',
-                                                    transition: 'all 0.18s',
-                                                }}
-                                            />
+                                    <button
+                                        onClick={() => {
+                                            if (!editMode) {
+                                                selectModel(model.id);
+                                                flyToModel(model.id);
+                                            }
+                                        }}
+                                        onPointerDown={(e) => handlePointerDown(e, model.id)}
+                                        onMouseEnter={() => { setHoveredId(model.id); setTooltipModel(model); }}
+                                        onMouseLeave={() => { setHoveredId(null); setTooltipModel(null); }}
+                                        title={model.name}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: editMode ? (isDragging ? 'crosshair' : 'grab') : 'pointer',
+                                            padding: 0,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            touchAction: 'none',
+                                        }}
+                                    >
+                                        {/* 選取脈衝環 */}
+                                        {isSel && !editMode && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                width: 28, height: 28,
+                                                borderRadius: '50%',
+                                                border: '1.5px solid rgba(37,99,235,0.5)',
+                                                animation: 'fpulse 1.6s ease-out infinite',
+                                            }} />
                                         )}
-                                    </div>
-                                </button>
+
+                                        {/* 標記底圓 */}
+                                        <div style={{
+                                            width: active ? 32 : 26,
+                                            height: active ? 32 : 26,
+                                            borderRadius: '50%',
+                                            background: isSel
+                                                ? 'rgba(37,99,235,0.9)'
+                                                : isHov
+                                                    ? 'rgba(37,99,235,0.75)'
+                                                    : 'rgba(255,255,255,0.88)',
+                                            border: editMode
+                                                ? '2px dashed rgba(37,99,235,0.6)'
+                                                : isSel
+                                                    ? '2px solid #1d4ed8'
+                                                    : '1.5px solid rgba(37,99,235,0.4)',
+                                            boxShadow: isSel
+                                                ? '0 2px 12px rgba(37,99,235,0.45)'
+                                                : '0 1px 6px rgba(0,0,0,0.12)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            transition: 'all 0.18s ease',
+                                            position: 'relative',
+                                        }}>
+                                            {hasSub ? (
+                                                <DoorOpen
+                                                    size={active ? 15 : 12}
+                                                    style={{
+                                                        color: isSel ? 'white' : '#2563eb',
+                                                        transition: 'all 0.18s',
+                                                    }}
+                                                />
+                                            ) : (
+                                                <MapPin
+                                                    size={active ? 15 : 12}
+                                                    style={{
+                                                        color: isSel ? 'white' : '#2563eb',
+                                                        transition: 'all 0.18s',
+                                                    }}
+                                                />
+                                            )}
+                                        </div>
+                                    </button>
+
+                                    {/* 編輯模式：眼睛按鈕 */}
+                                    {editMode && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); toggleVisibility(model); }}
+                                            title={hidden ? '顯示標記' : '隱藏標記'}
+                                            style={{
+                                                background: 'rgba(255,255,255,0.9)',
+                                                border: '1px solid rgba(0,0,0,0.1)',
+                                                borderRadius: '50%',
+                                                width: 20, height: 20,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer',
+                                                padding: 0,
+                                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                            }}
+                                        >
+                                            {hidden
+                                                ? <EyeOff size={10} style={{ color: '#94a3b8' }} />
+                                                : <Eye size={10} style={{ color: '#2563eb' }} />
+                                            }
+                                        </button>
+                                    )}
+                                </div>
                             );
                         })}
 
                         {/* Tooltip */}
-                        {tooltipModel && (() => {
+                        {tooltipModel && !draggingId && (() => {
                             const tp = getMarkerPos(tooltipModel);
                             const goLeft = tp.x > 65;
                             return (
@@ -268,7 +422,7 @@ export default function PlanViewFloating() {
                         })()}
                     </div>
 
-                    {/* 標題列：浮在霧化層之上，置中下方 */}
+                    {/* 標題列 */}
                     <div style={{
                         position: 'absolute',
                         top: '7%',
@@ -303,12 +457,47 @@ export default function PlanViewFloating() {
                                 color: '#6b7280',
                                 fontWeight: 400,
                             }}>
-                                · {models.length} 個模型
+                                · {visibleModels.length} 個模型
                             </span>
                         )}
                     </div>
 
-                    {/* 關閉按鈕：右上角 */}
+                    {/* 編輯標記按鈕：關閉按鈕左側 */}
+                    <button
+                        onClick={() => setEditMode(v => !v)}
+                        title={editMode ? '結束編輯標記' : '編輯標記'}
+                        style={{
+                            position: 'absolute',
+                            top: '7%',
+                            right: 'calc(8% + 40px)',
+                            height: 32,
+                            borderRadius: 16,
+                            border: editMode
+                                ? '1px solid rgba(37,99,235,0.5)'
+                                : '1px solid rgba(255,255,255,0.7)',
+                            background: editMode
+                                ? 'rgba(37,99,235,0.15)'
+                                : 'rgba(255,255,255,0.65)',
+                            backdropFilter: 'blur(12px)',
+                            WebkitBackdropFilter: 'blur(12px)',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            padding: '0 12px',
+                            color: editMode ? '#2563eb' : '#374151',
+                            fontSize: 11,
+                            fontWeight: 500,
+                            zIndex: 5,
+                            transition: 'all 0.15s',
+                        }}
+                    >
+                        <Pencil size={12} />
+                        {editMode ? '完成' : '編輯標記'}
+                    </button>
+
+                    {/* 關閉按鈕 */}
                     <button
                         onClick={togglePlanView}
                         title="關閉平面圖"

@@ -52,6 +52,9 @@ export interface FacilityModel {
     scale: { x: number; y: number; z: number };
     sortOrder: number;
     modelType: 'primary' | 'decorative';
+    planX: number | null;
+    planY: number | null;
+    planVisible: boolean;
     createdAt: string;
     updatedAt: string;
     infos: FacilityModelInfo[];

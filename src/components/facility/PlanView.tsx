@@ -56,6 +56,10 @@ export default function PlanView() {
     }, [currentScene, models]);
 
     const getMarkerPosition = (model: FacilityModel) => {
+        // 優先使用自訂平面圖位置
+        if (model.planX != null && model.planY != null) {
+            return { x: model.planX, y: model.planY };
+        }
         if (!bounds) return { x: 50, y: 50 };
         const rangeX = bounds.maxX - bounds.minX;
         const rangeZ = bounds.maxZ - bounds.minZ;
@@ -67,6 +71,12 @@ export default function PlanView() {
             y: Math.max(2, Math.min(98, y)),
         };
     };
+
+    // 篩選：decorative 不顯示，planVisible===false 不顯示
+    const visibleModels = useMemo(() =>
+        models.filter(m => m.modelType !== 'decorative' && m.planVisible !== false),
+        [models]
+    );
 
     return (
         <div className="border-t border-gray-700">
@@ -89,7 +99,7 @@ export default function PlanView() {
                                 className="w-full max-h-48 object-contain bg-gray-800 block"
                             />
                             {/* 模型標記覆蓋層 */}
-                            {bounds && models.map(model => {
+                            {bounds && visibleModels.map(model => {
                                 const pos = getMarkerPosition(model);
                                 const isSelected = model.id === selectedModelId;
                                 const isHovered = model.id === hoveredMarkerId;
