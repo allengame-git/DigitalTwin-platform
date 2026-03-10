@@ -6,9 +6,9 @@
  * 包含：場景管理 / 模型上傳 / 模型資訊編輯 / 場景地形
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
-import { UploadCloud, X, Building2, Package } from 'lucide-react';
+import { UploadCloud, X, Building2, Package, ChevronRight, ChevronDown } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useFacilityStore } from '../../stores/facilityStore';
 import type { FacilityScene } from '../../types/facility';
@@ -75,6 +75,286 @@ function SceneSelect({
     );
 }
 
+// ─── Scene Tree Utilities ────────────────────────────────────────────────────
+
+interface SceneTreeItem {
+    scene: FacilityScene;
+    children: SceneTreeItem[];
+}
+
+function buildSceneTree(scenes: FacilityScene[]): { root: FacilityScene | null; tree: SceneTreeItem[] } {
+    const root = scenes.find(s => !s.parentSceneId) ?? null;
+    if (!root) return { root: null, tree: [] };
+    const childMap = new Map<string, FacilityScene[]>();
+    for (const s of scenes) {
+        if (s.parentSceneId) {
+            const arr = childMap.get(s.parentSceneId) || [];
+            arr.push(s);
+            childMap.set(s.parentSceneId, arr);
+        }
+    }
+    function build(parent: FacilityScene): SceneTreeItem {
+        const kids = (childMap.get(parent.id) || []).sort((a, b) => a.sortOrder - b.sortOrder);
+        return { scene: parent, children: kids.map(build) };
+    }
+    return { root, tree: [build(root)] };
+}
+
+function countDescendants(node: SceneTreeItem): number {
+    let count = node.children.length;
+    for (const child of node.children) count += countDescendants(child);
+    return count;
+}
+
+// ─── SceneTreeNode (recursive) ──────────────────────────────────────────────
+
+interface SceneTreeNodeProps {
+    item: SceneTreeItem;
+    depth: number;
+    projectId: string;
+    onError: (msg: string) => void;
+    onRefresh: () => void;
+    planInputRef: React.RefObject<HTMLInputElement | null>;
+    setPlanUploadSceneId: (id: string) => void;
+    isPlanUploading: boolean;
+}
+
+const SceneTreeNode: React.FC<SceneTreeNodeProps> = ({
+    item, depth, projectId, onError, onRefresh, planInputRef, setPlanUploadSceneId, isPlanUploading,
+}) => {
+    const { createScene, updateScene, deleteScene } = useFacilityStore();
+    const [expanded, setExpanded] = useState(true);
+    const [models, setModels] = useState<FacilityModelItem[]>([]);
+
+    // 新增子場景
+    const [showAddSub, setShowAddSub] = useState(false);
+    const [addSubForm, setAddSubForm] = useState({ name: '', description: '', parentModelId: '' });
+    // 編輯
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState({ name: '', description: '', parentModelId: '', boundsWidth: '', boundsDepth: '', boundsHeight: '' });
+    // 刪除確認
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const scene = item.scene;
+
+    // 載入當前場景的模型（供子節點的 ModelSelect 使用）
+    useEffect(() => {
+        axios.get<FacilityModelItem[]>(`${API_BASE}/api/facility/models`, {
+            params: { sceneId: scene.id },
+            headers: getAuthHeaders(),
+            withCredentials: true,
+        }).then(r => setModels(Array.isArray(r.data) ? r.data : []))
+          .catch(() => setModels([]));
+    }, [scene.id]);
+
+    const handleAddSub = async () => {
+        if (!addSubForm.name.trim()) { onError('子場景名稱為必填'); return; }
+        setIsSaving(true);
+        try {
+            await createScene({
+                projectId,
+                parentSceneId: scene.id,
+                parentModelId: addSubForm.parentModelId || undefined,
+                name: addSubForm.name.trim(),
+                description: addSubForm.description.trim() || undefined,
+            });
+            setShowAddSub(false);
+            setAddSubForm({ name: '', description: '', parentModelId: '' });
+        } catch (e: any) {
+            onError(e?.response?.data?.error || '新增失敗');
+        } finally { setIsSaving(false); }
+    };
+
+    const handleEditSave = async () => {
+        if (!editForm.name.trim()) { onError('名稱為必填'); return; }
+        setIsSaving(true);
+        try {
+            const bW = parseFloat(editForm.boundsWidth);
+            const bD = parseFloat(editForm.boundsDepth);
+            const bH = parseFloat(editForm.boundsHeight);
+            const bounds = (bW > 0 && bD > 0 && bH > 0) ? { width: bW, depth: bD, height: bH } : null;
+            await updateScene(scene.id, {
+                name: editForm.name.trim(),
+                description: editForm.description.trim(),
+                parentModelId: editForm.parentModelId || null,
+                sceneBounds: bounds,
+            });
+            setIsEditing(false);
+        } catch (e: any) {
+            onError(e?.response?.data?.error || '更新失敗');
+        } finally { setIsSaving(false); }
+    };
+
+    const handleDelete = async () => {
+        try {
+            await deleteScene(scene.id);
+            setShowDeleteConfirm(false);
+        } catch (e: any) {
+            onError(e?.response?.data?.error || '刪除失敗');
+        }
+    };
+
+    const NodeModelSelect: React.FC<{ value: string; onChange: (v: string) => void; parentModels: FacilityModelItem[] }> = ({ value, onChange, parentModels }) => (
+        <select className="dm-form-input" value={value} onChange={e => onChange(e.target.value)}>
+            <option value="">（不關聯模型）</option>
+            {parentModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+    );
+
+    const descendantCount = countDescendants(item);
+    const hasChildren = item.children.length > 0;
+
+    return (
+        <div style={{ marginLeft: depth > 0 ? 16 : 0 }}>
+            <div className="dm-file-card" style={{ marginBottom: 4 }}>
+                {isEditing ? (
+                    <div style={{ flex: 1 }}>
+                        <div className="dm-form-group" style={{ marginBottom: 6 }}>
+                            <label className="dm-form-label">子場景名稱 *</label>
+                            <input className="dm-form-input" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+                        </div>
+                        <div className="dm-form-group" style={{ marginBottom: 6 }}>
+                            <label className="dm-form-label">描述（可選）</label>
+                            <input className="dm-form-input" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
+                        </div>
+                        <div className="dm-form-group" style={{ marginBottom: 8 }}>
+                            <label className="dm-form-label">關聯模型</label>
+                            <NodeModelSelect value={editForm.parentModelId} onChange={v => setEditForm(f => ({ ...f, parentModelId: v }))} parentModels={models} />
+                            <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>顯示父場景「{scene.name}」中的模型</div>
+                        </div>
+                        <div className="dm-form-group" style={{ marginBottom: 8 }}>
+                            <label className="dm-form-label">場景範圍（選填，空白=自動計算）</label>
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <input className="dm-form-input" type="number" min="0" step="any" placeholder="寬 (m)" value={editForm.boundsWidth} onChange={e => setEditForm(f => ({ ...f, boundsWidth: e.target.value }))} style={{ width: 90 }} />
+                                <span style={{ fontSize: 12, color: '#9ca3af' }}>x</span>
+                                <input className="dm-form-input" type="number" min="0" step="any" placeholder="深 (m)" value={editForm.boundsDepth} onChange={e => setEditForm(f => ({ ...f, boundsDepth: e.target.value }))} style={{ width: 90 }} />
+                                <span style={{ fontSize: 12, color: '#9ca3af' }}>x</span>
+                                <input className="dm-form-input" type="number" min="0" step="any" placeholder="高 (m)" value={editForm.boundsHeight} onChange={e => setEditForm(f => ({ ...f, boundsHeight: e.target.value }))} style={{ width: 90 }} />
+                                <span style={{ fontSize: 11, color: '#9ca3af' }}>m</span>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="dm-btn dm-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={handleEditSave} disabled={isSaving}>儲存</button>
+                            <button className="dm-btn dm-btn-secondary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => setIsEditing(false)}>取消</button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="dm-file-info" style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {hasChildren && (
+                                <button
+                                    onClick={() => setExpanded(!expanded)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#6b7280', display: 'flex' }}
+                                >
+                                    {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                </button>
+                            )}
+                            <span className="dm-file-name">{scene.name}</span>
+                            {hasChildren && <span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 4 }}>({item.children.length})</span>}
+                        </div>
+                        {scene.parentModelId && (
+                            <div className="dm-file-meta" style={{ color: '#2563eb' }}>
+                                關聯模型：{models.find(m => m.id === scene.parentModelId)?.name || scene.parentModelId}
+                            </div>
+                        )}
+                        {!scene.parentModelId && scene.parentSceneId && <div className="dm-file-meta">未關聯模型</div>}
+                        {scene.description && <div className="dm-file-meta">{scene.description}</div>}
+                        {/* 平面圖狀態 */}
+                        {(scene.planImageUrl || scene.autoPlanImageUrl) ? (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, padding: '3px 8px', borderRadius: 4, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                                <span style={{ fontSize: 11, color: '#15803d', fontWeight: 500 }}>已有平面圖</span>
+                                {scene.planImageUrl && <span style={{ fontSize: 10, color: '#86efac' }}>（手動上傳）</span>}
+                                {!scene.planImageUrl && scene.autoPlanImageUrl && <span style={{ fontSize: 10, color: '#86efac' }}>（自動生成）</span>}
+                            </div>
+                        ) : (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, padding: '3px 8px', borderRadius: 4, background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                                <span style={{ fontSize: 11, color: '#9ca3af' }}>尚未上傳平面圖</span>
+                            </div>
+                        )}
+                        <div className="dm-file-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                            <button className="dm-file-btn" onClick={() => {
+                                setIsEditing(true);
+                                setEditForm({
+                                    name: scene.name, description: scene.description || '',
+                                    parentModelId: scene.parentModelId || '',
+                                    boundsWidth: scene.sceneBounds?.width?.toString() || '',
+                                    boundsDepth: scene.sceneBounds?.depth?.toString() || '',
+                                    boundsHeight: scene.sceneBounds?.height?.toString() || '',
+                                });
+                            }}>編輯</button>
+                            <button className="dm-file-btn" onClick={() => { setPlanUploadSceneId(scene.id); planInputRef.current?.click(); }} disabled={isPlanUploading}>
+                                {(scene.planImageUrl || scene.autoPlanImageUrl) ? '更換平面圖' : '上傳平面圖'}
+                            </button>
+                            <button className="dm-file-btn" onClick={() => setShowAddSub(true)}>+ 子場景</button>
+                            {scene.parentSceneId && (
+                                <button className="dm-file-btn dm-file-btn-delete" onClick={() => setShowDeleteConfirm(true)}>刪除</button>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* 子場景列表 */}
+            {expanded && item.children.map(child => (
+                <SceneTreeNode
+                    key={child.scene.id}
+                    item={child}
+                    depth={depth + 1}
+                    projectId={projectId}
+                    onError={onError}
+                    onRefresh={onRefresh}
+                    planInputRef={planInputRef}
+                    setPlanUploadSceneId={setPlanUploadSceneId}
+                    isPlanUploading={isPlanUploading}
+                />
+            ))}
+
+            {/* 新增子場景表單 */}
+            {showAddSub && (
+                <div style={{ marginLeft: 16, marginTop: 4, padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                    <div className="dm-form-group">
+                        <label className="dm-form-label">子場景名稱 *</label>
+                        <input className="dm-form-input" value={addSubForm.name} onChange={e => setAddSubForm(f => ({ ...f, name: e.target.value }))} placeholder="例：操作室、試驗室" autoFocus />
+                    </div>
+                    <div className="dm-form-group">
+                        <label className="dm-form-label">描述（可選）</label>
+                        <input className="dm-form-input" value={addSubForm.description} onChange={e => setAddSubForm(f => ({ ...f, description: e.target.value }))} />
+                    </div>
+                    <div className="dm-form-group">
+                        <label className="dm-form-label">關聯模型（點擊該模型時顯示入口）</label>
+                        <NodeModelSelect value={addSubForm.parentModelId} onChange={v => setAddSubForm(f => ({ ...f, parentModelId: v }))} parentModels={models} />
+                        <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>顯示「{scene.name}」場景中的模型</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="dm-btn dm-btn-primary" onClick={handleAddSub} disabled={isSaving}>{isSaving ? '新增中...' : '新增子場景'}</button>
+                        <button className="dm-btn dm-btn-secondary" onClick={() => { setShowAddSub(false); }}>取消</button>
+                    </div>
+                </div>
+            )}
+
+            {/* 刪除確認 */}
+            {showDeleteConfirm && (
+                <div className="dm-modal-overlay">
+                    <div className="dm-modal dm-modal-delete">
+                        <div className="dm-modal-header">
+                            <h3 className="dm-modal-title" style={{ color: '#dc2626' }}>確認刪除</h3>
+                            <button onClick={() => setShowDeleteConfirm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
+                        </div>
+                        <div className="dm-modal-body">
+                            <p>確定刪除「{scene.name}」？{descendantCount > 0 ? `其下 ${descendantCount} 個子場景將一併刪除。` : ''}場景內的模型資料將一併移除，此操作無法復原。</p>
+                        </div>
+                        <div className="dm-modal-footer">
+                            <button className="dm-btn dm-btn-secondary" onClick={() => setShowDeleteConfirm(false)}>取消</button>
+                            <button className="dm-btn dm-btn-danger" onClick={handleDelete}>確認刪除</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // ─── Tab 1: SceneManager ─────────────────────────────────────────────────────
 
 const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
@@ -86,20 +366,15 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
     // 建立主場景
     const [isCreatingRoot, setIsCreatingRoot] = useState(false);
     const [createRootForm, setCreateRootForm] = useState({ name: '', description: '' });
-    // 新增子場景
+    // 新增子場景（根節點層級）
     const [showAddSub, setShowAddSub] = useState(false);
     const [addSubForm, setAddSubForm] = useState({ name: '', description: '', parentModelId: '' });
-    // 編輯子場景
-    const [editingSubId, setEditingSubId] = useState<string | null>(null);
-    const [editSubForm, setEditSubForm] = useState({ name: '', description: '', parentModelId: '', boundsWidth: '', boundsDepth: '', boundsHeight: '' });
-    // 刪除確認
-    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    // 主場景下的模型（供根層級新增子場景的 ModelSelect 使用）
+    const [rootModels, setRootModels] = useState<FacilityModelItem[]>([]);
     // 平面圖
     const [planUploadSceneId, setPlanUploadSceneId] = useState<string | null>(null);
     const [isPlanUploading, setIsPlanUploading] = useState(false);
     const planInputRef = useRef<HTMLInputElement>(null);
-    // 主場景下的模型（供子場景選擇關聯）
-    const [rootModels, setRootModels] = useState<FacilityModelItem[]>([]);
 
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -108,10 +383,9 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
         if (projectId) fetchScenes(projectId);
     }, [projectId, fetchScenes]);
 
-    const rootScene = scenes.find(s => !s.parentSceneId) ?? null;
-    const subScenes = scenes.filter(s => !!s.parentSceneId).sort((a, b) => a.sortOrder - b.sortOrder);
+    const { root: rootScene, tree } = useMemo(() => buildSceneTree(scenes), [scenes]);
 
-    // 主場景建立後，載入其模型供子場景關聯選擇
+    // 主場景建立後，載入其模型供根層級新增子場景的 ModelSelect 使用
     useEffect(() => {
         if (!rootScene) { setRootModels([]); return; }
         axios.get<FacilityModelItem[]>(`${API_BASE}/api/facility/models`, {
@@ -168,37 +442,6 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
         } finally { setIsSaving(false); }
     };
 
-    const handleEditSubSave = async (id: string) => {
-        if (!editSubForm.name.trim()) { setError('名稱為必填'); return; }
-        setIsSaving(true); setError(null);
-        try {
-            const bW = parseFloat(editSubForm.boundsWidth);
-            const bD = parseFloat(editSubForm.boundsDepth);
-            const bH = parseFloat(editSubForm.boundsHeight);
-            const subBounds = (bW > 0 && bD > 0 && bH > 0)
-                ? { width: bW, depth: bD, height: bH }
-                : null;
-            await updateScene(id, {
-                name: editSubForm.name.trim(),
-                description: editSubForm.description.trim(),
-                parentModelId: editSubForm.parentModelId || null,
-                sceneBounds: subBounds,
-            });
-            setEditingSubId(null);
-        } catch (e: any) {
-            setError(e?.response?.data?.error || '更新失敗');
-        } finally { setIsSaving(false); }
-    };
-
-    const handleDeleteSub = async (id: string) => {
-        try {
-            await deleteScene(id);
-            setDeleteConfirmId(null);
-        } catch (e: any) {
-            setError(e?.response?.data?.error || '刪除失敗');
-        }
-    };
-
     const handlePlanUpload = async (file: File, sceneId: string) => {
         setIsPlanUploading(true); setError(null);
         try {
@@ -214,7 +457,7 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
         } finally { setIsPlanUploading(false); setPlanUploadSceneId(null); }
     };
 
-    const ModelSelect: React.FC<{ value: string; onChange: (v: string) => void }> = ({ value, onChange }) => (
+    const RootModelSelect: React.FC<{ value: string; onChange: (v: string) => void }> = ({ value, onChange }) => (
         <select className="dm-form-input" value={value} onChange={e => onChange(e.target.value)}>
             <option value="">（不關聯模型）</option>
             {rootModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -317,81 +560,31 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                 </div>
             )}
 
-            {/* ── 子場景（僅主場景存在時顯示）── */}
-            {rootScene && (
+            {/* ── 場景樹（子場景） ── */}
+            {rootScene && tree.length > 0 && tree[0].children.length > 0 && (
                 <>
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>子場景</div>
-
                     <div className="dm-file-list" style={{ marginBottom: 8 }}>
-                        {subScenes.length === 0 && <div className="dm-empty">尚無子場景</div>}
-                        {subScenes.map(sub => {
-                            const linkedModel = rootModels.find(m => m.id === sub.parentModelId);
-                            return (
-                                <div key={sub.id} className="dm-file-card">
-                                    {editingSubId === sub.id ? (
-                                        <div style={{ flex: 1 }}>
-                                            <div className="dm-form-group" style={{ marginBottom: 6 }}>
-                                                <label className="dm-form-label">子場景名稱 *</label>
-                                                <input className="dm-form-input" value={editSubForm.name} onChange={e => setEditSubForm(f => ({ ...f, name: e.target.value }))} />
-                                            </div>
-                                            <div className="dm-form-group" style={{ marginBottom: 6 }}>
-                                                <label className="dm-form-label">描述（可選）</label>
-                                                <input className="dm-form-input" value={editSubForm.description} onChange={e => setEditSubForm(f => ({ ...f, description: e.target.value }))} />
-                                            </div>
-                                            <div className="dm-form-group" style={{ marginBottom: 8 }}>
-                                                <label className="dm-form-label">關聯模型</label>
-                                                <ModelSelect value={editSubForm.parentModelId} onChange={v => setEditSubForm(f => ({ ...f, parentModelId: v }))} />
-                                            </div>
-                                            <div className="dm-form-group" style={{ marginBottom: 8 }}>
-                                                <label className="dm-form-label">場景範圍（選填，空白=自動計算）</label>
-                                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                                    <input className="dm-form-input" type="number" min="0" step="any" placeholder="寬 (m)" value={editSubForm.boundsWidth} onChange={e => setEditSubForm(f => ({ ...f, boundsWidth: e.target.value }))} style={{ width: 90 }} />
-                                                    <span style={{ fontSize: 12, color: '#9ca3af' }}>x</span>
-                                                    <input className="dm-form-input" type="number" min="0" step="any" placeholder="深 (m)" value={editSubForm.boundsDepth} onChange={e => setEditSubForm(f => ({ ...f, boundsDepth: e.target.value }))} style={{ width: 90 }} />
-                                                    <span style={{ fontSize: 12, color: '#9ca3af' }}>x</span>
-                                                    <input className="dm-form-input" type="number" min="0" step="any" placeholder="高 (m)" value={editSubForm.boundsHeight} onChange={e => setEditSubForm(f => ({ ...f, boundsHeight: e.target.value }))} style={{ width: 90 }} />
-                                                    <span style={{ fontSize: 11, color: '#9ca3af' }}>m</span>
-                                                </div>
-                                            </div>
-                                            <div style={{ display: 'flex', gap: 8 }}>
-                                                <button className="dm-btn dm-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => handleEditSubSave(sub.id)} disabled={isSaving}>儲存</button>
-                                                <button className="dm-btn dm-btn-secondary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => setEditingSubId(null)}>取消</button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="dm-file-info" style={{ flex: 1 }}>
-                                            <div className="dm-file-name">{sub.name}</div>
-                                            {linkedModel && (
-                                                <div className="dm-file-meta" style={{ color: '#2563eb' }}>
-                                                    關聯模型：{linkedModel.name}
-                                                </div>
-                                            )}
-                                            {!linkedModel && <div className="dm-file-meta">未關聯模型</div>}
-                                            {sub.description && <div className="dm-file-meta">{sub.description}</div>}
-                                            {/* 平面圖狀態 */}
-                                            {(sub.planImageUrl || sub.autoPlanImageUrl) ? (
-                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, padding: '3px 8px', borderRadius: 4, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                                                    <span style={{ fontSize: 11, color: '#15803d', fontWeight: 500 }}>✓ 已有平面圖</span>
-                                                    {sub.planImageUrl && <span style={{ fontSize: 10, color: '#86efac' }}>（手動上傳）</span>}
-                                                    {!sub.planImageUrl && sub.autoPlanImageUrl && <span style={{ fontSize: 10, color: '#86efac' }}>（自動生成）</span>}
-                                                </div>
-                                            ) : (
-                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5, padding: '3px 8px', borderRadius: 4, background: '#f9fafb', border: '1px solid #e5e7eb' }}>
-                                                    <span style={{ fontSize: 11, color: '#9ca3af' }}>尚未上傳平面圖</span>
-                                                </div>
-                                            )}
-                                            <div className="dm-file-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-                                                <button className="dm-file-btn" onClick={() => { setEditingSubId(sub.id); setEditSubForm({ name: sub.name, description: sub.description || '', parentModelId: sub.parentModelId || '', boundsWidth: sub.sceneBounds?.width?.toString() || '', boundsDepth: sub.sceneBounds?.depth?.toString() || '', boundsHeight: sub.sceneBounds?.height?.toString() || '' }); }}>編輯</button>
-                                                <button className="dm-file-btn" onClick={() => { setPlanUploadSceneId(sub.id); planInputRef.current?.click(); }} disabled={isPlanUploading}>{(sub.planImageUrl || sub.autoPlanImageUrl) ? '更換平面圖' : '上傳平面圖'}</button>
-                                                <button className="dm-file-btn dm-file-btn-delete" onClick={() => setDeleteConfirmId(sub.id)}>刪除</button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
+                        {tree[0].children.map(child => (
+                            <SceneTreeNode
+                                key={child.scene.id}
+                                item={child}
+                                depth={0}
+                                projectId={projectId}
+                                onError={setError}
+                                onRefresh={() => fetchScenes(projectId)}
+                                planInputRef={planInputRef}
+                                setPlanUploadSceneId={setPlanUploadSceneId}
+                                isPlanUploading={isPlanUploading}
+                            />
+                        ))}
                     </div>
+                </>
+            )}
 
+            {/* 根層級新增子場景 */}
+            {rootScene && (
+                <>
                     {showAddSub ? (
                         <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
                             <div className="dm-form-group">
@@ -404,7 +597,7 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                             </div>
                             <div className="dm-form-group">
                                 <label className="dm-form-label">關聯模型（點擊該模型時顯示入口）</label>
-                                <ModelSelect value={addSubForm.parentModelId} onChange={v => setAddSubForm(f => ({ ...f, parentModelId: v }))} />
+                                <RootModelSelect value={addSubForm.parentModelId} onChange={v => setAddSubForm(f => ({ ...f, parentModelId: v }))} />
                             </div>
                             <div style={{ display: 'flex', gap: 8 }}>
                                 <button className="dm-btn dm-btn-primary" onClick={handleAddSubScene} disabled={isSaving}>{isSaving ? '新增中...' : '新增子場景'}</button>
@@ -428,24 +621,6 @@ const SceneManager: React.FC<{ projectId: string }> = ({ projectId }) => {
                     e.target.value = '';
                 }}
             />
-
-            {deleteConfirmId && (
-                <div className="dm-modal-overlay">
-                    <div className="dm-modal dm-modal-delete">
-                        <div className="dm-modal-header">
-                            <h3 className="dm-modal-title" style={{ color: '#dc2626' }}>確認刪除</h3>
-                            <button onClick={() => setDeleteConfirmId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
-                        </div>
-                        <div className="dm-modal-body">
-                            <p>確定刪除「{subScenes.find(s => s.id === deleteConfirmId)?.name}」？場景內的模型資料將一併移除，此操作無法復原。</p>
-                        </div>
-                        <div className="dm-modal-footer">
-                            <button className="dm-btn dm-btn-secondary" onClick={() => setDeleteConfirmId(null)}>取消</button>
-                            <button className="dm-btn dm-btn-danger" onClick={() => handleDeleteSub(deleteConfirmId)}>確認刪除</button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
