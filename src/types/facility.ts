@@ -98,3 +98,24 @@ export interface Transform {
     rotation?: { x: number; y: number; z: number };
     scale?: { x: number; y: number; z: number };
 }
+
+/** 動畫匯出 JSON 格式 (version 1) */
+export interface AnimationExportData {
+    name: string;
+    type: 'keyframe';
+    trigger: 'auto' | 'manual';
+    loop: boolean;
+    duration: number;
+    easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+    pathMode: 'linear' | 'catmullrom';
+    autoOrient: boolean;
+    keyframes: AnimationKeyframe[];
+}
+
+export interface AnimationExportFile {
+    version: 1;
+    exportedAt: string;
+    sourceModelName: string;
+    type: 'single' | 'batch';
+    animations: AnimationExportData[];
+}

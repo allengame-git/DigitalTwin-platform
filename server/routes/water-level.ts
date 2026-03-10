@@ -9,6 +9,7 @@
 
 import { Router, Request, Response } from 'express';
 import { safeResolvePath } from '../lib/safePath';
+import { getPythonExecutable } from '../lib/pythonPath';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -67,8 +68,7 @@ router.post('/', authenticate, upload.single('file'), async (req: Request, res: 
 
         // Python script
         const pythonScript = path.join(__dirname, '../scripts/water_level_processor.py');
-        const venvPython = path.join(__dirname, '../scripts/.venv/bin/python3');
-        const pythonExecutable = fs.existsSync(venvPython) ? venvPython : 'python3';
+        const pythonExecutable = getPythonExecutable();
 
         const pythonArgs = [
             pythonScript,

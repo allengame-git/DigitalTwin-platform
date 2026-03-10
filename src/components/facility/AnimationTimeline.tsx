@@ -3,9 +3,9 @@
  * 底部面板：多模型分軌顯示、播放控制、關鍵幀編輯
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Play, Pause, Square, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Play, Pause, Square, Plus, Trash2, RefreshCw, Download, Upload } from 'lucide-react';
 import { useFacilityStore, getModelGroupRef } from '@/stores/facilityStore';
-import type { FacilityAnimation, AnimationKeyframe } from '@/types/facility';
+import type { FacilityAnimation, AnimationKeyframe, AnimationExportFile, AnimationExportData } from '@/types/facility';
 
 const EASING_OPTIONS = [
     { value: 'linear', label: '線性' },
@@ -321,6 +321,68 @@ function ModelTrackRow({ modelId, modelName, isFocused, onFocus }: {
     );
 }
 
+// ── Export/Import Helpers ────────────────────────────────────────────────────
+
+/** Strip DB-specific fields from an animation for export */
+function toExportData(anim: FacilityAnimation): AnimationExportData {
+    return {
+        name: anim.name,
+        type: anim.type as 'keyframe',
+        trigger: anim.trigger,
+        loop: anim.loop,
+        duration: anim.duration,
+        easing: anim.easing,
+        pathMode: anim.pathMode,
+        autoOrient: anim.autoOrient,
+        keyframes: anim.keyframes,
+    };
+}
+
+/** Trigger browser download of a JSON file */
+function downloadJson(data: AnimationExportFile, filename: string) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+/** Sanitize string for safe filename */
+function safeFilename(s: string): string {
+    return s.replace(/[^\w\u4e00-\u9fff\u3400-\u4dbf-]/g, '-').replace(/-+/g, '-');
+}
+
+/** Apply position offset to all keyframes that have a position field */
+function applyPositionOffset(
+    keyframes: AnimationKeyframe[],
+    offset: { x: number; y: number; z: number },
+): AnimationKeyframe[] {
+    return keyframes.map(kf => {
+        if (!kf.position) return kf;
+        return {
+            ...kf,
+            position: {
+                x: kf.position.x + offset.x,
+                y: kf.position.y + offset.y,
+                z: kf.position.z + offset.z,
+            },
+        };
+    });
+}
+
+/** Validate an imported JSON object. Returns error message or null if valid. */
+function validateImport(data: unknown): string | null {
+    if (!data || typeof data !== 'object') return '檔案格式不正確';
+    const obj = data as Record<string, unknown>;
+    if (obj.version !== 1) return '不支援的版本格式';
+    if (!Array.isArray(obj.animations) || obj.animations.length === 0) return '檔案中沒有動畫資料';
+    return null;
+}
+
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function AnimationTimeline() {
@@ -444,6 +506,116 @@ export function AnimationTimeline() {
         setEditingKeyframeIndex(null);
     }, [selectedAnim, editingKeyframeIndex, deleteKeyframe, setEditingKeyframeIndex]);
 
+    // ── Export ──
+    const handleExportSingle = useCallback(() => {
+        if (!selectedAnim || !focusedModel) return;
+        const exportFile: AnimationExportFile = {
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            sourceModelName: focusedModel.name,
+            type: 'single',
+            animations: [toExportData(selectedAnim)],
+        };
+        downloadJson(exportFile, `${safeFilename(focusedModel.name)}-${safeFilename(selectedAnim.name)}-animation.json`);
+    }, [selectedAnim, focusedModel]);
+
+    const handleExportAll = useCallback(() => {
+        if (!focusedModel) return;
+        const modelAnims = animations.filter(a => a.modelId === focusedModel.id && a.type === 'keyframe');
+        if (modelAnims.length === 0) return;
+        const exportFile: AnimationExportFile = {
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            sourceModelName: focusedModel.name,
+            type: 'batch',
+            animations: modelAnims.map(toExportData),
+        };
+        downloadJson(exportFile, `${safeFilename(focusedModel.name)}-all-animations.json`);
+    }, [focusedModel, animations]);
+
+    // ── Import ──
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImportClick = useCallback(() => {
+        if (selectedModelIds.length === 0) {
+            alert('請先選擇目標模型');
+            return;
+        }
+        fileInputRef.current?.click();
+    }, [selectedModelIds]);
+
+    const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+
+        try {
+            const text = await file.text();
+            let data: unknown;
+            try {
+                data = JSON.parse(text);
+            } catch {
+                alert('檔案格式不正確');
+                return;
+            }
+
+            const error = validateImport(data);
+            if (error) { alert(error); return; }
+
+            const importFile = data as AnimationExportFile;
+            const keyframeAnims = importFile.animations.filter(a => a.type === 'keyframe');
+            if (keyframeAnims.length === 0) {
+                alert('檔案中沒有可匯入的 keyframe 動畫');
+                return;
+            }
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const modelId of selectedModelIds) {
+                const model = models.find(m => m.id === modelId);
+                if (!model) continue;
+
+                const modelPos = model.position ?? { x: 0, y: 0, z: 0 };
+
+                for (const animData of keyframeAnims) {
+                    const anchor = animData.keyframes.find(kf => kf.position);
+                    const offset = anchor?.position
+                        ? { x: modelPos.x - anchor.position.x, y: modelPos.y - anchor.position.y, z: modelPos.z - anchor.position.z }
+                        : { x: 0, y: 0, z: 0 };
+
+                    const offsetKeyframes = applyPositionOffset(animData.keyframes, offset);
+
+                    try {
+                        await createAnimation(modelId, {
+                            name: animData.name,
+                            type: animData.type,
+                            trigger: animData.trigger,
+                            loop: animData.loop,
+                            duration: animData.duration,
+                            easing: animData.easing,
+                            pathMode: animData.pathMode,
+                            autoOrient: animData.autoOrient,
+                            keyframes: offsetKeyframes,
+                        });
+                        successCount++;
+                    } catch {
+                        failCount++;
+                    }
+                }
+            }
+
+            const modelCount = selectedModelIds.length;
+            if (failCount === 0) {
+                alert(`已匯入 ${successCount} 個動畫到 ${modelCount} 個模型`);
+            } else {
+                alert(`已匯入 ${successCount} 個動畫，${failCount} 個失敗`);
+            }
+        } catch {
+            alert('匯入過程發生錯誤');
+        }
+    }, [selectedModelIds, models, createAnimation]);
+
     const handlePlay = useCallback(() => {
         if (playbackState === 'playing') {
             setPlaybackState('paused');
@@ -509,6 +681,13 @@ export function AnimationTimeline() {
                         <Plus size={14} />
                     </button>
                 )}
+                <button
+                    onClick={handleImportClick}
+                    style={{ ...iconBtnStyle, marginLeft: (!focusedModelId && !selectedAnim) ? 'auto' : 0 }}
+                    title="從 JSON 匯入動畫"
+                >
+                    <Upload size={14} />
+                </button>
             </div>
 
             {/* 新增表單 */}
@@ -620,13 +799,21 @@ export function AnimationTimeline() {
                             />
                             循環
                         </label>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); deleteAnimation(selectedAnim.id); }}
-                            style={{ ...iconBtnStyle, color: '#94a3b8', marginLeft: 'auto' }}
-                            title="刪除此動畫"
-                        >
-                            <Trash2 size={12} />
-                        </button>
+                        <div style={{ display: 'flex', gap: 2, marginLeft: 'auto' }}>
+                            <button onClick={handleExportSingle} style={{ ...iconBtnStyle, color: '#94a3b8' }} title="匯出此動畫">
+                                <Download size={12} />
+                            </button>
+                            <button onClick={handleExportAll} style={{ ...iconBtnStyle, color: '#94a3b8' }} title="匯出全部動畫">
+                                <Download size={12} /><Plus size={8} style={{ marginLeft: -4 }} />
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); deleteAnimation(selectedAnim.id); }}
+                                style={{ ...iconBtnStyle, color: '#94a3b8' }}
+                                title="刪除此動畫"
+                            >
+                                <Trash2 size={12} />
+                            </button>
+                        </div>
                     </div>
 
                     {/* 關鍵幀操作 */}
@@ -671,6 +858,15 @@ export function AnimationTimeline() {
                     </div>
                 </div>
             )}
+
+            {/* Hidden file input for import */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                style={{ display: 'none' }}
+                onChange={handleFileChange}
+            />
         </div>
     );
 }

@@ -7,10 +7,10 @@ import { spawn } from 'child_process';
 import prisma from '../lib/prisma';
 import { FacilityInfoType, Prisma } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
+import { safeResolvePath } from '../lib/safePath';
+import { getPythonExecutable } from '../lib/pythonPath';
 
 const router = Router();
-
-import { safeResolvePath } from '../lib/safePath';
 
 // ===== Upload directories =====
 const FACILITY_DIR = path.join(__dirname, '../uploads/facility');
@@ -702,8 +702,7 @@ router.post('/scenes/:id/terrain', authenticate, facilityTerrainUpload, async (r
         if (!file) return res.status(400).json({ error: '請選擇地形 CSV 檔案' });
 
         const pythonScript = path.join(__dirname, '../scripts/facility_terrain_processor.py');
-        const venvPython = path.join(__dirname, '../scripts/.venv/bin/python3');
-        const pythonExecutable = fs.existsSync(venvPython) ? venvPython : 'python3';
+        const pythonExecutable = getPythonExecutable();
 
         const outputDir = path.join(TERRAIN_DIR, id);
 

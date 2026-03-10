@@ -506,7 +506,11 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
                     currentTime = anim.loop
                         ? elapsed % anim.duration
                         : Math.min(elapsed, anim.duration);
-                    useFacilityStore.getState().setPlaybackTime(currentTime);
+                    // 節流：只在值變化超過閾值時才更新 store，避免每幀觸發 Zustand re-render
+                    const prev = useFacilityStore.getState().playbackTime;
+                    if (Math.abs(currentTime - prev) > 0.016) {
+                        useFacilityStore.getState().setPlaybackTime(currentTime);
+                    }
                     shouldAnimate = true;
                 } else if (playbackState === 'paused') {
                     // 只在 playbackTime 實際變化時 snap 一次，之後允許 TransformControls 自由拖曳

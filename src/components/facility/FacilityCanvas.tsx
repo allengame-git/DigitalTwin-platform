@@ -11,6 +11,7 @@ import { ScaleBarCalculator, ScaleBarOverlay, useScaleBar } from '../overlay/Sca
 import { FacilityNorthArrowCalculator, FacilityNorthArrowOverlay, useFacilityNorthArrow } from './FacilityNorthArrow';
 import { useMarqueeSelect, _setMarqueeRefs } from '../../hooks/useMarqueeSelect';
 import { MarqueeOverlay } from './MarqueeOverlay';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 
 /** Canvas 內的同步元件，將 camera/controls 寫入 module-level refs 供 useMarqueeSelect 使用 */
 function MarqueeCameraSync() {
@@ -29,6 +30,27 @@ export function FacilityCanvas() {
     const { containerRef, rect, isDragging } = useMarqueeSelect();
 
     return (
+        <ErrorBoundary fallback={
+            <div style={{
+                width: '100%', height: '100%',
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center',
+                background: '#111', color: '#ccc', gap: '12px',
+            }}>
+                <p style={{ fontSize: '16px', fontWeight: 500 }}>3D 場景載入失敗</p>
+                <p style={{ fontSize: '13px', color: '#888' }}>可能是模型檔案損壞或 WebGL 不支援</p>
+                <button
+                    onClick={() => window.location.reload()}
+                    style={{
+                        padding: '8px 20px', fontSize: '13px',
+                        background: '#2563eb', color: '#fff',
+                        border: 'none', borderRadius: '6px', cursor: 'pointer',
+                    }}
+                >
+                    重新載入
+                </button>
+            </div>
+        }>
         <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
             <Canvas
                 camera={{
@@ -97,6 +119,7 @@ export function FacilityCanvas() {
                 </div>
             )}
         </div>
+        </ErrorBoundary>
     );
 }
 
