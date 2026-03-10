@@ -14,6 +14,7 @@ import { spawn } from 'child_process';
 import prisma from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 import { safeResolvePath } from '../lib/safePath';
+import { getPythonExecutable } from '../lib/pythonPath';
 
 const router = express.Router();
 
@@ -345,8 +346,8 @@ async function startConversion(
         }
         const outputGlb = path.join(outputDir, 'model.glb');
 
-        // Python 虛擬環境路徑
-        const venvPython = path.join(__dirname, '../scripts/.venv/bin/python3');
+        // Python 執行檔路徑（支援 macOS/Linux/Windows）
+        const pythonExecutable = getPythonExecutable();
         const scriptPath = path.join(__dirname, '../scripts/geology_mesh_builder.py');
 
         // 建構 Python 參數
@@ -361,11 +362,11 @@ async function startConversion(
         ];
 
         console.log(`🐍 Starting Python conversion for model ${modelId}`);
-        console.log(`   Command: ${venvPython} ${args.join(' ')}`);
+        console.log(`   Command: ${pythonExecutable} ${args.join(' ')}`);
 
         // Spawn Python process
         const capturedBounds = await new Promise<{ minX: number, maxX: number, minY: number, maxY: number, minZ: number, maxZ: number } | null>((resolve, reject) => {
-            const proc = spawn(venvPython, args, {
+            const proc = spawn(pythonExecutable, args, {
                 cwd: path.dirname(scriptPath),
                 env: { ...process.env, PYTHONUNBUFFERED: '1' },
             });

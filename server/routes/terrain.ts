@@ -7,6 +7,7 @@ import { spawn } from 'child_process';
 import prisma from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 import { safeResolvePath } from '../lib/safePath';
+import { getPythonExecutable } from '../lib/pythonPath';
 
 const router = Router();
 
@@ -65,10 +66,7 @@ router.post('/', authenticate, terrainUpload, async (req: Request, res: Response
 
         // 執行 Python 處理腳本
         const pythonScript = path.join(__dirname, '../scripts/terrain_processor.py');
-        const venvPython = path.join(__dirname, '../scripts/.venv/bin/python3');
-
-        // 優先使用虛擬環境，若不存在則退回系統 python3
-        const pythonExecutable = fs.existsSync(venvPython) ? venvPython : 'python3';
+        const pythonExecutable = getPythonExecutable();
 
         const pythonArgs = [
             pythonScript,
