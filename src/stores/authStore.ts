@@ -152,6 +152,14 @@ export const useAuthStore = create<AuthStore>()(
                 // Token expired but session valid, try refresh
                 if (tokenExpiresAt && Date.now() > tokenExpiresAt) {
                     await get().refreshToken();
+                    const newToken = get().accessToken;
+                    if (!newToken) return;
+                    try {
+                        const user = await authApi.getCurrentUser(newToken);
+                        set({ user, isAuthenticated: true, isLoading: false });
+                    } catch {
+                        await get().logout();
+                    }
                     return;
                 }
 

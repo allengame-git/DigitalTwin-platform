@@ -2,6 +2,17 @@ import { create } from 'zustand';
 import axios from 'axios';
 import { useAuthStore } from './authStore';
 import type { FacilityScene, FacilityModel, FacilityAnimation, AnimationKeyframe, Transform } from '../types/facility';
+import type { ColorRampName } from '../utils/colorRamps';
+
+export interface FacilityTerrainSettings {
+    visible: boolean;
+    textureMode: 'satellite' | 'hillshade' | 'colorRamp';
+    colorRamp: ColorRampName;
+    reverse: boolean;
+    minZ: number;
+    maxZ: number;
+    autoRange: boolean;
+}
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -83,6 +94,7 @@ interface FacilityState {
     // Batch actions
     batchDeleteModels: (modelIds: string[]) => Promise<void>;
     toggleModelVisibility: (modelIds: string[]) => void;
+    setSelectedModelIds: (ids: string[], focusId?: string | null) => void;
     setHiddenModelIds: (ids: string[]) => void;
 
     // Edit mode
@@ -106,6 +118,10 @@ interface FacilityState {
     // Bbox centers (world-space, reported by FacilityModelItem on first frame)
     modelBboxCenters: Record<string, { x: number; y: number; z: number }>;
     setModelBboxCenter: (modelId: string, center: { x: number; y: number; z: number }) => void;
+
+    // Terrain settings
+    terrainSettings: FacilityTerrainSettings;
+    setTerrainSettings: (patch: Partial<FacilityTerrainSettings>) => void;
 
     // Animation
     animations: FacilityAnimation[];
@@ -160,6 +176,20 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     modelBboxCenters: {},
     isLoading: false,
     error: null,
+
+    // Terrain settings
+    terrainSettings: {
+        visible: true,
+        textureMode: 'hillshade',
+        colorRamp: 'spectral',
+        reverse: false,
+        minZ: 0,
+        maxZ: 100,
+        autoRange: true,
+    },
+    setTerrainSettings: (patch) => set(state => ({
+        terrainSettings: { ...state.terrainSettings, ...patch },
+    })),
 
     // Scene transition (N1)
     transitionState: 'idle' as const,
@@ -436,6 +466,11 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
             return { hiddenModelIds: newHidden };
         });
     },
+
+    setSelectedModelIds: (ids, focusId) => set({
+        selectedModelIds: ids,
+        focusedModelId: focusId !== undefined ? focusId : (ids.length > 0 ? ids[ids.length - 1] : null),
+    }),
 
     setHiddenModelIds: (ids) => set({ hiddenModelIds: ids }),
 

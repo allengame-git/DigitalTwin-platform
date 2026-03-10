@@ -1336,7 +1336,7 @@ interface GlbQueueItem {
 }
 
 const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) => {
-    const { scenes, fetchScenes } = useFacilityStore();
+    const { scenes, fetchScenes, updateScene } = useFacilityStore();
 
     const [sceneId, setSceneId] = useState('');
 
@@ -1360,6 +1360,67 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
     const [glbIsDragging, setGlbIsDragging] = useState(false);
     const [glbError, setGlbError] = useState<string | null>(null);
     const glbInputRef = useRef<HTMLInputElement>(null);
+
+    // ── 地形管理 ──
+    const selectedScene = scenes.find(s => s.id === sceneId);
+    const hasTerrain = !!selectedScene?.terrainHeightmapUrl;
+    const [editShiftX, setEditShiftX] = useState('');
+    const [editShiftY, setEditShiftY] = useState('');
+    const [editShiftZ, setEditShiftZ] = useState('');
+    const [editRotation, setEditRotation] = useState('');
+    const [isSavingTerrain, setIsSavingTerrain] = useState(false);
+    const [deleteTerrainConfirm, setDeleteTerrainConfirm] = useState(false);
+
+    // 切換場景時同步 shift/rotation 值
+    useEffect(() => {
+        if (selectedScene) {
+            setEditShiftX(String(selectedScene.coordShiftX ?? 0));
+            setEditShiftY(String(selectedScene.coordShiftY ?? 0));
+            setEditShiftZ(String(selectedScene.coordShiftZ ?? 0));
+            setEditRotation(String(selectedScene.coordRotation ?? 0));
+        }
+    }, [selectedScene?.id]);
+
+    const handleUpdateTerrainParams = async () => {
+        if (!sceneId) return;
+        setIsSavingTerrain(true);
+        setTerrainError(null);
+        try {
+            await updateScene(sceneId, {
+                coordShiftX: parseFloat(editShiftX) || 0,
+                coordShiftY: parseFloat(editShiftY) || 0,
+                coordShiftZ: parseFloat(editShiftZ) || 0,
+                coordRotation: parseFloat(editRotation) || 0,
+            });
+            setTerrainSuccess('座標偏移已更新');
+            useFacilityStore.getState().refreshCurrentScene();
+        } catch {
+            setTerrainError('更新失敗');
+        } finally {
+            setIsSavingTerrain(false);
+        }
+    };
+
+    const handleDeleteTerrain = async () => {
+        if (!sceneId) return;
+        setIsSavingTerrain(true);
+        setTerrainError(null);
+        try {
+            await axios.delete(`${API_BASE}/api/facility/scenes/${sceneId}/terrain`, {
+                headers: getAuthHeaders(),
+                withCredentials: true,
+            });
+            setTerrainSuccess('地形已刪除');
+            setDeleteTerrainConfirm(false);
+            // 重新取得場景資料
+            await fetchScenes(projectId, true);
+            useFacilityStore.getState().refreshCurrentScene();
+        } catch {
+            setTerrainError('刪除失敗');
+        } finally {
+            setIsSavingTerrain(false);
+        }
+    };
 
     // ── 場景模型清單 ──
     const [sceneModels, setSceneModels] = useState<FacilityModelItem[]>([]);
@@ -1397,7 +1458,7 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
 
         try {
             const fd = new FormData();
-            fd.append('csv', csvFile);
+            fd.append('file', csvFile);
             if (satelliteFile) fd.append('satellite', satelliteFile);
             fd.append('shiftX', shiftX);
             fd.append('shiftY', shiftY);
@@ -1416,7 +1477,8 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
             setCsvFile(null);
             setSatelliteFile(null);
             setUploadProgress(0);
-            // N5: 通知 3D 場景刷新
+            // 重新取得場景資料（更新 terrain 欄位）+ 通知 3D 場景刷新
+            await fetchScenes(projectId, true);
             useFacilityStore.getState().refreshCurrentScene();
         } catch (e: any) {
             setTerrainError(e?.response?.data?.error || '上傳失敗');
@@ -1549,58 +1611,143 @@ const SceneTerrainUploader: React.FC<{ projectId: string }> = ({ projectId }) =>
                 {terrainError && <div className="dm-error" style={{ marginBottom: 8 }}>{terrainError}</div>}
                 {terrainSuccess && <div style={{ color: 'var(--success)', background: '#f0fdf4', padding: '6px 10px', borderRadius: 6, marginBottom: 8, fontSize: 12 }}>{terrainSuccess}</div>}
 
-                {/* CSV */}
-                <div className="dm-form-group">
-                    <label className="dm-form-label">地形 CSV（x, y, elevation）*</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <button className="dm-btn dm-btn-secondary" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => csvInputRef.current?.click()}>選擇 CSV</button>
-                        {csvFile ? <span style={{ fontSize: 12, color: '#059669' }}>{csvFile.name}</span> : <span style={{ fontSize: 12, color: '#9ca3af' }}>未選取</span>}
-                        {csvFile && <button onClick={() => setCsvFile(null)} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>移除</button>}
-                    </div>
-                    <input ref={csvInputRef} type="file" hidden accept=".csv" onChange={e => setCsvFile(e.target.files?.[0] || null)} />
-                </div>
-
-                {/* 衛星影像 */}
-                <div className="dm-form-group">
-                    <label className="dm-form-label">衛星影像（可選）</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <button className="dm-btn dm-btn-secondary" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => satInputRef.current?.click()}>選擇影像</button>
-                        {satelliteFile ? <span style={{ fontSize: 12, color: '#059669' }}>{satelliteFile.name}</span> : <span style={{ fontSize: 12, color: '#9ca3af' }}>未選取</span>}
-                        {satelliteFile && <button onClick={() => setSatelliteFile(null)} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>移除</button>}
-                    </div>
-                    <input ref={satInputRef} type="file" hidden accept=".tif,.tiff,.jpg,.jpeg,.png" onChange={e => setSatelliteFile(e.target.files?.[0] || null)} />
-                </div>
-
-                {/* 座標偏移 */}
-                <div style={{ marginBottom: 10 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>座標偏移設定</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                        {[
-                            { label: 'Shift X', value: shiftX, onChange: setShiftX },
-                            { label: 'Shift Y', value: shiftY, onChange: setShiftY },
-                            { label: 'Shift Z', value: shiftZ, onChange: setShiftZ },
-                            { label: 'Rotation (deg)', value: rotation, onChange: setRotation },
-                        ].map(({ label, value, onChange }) => (
-                            <div key={label} className="dm-form-group" style={{ margin: 0 }}>
-                                <label className="dm-form-label">{label}</label>
-                                <input className="dm-form-input" type="number" value={value} onChange={e => onChange(e.target.value)} step="0.1" />
+                {/* ── 已有地形：管理面板 ── */}
+                {hasTerrain && (
+                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: 12, marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#059669' }}>
+                                已上傳地形
+                                {selectedScene?.terrainTextureUrl && ' + 衛星影像'}
                             </div>
-                        ))}
-                    </div>
-                </div>
-
-                {isUploading && (
-                    <>
-                        <div className="dm-progress-container" style={{ marginBottom: 4 }}>
-                            <div className="dm-progress-bar" style={{ width: `${uploadProgress}%` }} />
                         </div>
-                        <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>上傳中 {uploadProgress}%...</div>
-                    </>
+
+                        {selectedScene?.terrainBounds && (
+                            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 10, lineHeight: 1.6 }}>
+                                X: {selectedScene.terrainBounds.minX.toFixed(1)} ~ {selectedScene.terrainBounds.maxX.toFixed(1)}<br />
+                                Y: {selectedScene.terrainBounds.minY.toFixed(1)} ~ {selectedScene.terrainBounds.maxY.toFixed(1)}<br />
+                                Z: {selectedScene.terrainBounds.minZ.toFixed(1)} ~ {selectedScene.terrainBounds.maxZ.toFixed(1)}
+                            </div>
+                        )}
+
+                        {/* 座標偏移編輯 */}
+                        <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>座標偏移 / 旋轉</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                {[
+                                    { label: 'Shift X', value: editShiftX, onChange: setEditShiftX },
+                                    { label: 'Shift Y', value: editShiftY, onChange: setEditShiftY },
+                                    { label: 'Shift Z', value: editShiftZ, onChange: setEditShiftZ },
+                                    { label: 'Rotation (deg)', value: editRotation, onChange: setEditRotation },
+                                ].map(({ label, value, onChange }) => (
+                                    <div key={label} className="dm-form-group" style={{ margin: 0 }}>
+                                        <label className="dm-form-label">{label}</label>
+                                        <input className="dm-form-input" type="number" value={value} onChange={e => onChange(e.target.value)} step="0.1" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                                className="dm-btn dm-btn-primary"
+                                style={{ fontSize: 12, padding: '5px 12px' }}
+                                onClick={handleUpdateTerrainParams}
+                                disabled={isSavingTerrain}
+                            >
+                                {isSavingTerrain ? '儲存中...' : '儲存偏移'}
+                            </button>
+
+                            {!deleteTerrainConfirm ? (
+                                <button
+                                    className="dm-btn"
+                                    style={{ fontSize: 12, padding: '5px 12px', color: '#dc2626', border: '1px solid #fca5a5', background: '#fff' }}
+                                    onClick={() => setDeleteTerrainConfirm(true)}
+                                    disabled={isSavingTerrain}
+                                >
+                                    刪除地形
+                                </button>
+                            ) : (
+                                <>
+                                    <button
+                                        className="dm-btn"
+                                        style={{ fontSize: 12, padding: '5px 12px', color: '#fff', background: '#dc2626', border: 'none' }}
+                                        onClick={handleDeleteTerrain}
+                                        disabled={isSavingTerrain}
+                                    >
+                                        確認刪除
+                                    </button>
+                                    <button
+                                        className="dm-btn dm-btn-secondary"
+                                        style={{ fontSize: 12, padding: '5px 12px' }}
+                                        onClick={() => setDeleteTerrainConfirm(false)}
+                                    >
+                                        取消
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
                 )}
 
-                <button className="dm-btn dm-btn-primary" onClick={handleTerrainSubmit} disabled={isUploading}>
-                    {isUploading ? '上傳中...' : '上傳地形'}
-                </button>
+                {/* ── 上傳新地形 ── */}
+                <div style={{ borderTop: hasTerrain ? '1px solid #e2e8f0' : 'none', paddingTop: hasTerrain ? 12 : 0 }}>
+                    {hasTerrain && (
+                        <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8 }}>重新上傳將覆蓋現有地形</div>
+                    )}
+
+                    {/* CSV */}
+                    <div className="dm-form-group">
+                        <label className="dm-form-label">地形 CSV（x, y, elevation）*</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <button className="dm-btn dm-btn-secondary" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => csvInputRef.current?.click()}>選擇 CSV</button>
+                            {csvFile ? <span style={{ fontSize: 12, color: '#059669' }}>{csvFile.name}</span> : <span style={{ fontSize: 12, color: '#9ca3af' }}>未選取</span>}
+                            {csvFile && <button onClick={() => setCsvFile(null)} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>移除</button>}
+                        </div>
+                        <input ref={csvInputRef} type="file" hidden accept=".csv" onChange={e => setCsvFile(e.target.files?.[0] || null)} />
+                    </div>
+
+                    {/* 衛星影像 */}
+                    <div className="dm-form-group">
+                        <label className="dm-form-label">衛星影像（可選）</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <button className="dm-btn dm-btn-secondary" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => satInputRef.current?.click()}>選擇影像</button>
+                            {satelliteFile ? <span style={{ fontSize: 12, color: '#059669' }}>{satelliteFile.name}</span> : <span style={{ fontSize: 12, color: '#9ca3af' }}>未選取</span>}
+                            {satelliteFile && <button onClick={() => setSatelliteFile(null)} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>移除</button>}
+                        </div>
+                        <input ref={satInputRef} type="file" hidden accept=".tif,.tiff,.jpg,.jpeg,.png" onChange={e => setSatelliteFile(e.target.files?.[0] || null)} />
+                    </div>
+
+                    {/* 座標偏移（上傳用） */}
+                    <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>座標偏移設定</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            {[
+                                { label: 'Shift X', value: shiftX, onChange: setShiftX },
+                                { label: 'Shift Y', value: shiftY, onChange: setShiftY },
+                                { label: 'Shift Z', value: shiftZ, onChange: setShiftZ },
+                                { label: 'Rotation (deg)', value: rotation, onChange: setRotation },
+                            ].map(({ label, value, onChange }) => (
+                                <div key={label} className="dm-form-group" style={{ margin: 0 }}>
+                                    <label className="dm-form-label">{label}</label>
+                                    <input className="dm-form-input" type="number" value={value} onChange={e => onChange(e.target.value)} step="0.1" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {isUploading && (
+                        <>
+                            <div className="dm-progress-container" style={{ marginBottom: 4 }}>
+                                <div className="dm-progress-bar" style={{ width: `${uploadProgress}%` }} />
+                            </div>
+                            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>上傳中 {uploadProgress}%...</div>
+                        </>
+                    )}
+
+                    <button className="dm-btn dm-btn-primary" onClick={handleTerrainSubmit} disabled={isUploading}>
+                        {isUploading ? '上傳中...' : hasTerrain ? '重新上傳地形' : '上傳地形'}
+                    </button>
+                </div>
             </div>
 
             {/* ══ GLB / GLTF 模型批次上傳區塊 ══ */}

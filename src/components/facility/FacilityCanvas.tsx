@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
 import { MapControls } from '@react-three/drei';
 import { FacilityEnvironment } from './FacilityEnvironment';
 import { FacilityModels } from './FacilityModels';
@@ -9,15 +9,27 @@ import { FacilityCaptureHandler } from './FacilityCaptureHandler';
 import { useFacilityStore } from '../../stores/facilityStore';
 import { ScaleBarCalculator, ScaleBarOverlay, useScaleBar } from '../overlay/ScaleBar';
 import { FacilityNorthArrowCalculator, FacilityNorthArrowOverlay, useFacilityNorthArrow } from './FacilityNorthArrow';
+import { useMarqueeSelect, _setMarqueeRefs } from '../../hooks/useMarqueeSelect';
+import { MarqueeOverlay } from './MarqueeOverlay';
+
+/** Canvas 內的同步元件，將 camera/controls 寫入 module-level refs 供 useMarqueeSelect 使用 */
+function MarqueeCameraSync() {
+    const { camera, controls } = useThree();
+    React.useEffect(() => {
+        _setMarqueeRefs(camera, controls);
+    }, [camera, controls]);
+    return null;
+}
 
 export function FacilityCanvas() {
     const isLoading = useFacilityStore(state => state.isLoading);
     const selectModel = useFacilityStore(state => state.selectModel);
     const { pixelsPerMeter, handleScaleChange } = useScaleBar();
     const { cameraRotation, handleRotationChange } = useFacilityNorthArrow();
+    const { containerRef, rect, isDragging } = useMarqueeSelect();
 
     return (
-        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
             <Canvas
                 camera={{
                     fov: 45,
@@ -34,7 +46,9 @@ export function FacilityCanvas() {
                 }}
                 linear={false}  // 確保 sRGB 輸出，GLB 材質顏色正確
                 shadows
-                onPointerMissed={() => selectModel(null)}
+                onPointerMissed={() => {
+                    if (!isDragging.current) selectModel(null);
+                }}
             >
                 <Suspense fallback={null}>
                     <FacilityEnvironment />
@@ -56,9 +70,12 @@ export function FacilityCanvas() {
 
                 <FacilityCameraController />
                 <FacilityCaptureHandler />
+                <MarqueeCameraSync />
                 <ScaleBarCalculator onScaleChange={handleScaleChange} />
                 <FacilityNorthArrowCalculator onRotationChange={handleRotationChange} />
             </Canvas>
+
+            {rect && <MarqueeOverlay rect={rect} />}
 
             <ScaleBarOverlay pixelsPerMeter={pixelsPerMeter} />
             <FacilityNorthArrowOverlay cameraRotation={cameraRotation} />

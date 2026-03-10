@@ -30,9 +30,10 @@ export const FacilityPage: React.FC = () => {
     const selectedModel = useFacilityStore(state =>
         state.focusedModelId ? state.models.find(m => m.id === state.focusedModelId) : null
     );
+    const editMode = useFacilityStore(state => state.editMode);
     const animationMode = useFacilityStore(state => state.animationMode);
-    // InfoPanel 開啟條件：有選取且不是裝飾模型，且不在動畫模式
-    const isInfoPanelOpen = !!selectedModel && selectedModel.modelType !== 'decorative' && !animationMode;
+    // InfoPanel 開啟條件：有選取且不是裝飾模型，且不在編輯/動畫模式
+    const isInfoPanelOpen = !!selectedModel && selectedModel.modelType !== 'decorative' && !editMode && !animationMode;
     const currentScene = useFacilityStore(state => {
         const sid = state.currentSceneId;
         return sid ? state.scenes.find(s => s.id === sid) : null;

@@ -11,7 +11,6 @@ import type {
     RefreshResponse,
     User
 } from '../types/auth';
-import { useAuthStore } from '../stores/authStore';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -22,6 +21,8 @@ async function fetchApi<T>(
     endpoint: string,
     options: RequestInit = {}
 ): Promise<T> {
+    // lazy import 打破 authStore ↔ auth.ts 循環依賴
+    const { useAuthStore } = await import('../stores/authStore');
     const token = useAuthStore.getState().accessToken;
     const csrfToken = document.cookie
         .split('; ')

@@ -22,6 +22,7 @@ export default function FacilityInfoPanel() {
         return sid ? state.scenes.find(s => s.id === sid)?.sceneType : undefined;
     })
 
+    const animationMode = useFacilityStore(state => state.animationMode)
     const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
     const selectedModel = useMemo(
@@ -45,6 +46,9 @@ export default function FacilityInfoPanel() {
     )
 
     if (!selectedModelId) return null
+
+    // 編輯模式或動畫模式下不顯示 InfoPanel
+    if (editMode || animationMode) return null
 
     // 裝飾模型不顯示 InfoPanel
     if (models.find(m => m.id === selectedModelId)?.modelType === 'decorative') return null

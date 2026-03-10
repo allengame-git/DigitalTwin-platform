@@ -175,6 +175,8 @@ server/
 6. **`safeResolvePath()` 的路徑問題** — DB 中的 URL 以 `/uploads/...` 開頭（絕對路徑），`path.resolve(__dirname, '..', url)` 會忽略前面的 segments，必須先 strip 前導 `/`。
 7. **Express 5 的 `req.params` 型別是 `string | string[]`** — 不能直接 destructure `const { id } = req.params`，TypeScript 會報錯。必須用 `const id = req.params.id as string`。
 8. **Prisma 7 的 `Json` 欄位型別** — `Record<string, unknown>` 不能直接賦值給 Prisma 的 `InputJsonValue`，需要 cast：`(details as Prisma.InputJsonValue) ?? undefined`。
+9. **GeoTIFF 不能直接給前端** — Three.js TextureLoader 只支援 PNG/JPEG/WebP，衛星影像（.tif）必須在 Python 處理階段轉為 JPEG。地質模組的 `terrain_processor.py` 有完整的 `process_satellite()` 可參考。
+10. **`onBeforeCompile` 與材質快取** — Three.js 快取 shader program，若材質的 `map` 從有值變 null（或反之），shader 需重新編譯。用 `key` 強制 remount mesh 或手動 `material.dispose()` 清除快取。hillshade URL 可從 `heightmapUrl.replace('heightmap.png', 'texture.png')` 推導。
 
 ## Bug 修復指南
 
@@ -190,6 +192,9 @@ server/
 - `FacilityPage`：sidebar + canvas，編輯模式在 sidebar 底部切換
 - `TransformInputPanel`：右下角的移動/旋轉/縮放面板，Enter 或 blur 時呼叫 API 同步
 - `useFacilityStore`：Zustand store，`updateModelTransform` → `PUT /api/facility/models/:id/transform`
+- `FacilityTerrain.tsx`：地形渲染，支援衛星影像/山影圖/色階三種紋理模式，色階用 `onBeforeCompile` 注入 GLSL shader
+- `FacilitySidebar.tsx`：側邊欄包含地形設定（TerrainSettingsSection），可開關地形顯示、切換紋理模式
+- `facility_terrain_processor.py`：CSV→heightmap+hillshade+satellite(JPEG)，衛星影像用 rasterio reproject 對齊 DEM
 
 ## Conventions
 

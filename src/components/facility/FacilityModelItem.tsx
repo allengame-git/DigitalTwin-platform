@@ -552,16 +552,16 @@ export function FacilityModelItem({ model }: FacilityModelItemProps) {
             }
         }
 
-        // ── Label positioning ──
-        if (!labelGroupRef.current) return;
-
-        // 第一幀：把 bbox 視覺中心的 world-space 座標存進 store（供 fly-to 使用）
+        // 第一幀：把 bbox 視覺中心的 world-space 座標存進 store（供 fly-to / 框選使用）
         if (!bboxCenterReported.current) {
             const centerLocal = new THREE.Vector3(bboxInfo.cx, bboxInfo.cy, bboxInfo.cz);
             groupRef.current.localToWorld(centerLocal);
             setModelBboxCenter(model.id, { x: centerLocal.x, y: centerLocal.y, z: centerLocal.z });
             bboxCenterReported.current = true;
         }
+
+        // ── Label positioning ──
+        if (!labelGroupRef.current) return;
 
         // local → world（含 model scale / rotation / translation）
         _topLocal.set(bboxInfo.cx, bboxInfo.maxY, bboxInfo.cz);

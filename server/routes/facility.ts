@@ -771,6 +771,8 @@ router.post('/scenes/:id/terrain', authenticate, facilityTerrainUpload, async (r
                         terrainHeightmapUrl: `/uploads/facility/terrain/${id}/${meta.heightmap}`,
                         terrainTextureUrl: meta.satellite
                             ? `/uploads/facility/terrain/${id}/${meta.satellite}`
+                            : meta.texture
+                            ? `/uploads/facility/terrain/${id}/${meta.texture}`
                             : null,
                         terrainTextureMode: meta.satellite ? 'satellite' : 'colorRamp',
                         terrainBounds: {
@@ -783,8 +785,8 @@ router.post('/scenes/:id/terrain', authenticate, facilityTerrainUpload, async (r
 
                 res.json(scene);
             } catch (err: any) {
-                console.error('[FacilityTerrain] Processing error:', err);
-                res.status(500).json({ error: '系統錯誤', details: err.message });
+                console.error('[FacilityTerrain] Processing error:', err.message, err.stack);
+                res.status(500).json({ error: '地形處理失敗', details: err.message });
             }
         });
     } catch (error) {

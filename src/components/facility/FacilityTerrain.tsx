@@ -2,178 +2,222 @@
  * FacilityTerrain — 設施導覽地形元件
  * 從 useFacilityStore 取得 currentScene 的地形資料，
  * 在 3D 場景中渲染帶有 heightmap 位移的地形 mesh。
+ *
+ * 支援三種紋理模式：衛星影像、山影圖、色階（colorRamp）。
+ * 色階模式透過 onBeforeCompile 注入 shader，與地質模組 TerrainMesh 對齊。
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { useFrame } from '@react-three/fiber';
 import { useFacilityStore } from '@/stores/facilityStore';
+import { generateColorRampTexture } from '@/utils/colorRamps';
 
-interface TerrainBounds {
-    minX: number;
-    maxX: number;
-    minY: number;
-    maxY: number;
-    minZ: number;
-    maxZ: number;
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+function resolveUrl(url: string) {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return `${API_BASE}${url}`;
 }
 
-interface HeightData {
-    data: Uint8ClampedArray;
-    width: number;
-    height: number;
+/** 從 heightmapUrl 推導 hillshade texture URL */
+function deriveHillshadeUrl(heightmapUrl: string): string {
+    // heightmapUrl 形如 /uploads/facility/terrain/{id}/heightmap.png
+    // hillshade 固定為同目錄下 texture.png
+    return heightmapUrl.replace(/heightmap\.png$/, 'texture.png');
 }
 
 export function FacilityTerrain() {
     const scenes = useFacilityStore(state => state.scenes);
     const currentSceneId = useFacilityStore(state => state.currentSceneId);
+    const terrainSettings = useFacilityStore(state => state.terrainSettings);
     const currentScene = useMemo(
         () => scenes.find(s => s.id === currentSceneId),
         [scenes, currentSceneId]
     );
 
-    const [heightData, setHeightData] = useState<HeightData | null>(null);
-    const [colorTexture, setColorTexture] = useState<THREE.Texture | null>(null);
+    const [heightMap, setHeightMap] = useState<THREE.Texture | null>(null);
+    const [textureMap, setTextureMap] = useState<THREE.Texture | null>(null);
+    const materialRef = useRef<THREE.MeshStandardMaterial | null>(null);
+    const shaderRef = useRef<any>(null);
 
-    const bounds = currentScene?.terrainBounds as TerrainBounds | null;
+    const bounds = currentScene?.terrainBounds as {
+        minX: number; maxX: number;
+        minY: number; maxY: number;
+        minZ: number; maxZ: number;
+    } | null;
 
-    // 載入 heightmap（Image + Canvas 方式讀取 16-bit 灰階 PNG）
+    const hasSatellite = currentScene?.terrainTextureMode === 'satellite';
+    const textureMode = terrainSettings.textureMode;
+
+    // 衛星影像 URL（DB 存的 terrainTextureUrl，只在有 satellite 時有效）
+    const satelliteUrl = hasSatellite ? currentScene?.terrainTextureUrl : null;
+    // 山影圖 URL（從 heightmap 路徑推導）
+    const hillshadeUrl = currentScene?.terrainHeightmapUrl
+        ? deriveHillshadeUrl(currentScene.terrainHeightmapUrl)
+        : null;
+
+    // 色階紋理
+    const rampTexture = useMemo(() => {
+        return generateColorRampTexture(terrainSettings.colorRamp, terrainSettings.reverse);
+    }, [terrainSettings.colorRamp, terrainSettings.reverse]);
+
+    // ── 載入 heightmap ──
     useEffect(() => {
-        if (!currentScene?.terrainHeightmapUrl) {
-            setHeightData(null);
-            return;
-        }
-
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = currentScene.terrainHeightmapUrl;
-
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
-            ctx.drawImage(img, 0, 0);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            setHeightData({
-                data: imageData.data,
-                width: canvas.width,
-                height: canvas.height,
-            });
-        };
-
-        img.onerror = () => {
-            console.error('[FacilityTerrain] Failed to load heightmap:', currentScene.terrainHeightmapUrl);
-            setHeightData(null);
-        };
+        if (!currentScene?.terrainHeightmapUrl) { setHeightMap(null); return; }
+        const loader = new THREE.TextureLoader();
+        let tex: THREE.Texture | null = null;
+        loader.load(
+            resolveUrl(currentScene.terrainHeightmapUrl),
+            (t) => { tex = t; setHeightMap(t); },
+            undefined,
+            () => { console.warn('[FacilityTerrain] heightmap load failed'); setHeightMap(null); },
+        );
+        return () => { tex?.dispose(); };
     }, [currentScene?.terrainHeightmapUrl]);
 
-    // 載入 colorTexture
+    // ── 載入 texture（根據 textureMode 切換）──
     useEffect(() => {
-        if (!currentScene?.terrainTextureUrl) {
-            setColorTexture(null);
+        let url: string | null = null;
+
+        if (textureMode === 'satellite' && satelliteUrl) {
+            url = satelliteUrl;
+        } else if (textureMode === 'hillshade' && hillshadeUrl) {
+            url = hillshadeUrl;
+        } else if (textureMode === 'colorRamp') {
+            // colorRamp 不需要 texture map，用白色 + shader 上色
+            setTextureMap(null);
             return;
+        } else if (hillshadeUrl) {
+            // fallback to hillshade
+            url = hillshadeUrl;
         }
+
+        if (!url) { setTextureMap(null); return; }
 
         const loader = new THREE.TextureLoader();
         let tex: THREE.Texture | null = null;
-
         loader.load(
-            currentScene.terrainTextureUrl,
-            (loadedTex) => {
-                tex = loadedTex;
-                setColorTexture(loadedTex);
-            },
+            resolveUrl(url),
+            (t) => { tex = t; setTextureMap(t); },
             undefined,
-            (err) => {
-                console.error('[FacilityTerrain] Failed to load color texture:', err);
-            }
+            () => { console.warn('[FacilityTerrain] texture load failed:', url); setTextureMap(null); },
         );
+        return () => { tex?.dispose(); };
+    }, [textureMode, satelliteUrl, hillshadeUrl]);
 
-        return () => {
-            if (tex) {
-                tex.dispose();
-            }
-        };
-    }, [currentScene?.terrainTextureUrl]);
-
-    // 計算地形尺寸（依據 bounds）
-    const terrainWidth = bounds ? bounds.maxX - bounds.minX : 0;
-    const terrainHeight = bounds ? bounds.maxY - bounds.minY : 0;
-    const segments = 256;
-
-    // 建立 PlaneGeometry（useMemo 確保 bounds 改變時重建）
-    const geometry = useMemo(() => {
-        if (!bounds) return null;
-        return new THREE.PlaneGeometry(terrainWidth, terrainHeight, segments, segments);
-    }, [terrainWidth, terrainHeight, bounds]);
-
-    // 設定頂點高程（heightmap displacement）
-    useEffect(() => {
-        if (!geometry || !heightData || !bounds) return;
-
-        const positions = geometry.attributes.position as THREE.BufferAttribute;
-        const gridW = segments + 1;
-        const gridH = segments + 1;
-
-        for (let i = 0; i < gridH; i++) {
-            for (let j = 0; j < gridW; j++) {
-                const idx = i * gridW + j;
-                // UV 坐標（0~1）
-                const u = j / segments;
-                const v = i / segments;
-                // 對應 heightmap 像素
-                const px = Math.floor(u * (heightData.width - 1));
-                const py = Math.floor((1 - v) * (heightData.height - 1));
-                const pixelIdx = (py * heightData.width + px) * 4;
-                const r = heightData.data[pixelIdx];
-                const g = heightData.data[pixelIdx + 1];
-                // 16-bit 灰階：R channel 為高位元組，G channel 為低位元組
-                const normalizedHeight = (r * 256 + g) / 65535;
-                const elevation = bounds.minZ + normalizedHeight * (bounds.maxZ - bounds.minZ);
-                positions.setY(idx, elevation);
-            }
-        }
-
-        positions.needsUpdate = true;
-        geometry.computeVertexNormals();
-    }, [geometry, heightData, bounds]);
-
-    // Cleanup geometry on unmount or when recreated
-    const prevGeometryRef = useRef<THREE.PlaneGeometry | null>(null);
-    useEffect(() => {
-        const prev = prevGeometryRef.current;
-        prevGeometryRef.current = geometry;
-        if (prev && prev !== geometry) {
-            prev.dispose();
-        }
-    }, [geometry]);
-
-    // Cleanup color texture on unmount
+    // ── 卸載時 dispose 材質（清除 shader program 快取，確保 onBeforeCompile 下次重新觸發）──
     useEffect(() => {
         return () => {
-            colorTexture?.dispose();
+            materialRef.current?.dispose();
         };
-    }, [colorTexture]);
+    }, []);
 
-    if (!currentScene?.terrainHeightmapUrl || !bounds || !geometry) return null;
+    // ── 每幀更新 shader uniforms ──
+    useFrame(() => {
+        if (shaderRef.current) {
+            shaderRef.current.uniforms.uMinZ.value = terrainSettings.minZ;
+            shaderRef.current.uniforms.uMaxZ.value = terrainSettings.maxZ;
+            shaderRef.current.uniforms.uRamp.value = rampTexture;
+            shaderRef.current.uniforms.uUseColorRamp.value = textureMode === 'colorRamp' ? 1.0 : 0.0;
+        }
+    });
+
+    // 不顯示或無資料時不渲染
+    if (!terrainSettings.visible) return null;
+    if (!currentScene?.terrainHeightmapUrl || !bounds || !heightMap) return null;
+
+    const width = bounds.maxX - bounds.minX;
+    const depth = bounds.maxY - bounds.minY;
+
+    const centerX = bounds.minX + width / 2;
+    const centerY = bounds.minY + depth / 2;
 
     const coordShiftX = currentScene.coordShiftX ?? 0;
     const coordShiftY = currentScene.coordShiftY ?? 0;
     const coordShiftZ = currentScene.coordShiftZ ?? 0;
     const coordRotation = currentScene.coordRotation ?? 0;
 
+    const posX = centerX + coordShiftX;
+    const posZ = -(centerY + coordShiftY);
+
+    const onBeforeCompile = (shader: any) => {
+        shaderRef.current = shader;
+
+        shader.uniforms.uRamp = { value: rampTexture };
+        shader.uniforms.uMinZ = { value: terrainSettings.minZ };
+        shader.uniforms.uMaxZ = { value: terrainSettings.maxZ };
+        shader.uniforms.uUseColorRamp = { value: textureMode === 'colorRamp' ? 1.0 : 0.0 };
+
+        // Vertex Shader: Pass height to Fragment Shader
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <common>',
+            `
+            #include <common>
+            varying float vMyHeight;
+            `
+        );
+
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <displacementmap_vertex>',
+            `
+            #include <displacementmap_vertex>
+            vMyHeight = transformed.z;
+            `
+        );
+
+        // Fragment Shader: Map height to color (only when colorRamp mode)
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <common>',
+            `
+            #include <common>
+            uniform sampler2D uRamp;
+            uniform float uMinZ;
+            uniform float uMaxZ;
+            uniform float uUseColorRamp;
+            varying float vMyHeight;
+            `
+        );
+
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <map_fragment>',
+            `
+            #include <map_fragment>
+
+            if (uUseColorRamp > 0.5) {
+                float normHeight = (vMyHeight - uMinZ) / (uMaxZ - uMinZ);
+                normHeight = clamp(normHeight, 0.01, 0.99);
+
+                vec4 rampColor = texture2D(uRamp, vec2(normHeight, 0.5));
+                diffuseColor *= rampColor;
+            }
+            `
+        );
+    };
+
+    // key 包含 textureMode + 是否有 textureMap，確保 shader program 在模式切換時重新編譯
+    const meshKey = `terrain-${textureMode}-${textureMap ? 'tex' : 'notex'}`;
+
     return (
-        <group
-            position={[coordShiftX, coordShiftZ, -coordShiftY]}
-            rotation={[0, coordRotation * Math.PI / 180, 0]}
-        >
-            <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-                <primitive object={geometry} />
+        <group rotation={[0, coordRotation * Math.PI / 180, 0]}>
+            <mesh
+                key={meshKey}
+                rotation={[-Math.PI / 2, 0, 0]}
+                position={[posX, coordShiftZ, posZ]}
+                receiveShadow
+            >
+                <planeGeometry args={[width, depth, 256, 256]} />
                 <meshStandardMaterial
-                    map={colorTexture ?? undefined}
-                    color={colorTexture ? '#ffffff' : '#8B9E7A'}
-                    roughness={0.8}
+                    ref={materialRef}
+                    color={0xffffff}
+                    map={textureMap ?? undefined}
+                    displacementMap={heightMap}
+                    displacementScale={bounds.maxZ - bounds.minZ}
+                    displacementBias={bounds.minZ}
+                    roughness={1.0}
                     metalness={0}
+                    side={THREE.DoubleSide}
+                    onBeforeCompile={onBeforeCompile}
                 />
             </mesh>
         </group>

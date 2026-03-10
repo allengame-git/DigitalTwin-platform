@@ -6,8 +6,10 @@
 
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronRight, Box, DoorOpen, Edit3, Tag, Map, Film, Move, RotateCw, Maximize2, ChevronDown, Trash2, Eye, EyeOff, CheckSquare, Play, Pause, Square, ArrowDown, Video, RotateCcw } from 'lucide-react';
+import { ChevronRight, Box, DoorOpen, Edit3, Tag, Map, Film, Move, RotateCw, Maximize2, ChevronDown, Trash2, Eye, EyeOff, CheckSquare, Play, Pause, Square, ArrowDown, Video, RotateCcw, Mountain } from 'lucide-react';
 import { useFacilityStore, getModelGroupRef } from '@/stores/facilityStore';
+import type { FacilityTerrainSettings } from '@/stores/facilityStore';
+import type { ColorRampName } from '@/utils/colorRamps';
 import BreadcrumbNav from './BreadcrumbNav';
 
 type Axis = 'x' | 'y' | 'z';
@@ -185,6 +187,207 @@ function AnimTransformSection({ transformMode, setTransformMode }: {
                 </div>
             )}
         </div>
+    );
+}
+
+// ── 地形圖例設定 ──
+function getGradientStyle(ramp: string, reverse: boolean): string {
+    const direction = reverse ? 'to left' : 'to right';
+    switch (ramp) {
+        case 'rainbow': return `linear-gradient(${direction}, blue, cyan, green, yellow, red)`;
+        case 'spectral': return `linear-gradient(${direction}, #2b83ba, #abdda4, #ffffbf, #fdae61, #d7191c)`;
+        case 'terrain': return `linear-gradient(${direction}, #006400, #F4A460, #8B4513, #FFFFFF)`;
+        case 'viridis': return `linear-gradient(${direction}, #440154, #3b528b, #21918c, #5ec962, #fde725)`;
+        case 'magma': return `linear-gradient(${direction}, #000004, #51127c, #b73779, #fb8761, #fcfdbf)`;
+        default: return `linear-gradient(${direction}, white, black)`;
+    }
+}
+
+function TerrainSettingsSection() {
+    const terrainSettings = useFacilityStore(s => s.terrainSettings);
+    const setTerrainSettings = useFacilityStore(s => s.setTerrainSettings);
+    const currentScene = useFacilityStore(s => {
+        const sid = s.currentSceneId;
+        return sid ? s.scenes.find(sc => sc.id === sid) : null;
+    });
+
+    const [expanded, setExpanded] = React.useState(true);
+
+    if (!currentScene?.terrainHeightmapUrl || !currentScene?.terrainBounds) return null;
+
+    const bounds = currentScene.terrainBounds as { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
+    const hasSatellite = currentScene.terrainTextureMode === 'satellite';
+
+    // autoRange 時自動同步 bounds
+    React.useEffect(() => {
+        if (terrainSettings.autoRange) {
+            setTerrainSettings({ minZ: bounds.minZ, maxZ: bounds.maxZ });
+        }
+    }, [terrainSettings.autoRange, bounds.minZ, bounds.maxZ]);
+
+    // 初始化：有衛星影像時預設 satellite，否則 hillshade
+    React.useEffect(() => {
+        if (hasSatellite && terrainSettings.textureMode !== 'satellite' && terrainSettings.textureMode !== 'colorRamp') {
+            setTerrainSettings({ textureMode: 'satellite' });
+        }
+    }, [hasSatellite]);
+
+    const textureModes: { value: FacilityTerrainSettings['textureMode']; label: string }[] = [
+        ...(hasSatellite ? [{ value: 'satellite' as const, label: '衛星影像' }] : []),
+        { value: 'hillshade', label: '山影圖' },
+        { value: 'colorRamp', label: '色階' },
+    ];
+
+    return (
+        <section style={{ borderBottom: '1px solid #e5e7eb' }}>
+            <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 12px',
+            }}>
+                <button
+                    onClick={() => setExpanded(!expanded)}
+                    style={{
+                        flex: 1, display: 'flex', alignItems: 'center', gap: 6,
+                        border: 'none', background: 'transparent', padding: 0,
+                        cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#9ca3af',
+                        textTransform: 'uppercase', letterSpacing: '0.05em',
+                    }}
+                >
+                    <Mountain size={13} style={{ flexShrink: 0 }} />
+                    <span style={{ flex: 1, textAlign: 'left' }}>地形設定</span>
+                    <ChevronDown size={12} style={{ transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
+                </button>
+                {/* 地形顯示開關 */}
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setTerrainSettings({ visible: !terrainSettings.visible });
+                    }}
+                    title={terrainSettings.visible ? '隱藏地形' : '顯示地形'}
+                    style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        padding: 2, display: 'flex', alignItems: 'center', flexShrink: 0,
+                        color: terrainSettings.visible ? '#2563eb' : '#d1d5db',
+                        transition: 'color 0.15s',
+                    }}
+                >
+                    {terrainSettings.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                </button>
+            </div>
+            {expanded && (
+                <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {/* Texture Mode */}
+                    <div>
+                        <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4 }}>紋理模式</div>
+                        <div style={{ display: 'flex', gap: 3, background: '#f3f4f6', borderRadius: 5, padding: 2 }}>
+                            {textureModes.map(opt => (
+                                <button
+                                    key={opt.value}
+                                    onClick={() => setTerrainSettings({ textureMode: opt.value })}
+                                    style={{
+                                        flex: 1, padding: '4px 0', borderRadius: 4, fontSize: 10, fontWeight: 500,
+                                        cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+                                        background: terrainSettings.textureMode === opt.value ? '#2563eb' : 'transparent',
+                                        color: terrainSettings.textureMode === opt.value ? '#fff' : '#6b7280',
+                                    }}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Color Ramp options */}
+                    {terrainSettings.textureMode === 'colorRamp' && (
+                        <>
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                    <div style={{ fontSize: 10, color: '#6b7280' }}>顏色映射</div>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={terrainSettings.reverse}
+                                            onChange={e => setTerrainSettings({ reverse: e.target.checked })}
+                                            style={{ width: 12, height: 12 }}
+                                        />
+                                        <span style={{ fontSize: 9, color: '#6b7280' }}>反轉</span>
+                                    </label>
+                                </div>
+                                <select
+                                    value={terrainSettings.colorRamp}
+                                    onChange={e => setTerrainSettings({ colorRamp: e.target.value as ColorRampName })}
+                                    style={{
+                                        width: '100%', padding: '4px 6px', fontSize: 11,
+                                        borderRadius: 4, border: '1px solid #d1d5db', background: 'white',
+                                    }}
+                                >
+                                    <option value="spectral">Spectral (彩虹)</option>
+                                    <option value="rainbow">Rainbow (鮮豔)</option>
+                                    <option value="terrain">Terrain (地形色)</option>
+                                    <option value="viridis">Viridis (科學)</option>
+                                    <option value="magma">Magma (熱圖)</option>
+                                </select>
+                            </div>
+
+                            {/* Min/Max Z */}
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                    <div style={{ fontSize: 10, color: '#6b7280' }}>高程範圍 (m)</div>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={terrainSettings.autoRange}
+                                            onChange={e => setTerrainSettings({ autoRange: e.target.checked })}
+                                            style={{ width: 12, height: 12 }}
+                                        />
+                                        <span style={{ fontSize: 9, color: '#6b7280' }}>自動</span>
+                                    </label>
+                                </div>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: 9, color: '#94a3b8', marginBottom: 2 }}>Min</div>
+                                        <input
+                                            type="number"
+                                            value={Math.round(terrainSettings.minZ * 100) / 100}
+                                            disabled={terrainSettings.autoRange}
+                                            onChange={e => setTerrainSettings({ minZ: parseFloat(e.target.value) || 0 })}
+                                            style={{
+                                                width: '100%', padding: '3px 6px', fontSize: 11,
+                                                border: '1px solid #d1d5db', borderRadius: 4,
+                                                background: terrainSettings.autoRange ? '#f3f4f6' : 'white',
+                                                fontFamily: "'JetBrains Mono', monospace",
+                                            }}
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: 9, color: '#94a3b8', marginBottom: 2 }}>Max</div>
+                                        <input
+                                            type="number"
+                                            value={Math.round(terrainSettings.maxZ * 100) / 100}
+                                            disabled={terrainSettings.autoRange}
+                                            onChange={e => setTerrainSettings({ maxZ: parseFloat(e.target.value) || 0 })}
+                                            style={{
+                                                width: '100%', padding: '3px 6px', fontSize: 11,
+                                                border: '1px solid #d1d5db', borderRadius: 4,
+                                                background: terrainSettings.autoRange ? '#f3f4f6' : 'white',
+                                                fontFamily: "'JetBrains Mono', monospace",
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Gradient preview */}
+                            <div style={{
+                                width: '100%', height: 10, borderRadius: 3,
+                                background: getGradientStyle(terrainSettings.colorRamp, terrainSettings.reverse),
+                                border: '1px solid #e5e7eb',
+                            }} />
+                        </>
+                    )}
+                </div>
+            )}
+        </section>
     );
 }
 
@@ -659,6 +862,9 @@ const FacilitySidebar: React.FC = () => {
                         </ul>
                     )}
                 </section>
+
+                {/* 地形設定（有地形時顯示） */}
+                <TerrainSettingsSection />
 
                 {/* 子場景入口：選取的模型有關聯子場景時顯示（支援多個） */}
                 {selectedModelSubScenes.length > 0 && (
