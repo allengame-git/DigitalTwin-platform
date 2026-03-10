@@ -13,6 +13,7 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import prisma from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
+import { safeResolvePath } from '../lib/safePath';
 
 const router = express.Router();
 
@@ -67,7 +68,7 @@ const uploadFields = upload.fields([
  * GET /api/geology-model
  * 取得所有地質模型版本
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId } = req.query;
         if (!projectId) {
@@ -92,7 +93,7 @@ router.get('/', async (req: Request, res: Response) => {
  * GET /api/geology-model/:id
  * 取得單一模型詳情
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const model = await prisma.geologyModel.findUnique({
             where: { id: req.params.id as string },
@@ -112,7 +113,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  * GET /api/geology-model/:id/status
  * 查詢轉換狀態
  */
-router.get('/:id/status', async (req: Request, res: Response) => {
+router.get('/:id/status', authenticate, async (req: Request, res: Response) => {
     try {
         const model = await prisma.geologyModel.findUnique({
             where: { id: req.params.id as string },
@@ -258,18 +259,20 @@ router.delete('/:id', authenticate, async (req: Request, res: Response) => {
             return res.status(404).json({ message: '找不到此模型' });
         }
 
-        // 刪除原始 CSV 檔案
-        const csvPath = path.join(GEOLOGY_DIR, model.filename);
+        // 刪除原始 CSV 檔案（filename 是純檔名，join 到固定目錄安全）
+        const csvPath = path.join(GEOLOGY_DIR, path.basename(model.filename));
         if (fs.existsSync(csvPath)) {
             fs.unlinkSync(csvPath);
         }
 
-        // 刪除轉換後的 tiles 目錄
+        // 刪除轉換後的 tiles 目錄（透過 safeResolvePath 驗證路徑邊界）
         if (model.tilesetUrl) {
-            const tilesDir = path.join(__dirname, '..', model.tilesetUrl.replace('/uploads/', 'uploads/'));
-            const parentDir = path.dirname(tilesDir);
-            if (fs.existsSync(parentDir)) {
-                fs.rmSync(parentDir, { recursive: true, force: true });
+            const safeTileset = safeResolvePath(model.tilesetUrl);
+            if (safeTileset) {
+                const parentDir = path.dirname(safeTileset);
+                if (parentDir.startsWith(path.resolve(__dirname, '../uploads/geology-tiles')) && fs.existsSync(parentDir)) {
+                    fs.rmSync(parentDir, { recursive: true, force: true });
+                }
             }
         }
 

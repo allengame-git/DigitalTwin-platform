@@ -6,6 +6,7 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import prisma from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
+import { safeResolvePath } from '../lib/safePath';
 
 const router = Router();
 
@@ -187,7 +188,7 @@ router.post('/', authenticate, terrainUpload, async (req: Request, res: Response
  * GET /api/terrain
  * List terrains for a project
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId } = req.query;
         if (!projectId) return res.status(400).json({ error: 'ProjectId required' });
@@ -214,17 +215,19 @@ router.delete('/:id', authenticate, async (req: Request, res: Response) => {
 
         if (!terrain) return res.status(404).json({ error: 'Not found' });
 
-        // Delete files
-        const filesToDelete = [
-            path.join(__dirname, '..', terrain.path),
-            path.join(__dirname, '..', terrain.heightmap),
-            path.join(__dirname, '..', terrain.texture || ''),
-            path.join(__dirname, '..', terrain.satelliteTexture || '')
+        // Delete files (validate paths via safeResolvePath)
+        const urlsToDelete = [
+            terrain.path,
+            terrain.heightmap,
+            terrain.texture,
+            terrain.satelliteTexture,
         ];
 
-        for (const f of filesToDelete) {
-            if (f && fs.existsSync(f) && fs.statSync(f).isFile()) {
-                fs.unlinkSync(f);
+        for (const url of urlsToDelete) {
+            if (!url) continue;
+            const safe = safeResolvePath(url);
+            if (safe && fs.existsSync(safe) && fs.statSync(safe).isFile()) {
+                fs.unlinkSync(safe);
             }
         }
 

@@ -211,7 +211,7 @@ router.post('/imagery', authenticate, upload.single('file'), async (req: Request
 });
 
 // 取得已上傳列表
-router.get('/imagery', async (req: Request, res: Response) => {
+router.get('/imagery', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId } = req.query;
         if (!projectId) {
@@ -230,7 +230,7 @@ router.get('/imagery', async (req: Request, res: Response) => {
 });
 
 // 取得單一圖資
-router.get('/imagery/:id', async (req: Request, res: Response) => {
+router.get('/imagery/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
         const imagery = await prisma.imagery.findUnique({
@@ -408,7 +408,7 @@ router.post('/geophysics', authenticate, geophysicsUpload.single('file'), async 
 });
 
 // 取得地球物理探查資料列表
-router.get('/geophysics', async (req: Request, res: Response) => {
+router.get('/geophysics', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId } = req.query;
         if (!projectId) {
@@ -426,7 +426,7 @@ router.get('/geophysics', async (req: Request, res: Response) => {
 });
 
 // 取得單筆地球物理探查資料
-router.get('/geophysics/:id', async (req: Request, res: Response) => {
+router.get('/geophysics/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const geophysics = await prisma.geophysics.findUnique({
             where: { id: req.params.id as string },

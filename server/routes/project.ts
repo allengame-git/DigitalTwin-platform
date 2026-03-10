@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { z } from "zod";
+import { authenticate } from '../middleware/auth';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ const router = Router();
  * GET /api/project
  * 取得所有專案
  */
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', authenticate, async (_req: Request, res: Response) => {
     try {
         const projects = await prisma.project.findMany({
             orderBy: { createdAt: 'desc' },
@@ -41,7 +42,7 @@ router.get('/', async (_req: Request, res: Response) => {
  * GET /api/project/:id
  * 取得單一專案
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
         const project = await prisma.project.findUnique({
@@ -73,7 +74,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  * GET /api/project/code/:code
  * 根據專案代碼取得專案
  */
-router.get('/code/:code', async (req: Request, res: Response) => {
+router.get('/code/:code', authenticate, async (req: Request, res: Response) => {
     try {
         const code = req.params.code as string;
         const project = await prisma.project.findUnique({
@@ -105,7 +106,7 @@ router.get('/code/:code', async (req: Request, res: Response) => {
  * POST /api/project
  * 建立專案
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authenticate, async (req: Request, res: Response) => {
     try {
         const { name, code, description, originX, originY } = req.body;
 
@@ -145,7 +146,7 @@ router.post('/', async (req: Request, res: Response) => {
  * PUT /api/project/:id
  * 更新專案
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
         const updateProjectSchema = z.object({
@@ -182,7 +183,7 @@ router.put('/:id', async (req: Request, res: Response) => {
  * DELETE /api/project/:id
  * 刪除專案 (Cascade - 需 admin 權限)
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
         const { confirmName } = req.body;
@@ -234,7 +235,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
  * GET /api/project/:id/stats
  * 取得專案統計資訊
  */
-router.get('/:id/stats', async (req: Request, res: Response) => {
+router.get('/:id/stats', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
 

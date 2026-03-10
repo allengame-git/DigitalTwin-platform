@@ -15,7 +15,7 @@ const router = Router();
  * GET /api/attitude
  * 取得專案所有位態資料
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId } = req.query;
 

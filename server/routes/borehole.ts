@@ -48,7 +48,7 @@ const photoUpload = multer({
  * GET /api/borehole
  * 取得專案所有鑽孔 (含 layers)
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId } = req.query;
 
@@ -76,7 +76,7 @@ router.get('/', async (req: Request, res: Response) => {
  * GET /api/borehole/:id
  * 取得單一鑽孔詳細資料
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 

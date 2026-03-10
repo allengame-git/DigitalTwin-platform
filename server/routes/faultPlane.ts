@@ -15,7 +15,7 @@ const router = Router();
  * GET /api/fault-plane
  * 取得專案的所有斷層面 (含座標)
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
         const projectId = req.query.projectId as string;
 
@@ -44,7 +44,7 @@ router.get('/', async (req: Request, res: Response) => {
  * GET /api/fault-plane/:id
  * 取得單一斷層面詳情
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
 

@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
+import { authenticate } from '../middleware/auth';
 
 const router = Router();
 
@@ -29,7 +30,7 @@ const DEFAULT_LITHOLOGIES = [
  * GET /api/lithology
  * 取得專案岩性列表
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId } = req.query;
 
@@ -53,7 +54,7 @@ router.get('/', async (req: Request, res: Response) => {
  * POST /api/lithology
  * 新增岩性
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId, lithId, code, name, color } = req.body;
 
@@ -85,7 +86,7 @@ router.post('/', async (req: Request, res: Response) => {
  * PUT /api/lithology/:id
  * 更新岩性
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { lithId, code, name, color } = req.body;
@@ -114,7 +115,7 @@ router.put('/:id', async (req: Request, res: Response) => {
  * DELETE /api/lithology/:id
  * 刪除岩性
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 
@@ -163,7 +164,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
  * POST /api/lithology/init-defaults
  * 以預設岩性初始化專案
  */
-router.post('/init-defaults', async (req: Request, res: Response) => {
+router.post('/init-defaults', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId } = req.body;
 
@@ -205,7 +206,7 @@ router.post('/init-defaults', async (req: Request, res: Response) => {
  * POST /api/lithology/batch
  * 批次匯入岩性 (CSV)
  */
-router.post('/batch', async (req: Request, res: Response) => {
+router.post('/batch', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId, lithologies } = req.body;
 
