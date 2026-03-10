@@ -5,7 +5,7 @@
  * @module components/facility/PlanViewFloating
  */
 
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { X, MapPin, DoorOpen, Map, Pencil, Eye, EyeOff } from 'lucide-react';
 import { useFacilityStore } from '@/stores/facilityStore';
 import type { FacilityModel } from '@/types/facility';
@@ -113,10 +113,18 @@ export default function PlanViewFloating() {
         return { x: Math.max(1, Math.min(99, x)), y: Math.max(1, Math.min(99, y)) };
     }, []);
 
-    /** 更新本地 model 的 planX/planY（樂觀更新） */
+    // Unmount 清理 debounce timer
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
+    }, []);
+
+    /** 更新本地 model 的 planX/planY（樂觀更新）— 用 getState() 避免 stale closure */
     const updateModelLocal = useCallback((modelId: string, patch: Partial<FacilityModel>) => {
-        setModels(models.map(m => m.id === modelId ? { ...m, ...patch } : m));
-    }, [models, setModels]);
+        const current = useFacilityStore.getState().models;
+        setModels(current.map(m => m.id === modelId ? { ...m, ...patch } : m));
+    }, [setModels]);
 
     /** 拖曳結束 → debounce 寫入 API */
     const savePlanMarker = useCallback((modelId: string, planX: number, planY: number) => {
@@ -132,9 +140,10 @@ export default function PlanViewFloating() {
         }, 300);
     }, []);
 
-    /** 切換可見性 */
+    /** 切換可見性 — rollback 用 store 最新值避免 stale closure */
     const toggleVisibility = useCallback(async (model: FacilityModel) => {
-        const newVisible = model.planVisible === false ? true : false;
+        const oldVisible = model.planVisible;
+        const newVisible = oldVisible === false ? true : false;
         updateModelLocal(model.id, { planVisible: newVisible });
         try {
             const { useAuthStore } = await import('@/stores/authStore');
@@ -142,7 +151,8 @@ export default function PlanViewFloating() {
             await updatePlanMarker(model.id, { planVisible: newVisible }, token);
         } catch (e) {
             console.error('Failed to toggle visibility:', e);
-            updateModelLocal(model.id, { planVisible: model.planVisible }); // rollback
+            // rollback：用呼叫時捕捉的 oldVisible，不依賴 closure 中的 model 物件
+            updateModelLocal(model.id, { planVisible: oldVisible });
         }
     }, [updateModelLocal]);
 
@@ -164,12 +174,14 @@ export default function PlanViewFloating() {
 
     const handlePointerUp = useCallback(() => {
         if (!draggingId) return;
-        const model = models.find(m => m.id === draggingId);
+        // 用 getState() 取最新 models，避免拖曳過程中 stale closure
+        const current = useFacilityStore.getState().models;
+        const model = current.find(m => m.id === draggingId);
         if (model && model.planX != null && model.planY != null) {
             savePlanMarker(draggingId, model.planX, model.planY);
         }
         setDraggingId(null);
-    }, [draggingId, models, savePlanMarker]);
+    }, [draggingId, savePlanMarker]);
 
     if (!showPlanView || !planImage) return null;
 

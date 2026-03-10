@@ -396,6 +396,9 @@ router.put('/models/:id/plan-marker', authenticate, async (req: Request, res: Re
         if (planY !== undefined && planY !== null && (typeof planY !== 'number' || planY < 0 || planY > 100)) {
             return res.status(400).json({ error: 'planY 必須為 0~100 的數字或 null' });
         }
+        if (planVisible !== undefined && typeof planVisible !== 'boolean') {
+            return res.status(400).json({ error: 'planVisible 必須為布林值' });
+        }
 
         const model = await prisma.facilityModel.update({
             where: { id },
