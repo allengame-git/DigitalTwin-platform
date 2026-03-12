@@ -30,6 +30,7 @@ model Project {
   facilityScenes FacilityScene[]
   userProjects   UserProject[]
   modules        Module[]
+  reviewSessions ReviewSession[]
 
   @@map("projects")
 }
@@ -61,6 +62,9 @@ model Module {
 
   // Viewer permissions
   userAccess UserProjectModule[]
+
+  // Review system
+  reviewMarkers ReviewMarker[]
 
   @@index([projectId])
   @@index([projectId, type])
@@ -514,9 +518,10 @@ model User {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   lastLoginAt        DateTime?
-  sessions           Session[]
-  auditLogs          AuditLog[]
-  userProjects       UserProject[]
+  sessions              Session[]
+  auditLogs             AuditLog[]
+  userProjects          UserProject[]
+  reviewParticipations  ReviewParticipant[]
 
   @@map("users")
 }
@@ -592,4 +597,97 @@ model UserProjectModule {
   @@unique([userProjectId, moduleId])
   @@index([moduleId])
   @@map("user_project_modules")
+}
+
+// ── 審查系統 ──────────────────────────────────────────
+
+enum ReviewStatus {
+  draft
+  active
+  concluded
+}
+
+enum MarkerStatus {
+  open
+  in_progress
+  resolved
+}
+
+enum MarkerPriority {
+  low
+  medium
+  high
+}
+
+model ReviewSession {
+  id           String       @id @default(uuid())
+  projectId    String
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  status       ReviewStatus @default(draft)
+  conclusion   String?
+  scheduledAt  DateTime?
+  concludedAt  DateTime?
+  pdfUrl       String?
+  createdBy    String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  markers      ReviewMarker[]
+  participants ReviewParticipant[]
+  @@index([projectId])
+  @@map("review_sessions")
+}
+
+model ReviewParticipant {
+  id        String        @id @default(uuid())
+  sessionId String
+  session   ReviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String        @default("participant")
+  joinedAt  DateTime      @default(now())
+  @@unique([sessionId, userId])
+  @@map("review_participants")
+}
+
+model ReviewMarker {
+  id              String         @id @default(uuid())
+  sessionId       String
+  session         ReviewSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  moduleId        String
+  module          Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  status          MarkerStatus   @default(open)
+  priority        MarkerPriority @default(medium)
+  positionX       Float
+  positionY       Float
+  positionZ       Float
+  cameraPositionX Float
+  cameraPositionY Float
+  cameraPositionZ Float
+  cameraTargetX   Float
+  cameraTargetY   Float
+  cameraTargetZ   Float
+  screenshotUrl   String?
+  createdBy       String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  comments        ReviewComment[]
+  @@index([sessionId])
+  @@index([moduleId])
+  @@map("review_markers")
+}
+
+model ReviewComment {
+  id        String       @id @default(uuid())
+  markerId  String
+  marker    ReviewMarker @relation(fields: [markerId], references: [id], onDelete: Cascade)
+  content   String
+  createdBy String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  @@index([markerId])
+  @@map("review_comments")
 }
