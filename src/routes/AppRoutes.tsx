@@ -25,6 +25,8 @@ const ModuleDataPageLoader = React.lazy(() => import('../pages/ModuleDataPageLoa
 const AnnotationsPage = React.lazy(() => import('../pages/AnnotationsPage'));
 const ProjectDashboardPage = React.lazy(() => import('../pages/ProjectDashboardPage'));
 const ChangePasswordPage = React.lazy(() => import('../pages/ChangePasswordPage'));
+const ReviewListPage = React.lazy(() => import('../pages/ReviewListPage'));
+const ReviewDetailPage = React.lazy(() => import('../pages/ReviewDetailPage'));
 
 // Admin pages
 const AdminUsersPage = React.lazy(() => import('../pages/AdminUsersPage'));
@@ -149,6 +151,22 @@ const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute allowedRoles={['admin', 'viewer', 'engineer']}>
                         <AnnotationsPage />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: '/project/:projectCode/reviews',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']}>
+                        <ReviewListPage />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: '/project/:projectCode/reviews/:sessionId',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']}>
+                        <ReviewDetailPage />
                     </ProtectedRoute>
                 ),
             },

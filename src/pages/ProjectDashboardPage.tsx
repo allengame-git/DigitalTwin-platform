@@ -12,7 +12,8 @@ import { useProjectStore } from '../stores/projectStore';
 import { useModuleStore, type Module, type ModuleStats } from '../stores/moduleStore';
 import { getModuleTypeConfig, getAvailableModuleTypes, MODULE_TYPES } from '../config/moduleRegistry';
 import { RoleBasedUI } from '../components/auth/RoleBasedUI';
-import { Plus, Pencil, Trash2, GripVertical, X, Database, MessageSquareText } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, X, Database, MessageSquareText, ClipboardList } from 'lucide-react';
+import { useReviewStore } from '../stores/reviewStore';
 import {
     DndContext,
     closestCenter,
@@ -524,6 +525,7 @@ export const ProjectDashboardPage: React.FC = () => {
     const logout = useAuthStore(state => state.logout);
     const { projects, fetchProjects, getProjectByCode, setActiveProject } = useProjectStore();
     const { modules, fetchModules } = useModuleStore();
+    const { sessions, fetchSessions } = useReviewStore();
 
     // Modal states
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -550,8 +552,9 @@ export const ProjectDashboardPage: React.FC = () => {
     useEffect(() => {
         if (project) {
             fetchModules(project.id);
+            fetchSessions(project.id);
         }
-    }, [project, fetchModules]);
+    }, [project, fetchModules, fetchSessions]);
 
     // 判斷模組是否可存取
     const canAccessModule = useCallback((moduleId: string) => {
@@ -786,6 +789,72 @@ export const ProjectDashboardPage: React.FC = () => {
                 </div>
                 </SortableContext>
                 </DndContext>
+
+                {/* 審查作業區塊 */}
+                {project && (
+                <div style={{ marginTop: 32 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                        <h2 style={{ fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <ClipboardList size={20} />
+                            審查作業
+                        </h2>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <Link
+                                to={`/project/${project.code}/reviews`}
+                                style={{ fontSize: 14, color: '#2563eb', textDecoration: 'none' }}
+                            >
+                                查看全部
+                            </Link>
+                        </div>
+                    </div>
+                    {sessions.length === 0 ? (
+                        <p style={{ color: '#9ca3af', fontSize: 14 }}>尚無審查作業</p>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+                            {sessions.slice(0, 3).map((session) => (
+                                <Link
+                                    key={session.id}
+                                    to={`/project/${project.code}/reviews/${session.id}`}
+                                    style={{
+                                        display: 'block',
+                                        padding: 16,
+                                        background: '#fff',
+                                        borderRadius: 8,
+                                        border: '1px solid #e5e7eb',
+                                        textDecoration: 'none',
+                                        color: 'inherit',
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                        <span style={{ fontWeight: 600, fontSize: 15 }}>{session.title}</span>
+                                        <span style={{
+                                            fontSize: 12,
+                                            padding: '2px 8px',
+                                            borderRadius: 12,
+                                            background: session.status === 'concluded' ? '#dcfce7' : session.status === 'active' ? '#dbeafe' : '#f3f4f6',
+                                            color: session.status === 'concluded' ? '#166534' : session.status === 'active' ? '#1e40af' : '#6b7280',
+                                        }}>
+                                            {session.status === 'concluded' ? '已結案' : session.status === 'active' ? '進行中' : '草稿'}
+                                        </span>
+                                    </div>
+                                    <div style={{ fontSize: 13, color: '#6b7280' }}>
+                                        {new Date(session.createdAt).toLocaleDateString('zh-TW')}
+                                        {session.markerStats && (
+                                            <span style={{ marginLeft: 12 }}>
+                                                <span style={{ color: '#ef4444' }}>{session.markerStats.open}</span>
+                                                {' / '}
+                                                <span style={{ color: '#eab308' }}>{session.markerStats.in_progress}</span>
+                                                {' / '}
+                                                <span style={{ color: '#22c55e' }}>{session.markerStats.resolved}</span>
+                                            </span>
+                                        )}
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                )}
             </main>
 
             {/* Modals */}
