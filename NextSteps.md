@@ -2,7 +2,7 @@
 
 本文件記錄專案目前的完成狀態、座標系統說明，以及後續待辦事項，供接手的 AI Agent 或開發人員參考。
 
-**最後更新**: 2026-03-12（viewer 角色權限控制 + 岩性系統整合 G1 + 斷層面 Html Label G2 + store auth 統一）
+**最後更新**: 2026-03-12（viewer 權限安全修復 + viewer 角色權限控制 + 岩性系統整合 G1 + 斷層面 Html Label G2 + store auth 統一）
 **當前分支**: `main`
 
 ---
@@ -595,6 +595,16 @@ clearViewPreset()        // CameraController 消費後清除
 - **AdminUsersPage**: viewer 行「權限設定」按鈕 → Modal（專案 checkbox + 模組 checkbox），`/api/user-access/:userId/batch` 儲存
 - **admin/users 路由**: 從 `['admin']` 改為 `['admin', 'engineer']`，engineer 也能管理 viewer 權限
 - **projectStore**: `Project` interface 新增 `allowedModules?: string[]`
+
+#### 9d. 安全修復（2026-03-12，code review 後）
+- **CRITICAL: enforceProjectAccess 掛載**: middleware 增強為同時檢查 `req.params` + `req.query`，viewer 無 projectId 直接 403。掛載到 `GET /project/:id`
+- **CRITICAL: 專案 API 權限**: `GET /project/:id` 加 `enforceProjectAccess('id')` + viewer 回傳 `allowedModules`；`GET /project/code/:code` 加 inline viewer 存取檢查 + `allowedModules`
+- **CRITICAL: Legacy routes 封鎖**: `/geology`、`/engineering`、`/simulation`、`/annotations` legacy routes 移除 viewer（無專案範圍不可用）
+- **專案寫入權限**: `POST /project` → `authorize('admin', 'engineer')`、`PUT /project/:id` → `authorize('admin', 'engineer')`、`DELETE /project/:id` → `authorize('admin')`
+- **user-access DELETE 驗證**: 新增 viewer role 檢查，避免對 admin/engineer 操作
+- **handleSaveAccess 修正**: 移除 `.filter(([_, modules]) => modules.length > 0)`，保留 0 module 的 project 指派
+- **ProtectedRoute race condition**: viewer + requiredModule 時，projects 未載入顯示 loading spinner 而非直接放行；project 無 `allowedModules` 時 deny
+- **Prisma client regenerate**: DB enum `reviewer → viewer` 後必須跑 `npx prisma generate` 重建 client，否則 `findMany()` 查到 `viewer` 值會 throw `Value 'viewer' not found in enum 'UserRole'`
 
 ### 7. 安全審計與修復 (2026-03-06) — 完整
 

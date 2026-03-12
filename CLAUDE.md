@@ -112,7 +112,7 @@ JWT (HS256) with refresh tokens in HTTP-only cookies. Prisma-persisted users/ses
 - **Frontend**: `useAuthStore` (Zustand) 統一管理認證狀態，`useAdminStore` 管理 admin 操作
 - **Seed**: `npx prisma db seed` → `admin@llrwd.tw` / `Admin@2026` (mustChangePassword)
 - **CSRF**: admin routes 掛載 `verifyCsrf`，前端 `fetchApi` 自動從 cookie 讀取 csrf-token 注入 header
-- **Viewer 角色權限**: `UserProject` + `UserProjectModule` 雙 junction table 控制 per-project/per-module 存取。`enforceProjectAccess` middleware 檢查專案層級，`ProtectedRoute.requiredModule` 檢查模組層級。`GET /api/project` 依角色篩選回傳。管理 API: `/api/user-access`（admin+engineer 可用）。
+- **Viewer 角色權限**: `UserProject` + `UserProjectModule` 雙 junction table 控制 per-project/per-module 存取。`enforceProjectAccess` middleware 檢查 `req.params` + `req.query` 的 projectId（viewer 無 projectId 直接 403）。已掛載到 `GET /project/:id`，`GET /project/code/:code` 用 inline 檢查。`ProtectedRoute.requiredModule` 檢查模組層級（projects 未載入時顯示 loading，非直接放行）。`GET /api/project` 依角色篩選回傳。管理 API: `/api/user-access`（admin+engineer 可用）。專案 CRUD 寫入限 admin/engineer，DELETE 限 admin。Legacy routes（`/geology` 等）不允許 viewer。
 
 ### 資料管理頁面架構（共用設計系統）
 
@@ -137,7 +137,7 @@ src/
 └── utils/                # coordinates.ts, lod.ts, colorRamps.ts
 
 server/
-├── routes/               # 14 Express route modules (incl. user-access.ts for viewer permissions)
+├── routes/               # 16 Express route modules (incl. user-access.ts for viewer permissions)
 ├── scripts/              # Python processors (geology, terrain, water level)
 ├── prisma/schema.prisma  # Full database schema
 ├── middleware/            # auth.ts, rateLimit.ts, csrf.ts, errorLogger.ts
@@ -182,6 +182,7 @@ server/
 12. **所有 store fetch 都要帶 `Authorization: Bearer` header** — 安全修復統一加 `authenticate` middleware 後，`credentials: 'include'` 無效（middleware 讀的是 `Authorization` header 不是 cookie）。已修過的 store：`projectStore`、`lithologyStore`、`attitudeStore`、`boreholeStore`、`faultPlaneStore`。新增 store 或新增 fetch 時，一律用 `useAuthStore.getState().accessToken` 取 token。
 13. **ShaderMaterial uniforms 與 useMemo 脫鉤** — `GeologyTiles.tsx` 的 `capMaterial` 用 `useMemo` 建立 ShaderMaterial，但依賴沒有 `palette`。當岩性顏色編輯後，palette 重算但 cap uniforms 不會更新。修法：加 `useEffect` 在 `palette` 變化時手動同步 `capMaterial.uniforms.uLithColors/uLithIds/uLithCount`。
 14. **Viewer 角色的 `allowedModules` 來自 `GET /api/project` 回傳** — viewer 登入後 `projectStore.fetchProjects()` 會拿到 `allowedModules` 欄位，`ProtectedRoute` 和 `ProjectDashboardPage` 用它做模組級控制。如果 `allowedModules` 為 undefined（admin/engineer），代表全部放行。新增模組時需同步更新：`server/routes/user-access.ts` 的 `validModules` 陣列、`AdminUsersPage` 的 `ALL_MODULES`/`MODULE_LABELS`、設計文件。
+15. **Prisma enum rename 後必須 `npx prisma generate`** — DB enum 值用 raw SQL `ALTER TYPE ... RENAME VALUE` 修改後，`prisma db push` 只同步 schema 到 DB，不會重建 Prisma client。若忘記跑 `npx prisma generate`，`findMany()` 查到新 enum 值（如 `viewer`）時會 throw `Value 'viewer' not found in enum 'UserRole'`，回傳 500 伺服器錯誤。修完 schema 後一律跑 `npx prisma db push && npx prisma generate`。
 
 ## Bug 修復指南
 

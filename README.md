@@ -770,6 +770,15 @@ npm run build
   - **Migration**: 既有 viewer 自動指派全部專案+模組，零斷線
   - **全域 rename**: 15 前端 + 3 後端檔案 reviewer→viewer
 
+- [x] **Viewer 權限安全修復 (2026-03-12)**:
+  - **CRITICAL: enforceProjectAccess 掛載**: middleware 支援 `req.params` + `req.query` 雙重查找，viewer 無 projectId 直接 403
+  - **CRITICAL: 專案 API 權限**: `GET /project/:id` 掛載 enforceProjectAccess + 回傳 allowedModules，`GET /project/code/:code` 加 viewer 存取檢查
+  - **CRITICAL: Legacy routes 封鎖**: `/geology`、`/engineering`、`/simulation`、`/annotations` 移除 viewer 存取（無專案範圍不可用）
+  - **專案寫入權限**: `POST/PUT/DELETE /project` 加 `authorize()` 限制（POST/PUT: admin+engineer, DELETE: admin only）
+  - **user-access DELETE 驗證**: 目標使用者必須是 viewer 角色
+  - **handleSaveAccess 修正**: 移除 empty-modules filter，0 module 的 project 仍保留指派記錄
+  - **ProtectedRoute race condition**: viewer + requiredModule 時，projects 未載入顯示 loading 而非放行
+
 - [x] **第三輪安全審計發現 (2026-03-08, 尚未修復)**:
   - **V3-1 (High)**: `safeResolvePath` 對 DB 中以 `/uploads/...` 開頭的絕對路徑 URL 永遠 return null — `path.resolve(__dirname, '..', '/uploads/...')` 忽略前段路徑
   - **V3-2 (High)**: `terrain.ts` 檔案刪除路由無路徑邊界驗證（未使用 `safeResolvePath`）
@@ -794,7 +803,7 @@ npm run build
 | GET    | /api/auth/me             | 取得當前使用者資訊                        |
 | PUT    | /api/auth/change-password| 變更密碼（含密碼強度驗證）                |
 
-### Admin (需 admin 角色)
+### Admin (需 admin 角色，admin routes 含 CSRF 保護)
 
 | Method | Endpoint                              | Description                |
 |--------|---------------------------------------|----------------------------|
@@ -808,15 +817,25 @@ npm run build
 | DELETE | /api/admin/users/:id/sessions         | 踢掉該使用者全部 session     |
 | GET    | /api/admin/audit-logs                 | 稽核日誌（分頁+篩選）        |
 
+### User Access (需 admin/engineer 角色)
+
+| Method | Endpoint                                    | Description                    |
+|--------|---------------------------------------------|--------------------------------|
+| GET    | /api/user-access/:userId/projects           | 取得 viewer 的專案權限          |
+| PUT    | /api/user-access/:userId/projects/:projectId| 設定單一專案模組權限             |
+| DELETE | /api/user-access/:userId/projects/:projectId| 移除專案存取權限                 |
+| GET    | /api/user-access/project/:projectId/viewers | 取得專案的所有 viewer            |
+| PUT    | /api/user-access/:userId/batch              | 批次設定所有專案權限（transaction）|
+
 ### Project (專案管理)
 
-| Method | Endpoint            | Description      |
-|--------|---------------------|------------------|
-| GET    | /api/project        | 取得所有專案     |
-| POST   | /api/project        | 建立專案         |
-| GET    | /api/project/:id    | 取得單一專案     |
-| PUT    | /api/project/:id    | 更新專案         |
-| DELETE | /api/project/:id    | 刪除專案         |
+| Method | Endpoint            | Description                        |
+|--------|---------------------|------------------------------------|
+| GET    | /api/project        | 取得所有專案（viewer 僅回傳被指派的）|
+| POST   | /api/project        | 建立專案（admin/engineer）           |
+| GET    | /api/project/:id    | 取得單一專案（viewer 含 allowedModules）|
+| PUT    | /api/project/:id    | 更新專案（admin/engineer）           |
+| DELETE | /api/project/:id    | 刪除專案（admin only）               |
 
 ### Borehole API (鑽孔)
 
