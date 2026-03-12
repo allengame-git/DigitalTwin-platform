@@ -779,6 +779,19 @@ npm run build
   - **handleSaveAccess 修正**: 移除 empty-modules filter，0 module 的 project 仍保留指派記錄
   - **ProtectedRoute race condition**: viewer + requiredModule 時，projects 未載入顯示 loading 而非放行
 
+- [x] **多模組實例架構 (2026-03-12)**:
+  - **架構重構**: 從「每種類型每專案一個模組」改為「每種類型可建立多個模組實例」，每個實例獨立資料、自訂名稱/說明
+  - **DB Schema**: 新增 `Module` entity（id/projectId/type/name/description/sortOrder），所有資料表（Borehole、GeologyModel、FaultPlane、Terrain、WaterLevel、Imagery、Geophysics、Attitude、FacilityScene）新增 `moduleId`（required）取代原本單純的 `projectId` 分隔
+  - **Module CRUD API**: `server/routes/module.ts` 7 個端點（GET/POST/PUT/DELETE/stats/reorder），stats 端點跨 9 張資料表計算刪除確認用數據量
+  - **前端 Store**: `src/stores/moduleStore.ts`（Zustand）管理模組實例 CRUD + 排序
+  - **Module Registry**: `src/config/moduleRegistry.ts` 定義模組類型 metadata（label/icon/description）
+  - **Dashboard 動態卡片**: `ProjectDashboardPage` 從靜態 4 卡改為 `modules.map()` 動態渲染，admin 可 drag-to-reorder（@dnd-kit）、編輯名稱/說明、新增/刪除模組
+  - **動態路由**: `/project/:code/module/:moduleId` + `/module/:moduleId/data`，`ModulePageLoader`/`ModuleDataPageLoader` 依 `module.type` lazy-load 對應頁面
+  - **Viewer 權限升級**: `UserProjectModule.moduleKey`（string）→ `moduleId`（UUID FK to Module），`AdminUsersPage` 改為從 API 取實際模組實例
+  - **Domain Stores moduleId**: 所有前端 store 的 fetch 函數新增 `moduleId` 參數，後端 route 支援 `moduleId` query
+  - **Migration**: `server/prisma/migrate-to-modules.ts` 自動建立模組實例、遷移 516 筆資料記錄、4 筆 viewer 權限
+  - **Legacy 清理**: 移除 11 條舊路由（`/geology`、`/facility` 等）、`moduleKey` 欄位刪除、`moduleId` 改為 required
+
 - [x] **第三輪安全審計發現 (2026-03-08, 尚未修復)**:
   - **V3-1 (High)**: `safeResolvePath` 對 DB 中以 `/uploads/...` 開頭的絕對路徑 URL 永遠 return null — `path.resolve(__dirname, '..', '/uploads/...')` 忽略前段路徑
   - **V3-2 (High)**: `terrain.ts` 檔案刪除路由無路徑邊界驗證（未使用 `safeResolvePath`）
@@ -826,6 +839,18 @@ npm run build
 | DELETE | /api/user-access/:userId/projects/:projectId| 移除專案存取權限                 |
 | GET    | /api/user-access/project/:projectId/viewers | 取得專案的所有 viewer            |
 | PUT    | /api/user-access/:userId/batch              | 批次設定所有專案權限（transaction）|
+
+### Module (模組實例管理)
+
+| Method | Endpoint                | Description                          |
+|--------|-------------------------|--------------------------------------|
+| GET    | /api/module?projectId=  | 取得專案所有模組實例                  |
+| POST   | /api/module             | 建立模組實例                          |
+| GET    | /api/module/:id         | 取得單一模組實例                      |
+| GET    | /api/module/:id/stats   | 取得模組資料統計（刪除確認用）        |
+| PUT    | /api/module/:id         | 更新模組名稱/說明                     |
+| DELETE | /api/module/:id         | 刪除模組（需確認名稱，級聯刪除資料）  |
+| PUT    | /api/module/reorder     | 批次更新排序                          |
 
 ### Project (專案管理)
 

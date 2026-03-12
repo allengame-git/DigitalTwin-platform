@@ -2,7 +2,7 @@
 
 本文件記錄專案目前的完成狀態、座標系統說明，以及後續待辦事項，供接手的 AI Agent 或開發人員參考。
 
-**最後更新**: 2026-03-12（viewer 權限安全修復 + viewer 角色權限控制 + 岩性系統整合 G1 + 斷層面 Html Label G2 + store auth 統一）
+**最後更新**: 2026-03-12（多模組實例架構 + viewer 權限安全修復 + viewer 角色權限控制 + 岩性系統整合 G1 + 斷層面 Html Label G2 + store auth 統一）
 **當前分支**: `main`
 
 ---
@@ -605,6 +605,30 @@ clearViewPreset()        // CameraController 消費後清除
 - **handleSaveAccess 修正**: 移除 `.filter(([_, modules]) => modules.length > 0)`，保留 0 module 的 project 指派
 - **ProtectedRoute race condition**: viewer + requiredModule 時，projects 未載入顯示 loading spinner 而非直接放行；project 無 `allowedModules` 時 deny
 - **Prisma client regenerate**: DB enum `reviewer → viewer` 後必須跑 `npx prisma generate` 重建 client，否則 `findMany()` 查到 `viewer` 值會 throw `Value 'viewer' not found in enum 'UserRole'`
+
+### 10. 多模組實例架構 (2026-03-12) — 完整
+
+#### 10a. DB & API
+- **Module entity**: `server/prisma/schema.prisma` 新增 `Module` model（id/projectId/type/name/description/sortOrder），所有 9 張資料表新增 `moduleId`（required, FK to Module）
+- **Module CRUD**: `server/routes/module.ts` 7 個端點，掛載在 `/api/module`，含 stats（跨 9 張表統計）和 reorder
+- **Migration**: `server/prisma/migrate-to-modules.ts` — 每專案每類型建 1 個模組實例，遷移既有資料的 moduleId，遷移 UserProjectModule 從 moduleKey→moduleId
+- **Domain routes moduleId**: 所有後端資料路由（borehole、terrain、geology-model 等）支援 `?moduleId=` query param
+
+#### 10b. 前端
+- **moduleStore**: `src/stores/moduleStore.ts`（Zustand）— CRUD + reorder + activeModuleId
+- **moduleRegistry**: `src/config/moduleRegistry.ts` — 模組類型 metadata（label/icon/description）
+- **ProjectDashboardPage**: 動態卡片 `modules.map()`，`SortableModuleCard` 用 @dnd-kit 拖曳排序，admin 有 drag handle + edit/delete，engineer 有 edit，viewer 只看被指派的
+- **CreateModuleModal/EditModuleModal/DeleteModuleModal**: 模組 CRUD UI，刪除需輸入名稱確認 + 顯示 stats
+- **ModulePageLoader/ModuleDataPageLoader**: 依 `module.type` lazy-load 對應 Page 元件
+- **AppRoutes**: `/project/:code/module/:moduleId` + `/module/:moduleId/data`，移除 11 條 legacy routes
+- **ProtectedRoute**: 新增 `requiredModuleId` prop，viewer 檢查 URL 中的 moduleId 是否在 allowedModules
+- **AdminUsersPage**: 從 API 取實際模組實例（而非 hardcoded 4 個類型），送 moduleIds（UUID）
+- **Domain stores**: 所有 fetch 函數新增 optional `moduleId` 參數
+
+#### 10c. Viewer 權限
+- `UserProjectModule`: `moduleKey`（String）→ `moduleId`（String FK to Module）
+- `user-access.ts`: 移除 `VALID_MODULES` hardcoded array，改用 `resolveModules()` 查 DB
+- `project.ts`: viewer `allowedModules` 回傳 moduleId（UUID）
 
 ### 7. 安全審計與修復 (2026-03-06) — 完整
 

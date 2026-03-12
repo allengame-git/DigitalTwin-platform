@@ -96,7 +96,7 @@ TWD97 (Taiwan local, meters). Each project has configurable origin (originX/orig
 
 ### Multi-Project Data Isolation
 
-All data is project-scoped via `projectId`. API calls must include project context. Routes in `server/routes/` (13 modules).
+All data is scoped via `moduleId` (each module instance belongs to a project). The `Module` entity (`server/prisma/schema.prisma`) links project ↔ data, supporting N instances per type per project. Module CRUD API: `server/routes/module.ts`. Frontend: `src/stores/moduleStore.ts` + `src/config/moduleRegistry.ts`. Routes: `/project/:code/module/:moduleId`.
 
 ### File Upload Pipeline
 
@@ -112,7 +112,7 @@ JWT (HS256) with refresh tokens in HTTP-only cookies. Prisma-persisted users/ses
 - **Frontend**: `useAuthStore` (Zustand) 統一管理認證狀態，`useAdminStore` 管理 admin 操作
 - **Seed**: `npx prisma db seed` → `admin@llrwd.tw` / `Admin@2026` (mustChangePassword)
 - **CSRF**: admin routes 掛載 `verifyCsrf`，前端 `fetchApi` 自動從 cookie 讀取 csrf-token 注入 header
-- **Viewer 角色權限**: `UserProject` + `UserProjectModule` 雙 junction table 控制 per-project/per-module 存取。`enforceProjectAccess` middleware 檢查 `req.params` + `req.query` 的 projectId（viewer 無 projectId 直接 403）。已掛載到 `GET /project/:id`，`GET /project/code/:code` 用 inline 檢查。`ProtectedRoute.requiredModule` 檢查模組層級（projects 未載入時顯示 loading，非直接放行）。`GET /api/project` 依角色篩選回傳。管理 API: `/api/user-access`（admin+engineer 可用）。專案 CRUD 寫入限 admin/engineer，DELETE 限 admin。Legacy routes（`/geology` 等）不允許 viewer。
+- **Viewer 角色權限**: `UserProject` + `UserProjectModule`（moduleId FK to Module）雙 junction table 控制 per-project/per-module 存取。`enforceProjectAccess` middleware 檢查 `req.params` + `req.query` 的 projectId。`ProtectedRoute.requiredModuleId` 從 URL 取 moduleId 檢查 `allowedModules`（UUID 陣列）。`GET /api/project` 依角色篩選回傳。管理 API: `/api/user-access`（admin+engineer 可用），moduleId 透過 DB 驗證而非 hardcoded 陣列。
 
 ### 資料管理頁面架構（共用設計系統）
 
@@ -129,15 +129,15 @@ src/
 ├── components/overlay/   # UI panels over 3D: LayerPanel, BoreholeDetailPanel, ClippingToolPanel
 ├── components/controls/  # Interactive controls
 ├── components/data/      # Data upload sections (ImageryUploadSection, GeologyModelSection, GeophysicsUploadSection, DataPageTOC, etc.)
-├── stores/               # Zustand stores (~17)
+├── stores/               # Zustand stores (~18, incl. moduleStore)
 ├── api/                  # API clients (auth.ts, admin.ts + domain-specific)
-├── pages/                # Route pages (GeologyPage, DataManagementPage, ProjectDashboard)
+├── pages/                # Route pages (ProjectDashboard, ModulePageLoader, ModuleDataPageLoader, GeologyPage, etc.)
 ├── types/                # TypeScript interfaces
-├── config/               # three.ts (LOD/rendering), lithologyConfig.ts, permissions.ts
+├── config/               # three.ts (LOD/rendering), lithologyConfig.ts, moduleRegistry.ts, permissions.ts
 └── utils/                # coordinates.ts, lod.ts, colorRamps.ts
 
 server/
-├── routes/               # 16 Express route modules (incl. user-access.ts for viewer permissions)
+├── routes/               # 17 Express route modules (incl. module.ts, user-access.ts)
 ├── scripts/              # Python processors (geology, terrain, water level)
 ├── prisma/schema.prisma  # Full database schema
 ├── middleware/            # auth.ts, rateLimit.ts, csrf.ts, errorLogger.ts
@@ -181,8 +181,10 @@ server/
 11. **React hooks 順序 — 不可在 hooks 之前 early return** — `TerrainSettingsSection` 曾在 `useEffect` 之前 `return null`，切換到無地形場景時 hooks 數量改變觸發 "Rendered fewer hooks than expected" crash。修法：將所有 `return null` 移到 hooks 之後，用 boolean flag guard effect 邏輯。
 12. **所有 store fetch 都要帶 `Authorization: Bearer` header** — 安全修復統一加 `authenticate` middleware 後，`credentials: 'include'` 無效（middleware 讀的是 `Authorization` header 不是 cookie）。已修過的 store：`projectStore`、`lithologyStore`、`attitudeStore`、`boreholeStore`、`faultPlaneStore`。新增 store 或新增 fetch 時，一律用 `useAuthStore.getState().accessToken` 取 token。
 13. **ShaderMaterial uniforms 與 useMemo 脫鉤** — `GeologyTiles.tsx` 的 `capMaterial` 用 `useMemo` 建立 ShaderMaterial，但依賴沒有 `palette`。當岩性顏色編輯後，palette 重算但 cap uniforms 不會更新。修法：加 `useEffect` 在 `palette` 變化時手動同步 `capMaterial.uniforms.uLithColors/uLithIds/uLithCount`。
-14. **Viewer 角色的 `allowedModules` 來自 `GET /api/project` 回傳** — viewer 登入後 `projectStore.fetchProjects()` 會拿到 `allowedModules` 欄位，`ProtectedRoute` 和 `ProjectDashboardPage` 用它做模組級控制。如果 `allowedModules` 為 undefined（admin/engineer），代表全部放行。新增模組時需同步更新：`server/routes/user-access.ts` 的 `validModules` 陣列、`AdminUsersPage` 的 `ALL_MODULES`/`MODULE_LABELS`、設計文件。
-15. **Prisma enum rename 後必須 `npx prisma generate`** — DB enum 值用 raw SQL `ALTER TYPE ... RENAME VALUE` 修改後，`prisma db push` 只同步 schema 到 DB，不會重建 Prisma client。若忘記跑 `npx prisma generate`，`findMany()` 查到新 enum 值（如 `viewer`）時會 throw `Value 'viewer' not found in enum 'UserRole'`，回傳 500 伺服器錯誤。修完 schema 後一律跑 `npx prisma db push && npx prisma generate`。
+14. **Viewer 角色的 `allowedModules` 是 moduleId UUID 陣列** — viewer 登入後 `projectStore.fetchProjects()` 拿到 `allowedModules: string[]`（Module UUID），`ProtectedRoute` 和 `ProjectDashboardPage` 用它做模組級控制。admin/engineer 的 `allowedModules` 為 undefined，代表全部放行。新增模組類型時只需在 `src/config/moduleRegistry.ts` 的 `MODULE_TYPES` 加一筆，viewer 權限由實際 Module instance 動態查詢。
+15. **新增 store 的 API_BASE 必須用 `VITE_API_URL`（不是 `VITE_API_BASE_URL`）** — 專案 `.env` 設定的是 `VITE_API_URL=http://localhost:3001`，若誤用 `VITE_API_BASE_URL`（空值）+ 拼接 `/api/xxx`，會產生 `/api/api/xxx` 雙前綴 404。已修過的 store：`moduleStore`。所有 store 統一用 `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/<domain>`。
+16. **Prisma enum rename 後必須 `npx prisma generate`** — DB enum 值用 raw SQL `ALTER TYPE ... RENAME VALUE` 修改後，`prisma db push` 只同步 schema 到 DB，不會重建 Prisma client。若忘記跑 `npx prisma generate`，`findMany()` 查到新 enum 值（如 `viewer`）時會 throw `Value 'viewer' not found in enum 'UserRole'`，回傳 500 伺服器錯誤。修完 schema 後一律跑 `npx prisma db push && npx prisma generate`。
+17. **所有資料表的 `moduleId` 是 required** — Borehole、GeologyModel、FaultPlane、Attitude、Terrain、WaterLevel、Imagery、Geophysics、FacilityScene 都有 `moduleId String`（非 optional）。建立資料記錄時必須帶 moduleId，否則 Prisma 會 throw。前端 domain stores 的 fetch 函數都支援 `moduleId` 參數（`?moduleId=xxx`），從 `useModuleStore.activeModuleId` 取得。
 
 ## Bug 修復指南
 
@@ -206,6 +208,19 @@ server/
 - `FacilityUploadSection.tsx`：場景管理用遞迴 `SceneTreeNode` 支援 N 級巢狀，每層載入父場景模型供 ModelSelect
 - `facility_terrain_processor.py`：CSV→heightmap+hillshade+satellite(JPEG)，衛星影像用 rasterio reproject 對齊 DEM
 - `server/lib/pythonPath.ts`：跨平台 Python venv 路徑解析（macOS/Linux/Windows），`facility.ts` 和 `water-level.ts` 共用
+
+## 多模組實例架構
+
+每個專案可建立多個模組實例（如兩個地質模組、三個設施導覽），取代原本「每種類型固定一個」的設計。
+
+- **Module entity**: `server/prisma/schema.prisma` 的 `Module` model，`projectId` + `type` + `name` + `description` + `sortOrder`
+- **Module CRUD**: `server/routes/module.ts`（7 端點），掛載在 `/api/module`
+- **moduleStore**: `src/stores/moduleStore.ts`（Zustand），管理 modules[]、CRUD、reorder、activeModuleId
+- **moduleRegistry**: `src/config/moduleRegistry.ts`，`MODULE_TYPES` 定義可用模組類型（geology/facility/engineering/simulation）
+- **路由**: `/project/:code/module/:moduleId` → `ModulePageLoader`（lazy-load 對應 Page），`/module/:moduleId/data` → `ModuleDataPageLoader`
+- **Dashboard**: `ProjectDashboardPage` 用 @dnd-kit `SortableModuleCard` 拖曳排序，admin 可新增/編輯/刪除模組
+- **資料隔離**: 所有 domain store fetch 都帶 `moduleId`，後端 route 用 `req.query.moduleId` 篩選
+- **新增模組類型**: 只需在 `MODULE_TYPES` 加一筆 + 建立對應 Page 元件 + 在 `ModulePageLoader.PAGE_MAP` 註冊
 
 ## Conventions
 
