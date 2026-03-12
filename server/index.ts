@@ -28,6 +28,7 @@ import cleanupRoutes from './routes/cleanup';
 import facilityRoutes from './routes/facility';
 import userAccessRoutes from './routes/user-access';
 import moduleRoutes from './routes/module';
+import reviewRoutes from './routes/review';
 import adminRoutes from './routes/admin';
 import { requestIdMiddleware, requestLogger, errorLogger } from './middleware/errorLogger';
 import { verifyCsrf } from './middleware/csrf';
@@ -76,6 +77,7 @@ app.use('/api/cleanup', cleanupRoutes);
 app.use('/api/facility', facilityRoutes);
 app.use('/api/user-access', userAccessRoutes);
 app.use('/api/module', moduleRoutes);
+app.use('/api/review', reviewRoutes);
 app.use('/api/admin', verifyCsrf);
 app.use('/api/admin', adminRoutes);
 
