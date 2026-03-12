@@ -36,7 +36,7 @@ interface WaterLevelState {
     isLoading: boolean;
     error: string | null;
 
-    fetchWaterLevels: (projectId: string) => Promise<void>;
+    fetchWaterLevels: (projectId: string, moduleId?: string) => Promise<void>;
     uploadWaterLevel: (
         projectId: string,
         file: File,
@@ -58,13 +58,17 @@ export const useWaterLevelStore = create<WaterLevelState>((set, get) => ({
     isLoading: false,
     error: null,
 
-    fetchWaterLevels: async (projectId: string) => {
+    fetchWaterLevels: async (projectId: string, moduleId?: string) => {
         try {
             const token = useAuthStore.getState().accessToken;
+            const params: any = {};
+            if (moduleId) params.moduleId = moduleId;
+            else params.projectId = projectId;
+
             const response = await axios.get<WaterLevel[]>(
                 `${API_BASE}/api/water-level`,
                 {
-                    params: { projectId },
+                    params,
                     headers: { Authorization: `Bearer ${token}` },
                 }
             );

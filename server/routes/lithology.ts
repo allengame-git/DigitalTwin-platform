@@ -32,14 +32,18 @@ const DEFAULT_LITHOLOGIES = [
  */
 router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId } = req.query;
+        const { projectId, moduleId } = req.query;
 
-        if (!projectId) {
-            return res.status(400).json({ error: '缺少 projectId 參數' });
+        if (!projectId && !moduleId) {
+            return res.status(400).json({ error: '缺少 projectId 或 moduleId 參數' });
         }
 
+        const where: any = {};
+        if (moduleId) where.moduleId = moduleId as string;
+        else if (projectId) where.projectId = projectId as string;
+
         const lithologies = await prisma.projectLithology.findMany({
-            where: { projectId: projectId as string },
+            where,
             orderBy: { lithId: 'asc' }
         });
 
@@ -56,7 +60,7 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
  */
 router.post('/', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId, lithId, code, name, color } = req.body;
+        const { projectId, moduleId, lithId, code, name, color } = req.body;
 
         if (!projectId || !lithId || !code || !name || !color) {
             return res.status(400).json({ error: '缺少必填欄位' });
@@ -65,6 +69,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         const lithology = await prisma.projectLithology.create({
             data: {
                 projectId,
+                ...(moduleId && { moduleId }),
                 lithId: parseInt(lithId),
                 code: code.trim().toUpperCase(),
                 name: name.trim(),

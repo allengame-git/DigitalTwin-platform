@@ -29,7 +29,7 @@ interface LithologyState {
 }
 
 interface LithologyActions {
-    fetchLithologies: (projectId: string) => Promise<void>;
+    fetchLithologies: (projectId: string, moduleId?: string) => Promise<void>;
     createLithology: (projectId: string, data: Omit<ProjectLithology, 'id'>) => Promise<ProjectLithology | null>;
     importLithologies: (projectId: string, data: Omit<ProjectLithology, 'id'>[]) => Promise<number | null>;
     updateLithology: (id: string, data: Partial<ProjectLithology>) => Promise<ProjectLithology | null>;
@@ -44,10 +44,11 @@ export const useLithologyStore = create<LithologyState & LithologyActions>((set,
     status: 'idle',
     error: null,
 
-    fetchLithologies: async (projectId: string) => {
+    fetchLithologies: async (projectId: string, moduleId?: string) => {
         set({ status: 'loading', error: null });
         try {
-            const response = await fetch(`${API_BASE}/api/lithology?projectId=${projectId}`, {
+            const query = moduleId ? `moduleId=${moduleId}` : `projectId=${projectId}`;
+            const response = await fetch(`${API_BASE}/api/lithology?${query}`, {
                 headers: authHeaders(),
             });
 

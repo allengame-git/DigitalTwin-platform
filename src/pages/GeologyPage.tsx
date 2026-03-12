@@ -13,7 +13,11 @@ import { useProjectStore } from '../stores/projectStore';
 import { useLithologyStore } from '../stores/lithologyStore';
 import { useTerrainStore } from '../stores/terrainStore';
 
-export const GeologyPage: React.FC = () => {
+interface GeologyPageProps {
+    moduleId?: string;
+}
+
+export const GeologyPage: React.FC<GeologyPageProps> = ({ moduleId }) => {
     const { projectCode } = useParams<{ projectCode: string }>();
     const { projects, setActiveProject } = useProjectStore();
     const { fetchLithologies } = useLithologyStore();

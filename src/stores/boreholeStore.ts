@@ -28,7 +28,7 @@ interface BoreholeState {
 }
 
 interface BoreholeActions {
-    fetchBoreholes: (projectId?: string) => Promise<void>;
+    fetchBoreholes: (projectId?: string, moduleId?: string) => Promise<void>;
     selectBorehole: (id: string) => Promise<void>;
     clearSelection: () => void;
     setFilter: (filter: Partial<BoreholeState['filter']>) => void;
@@ -37,9 +37,9 @@ interface BoreholeActions {
     updateBorehole: (id: string, data: Partial<CreateBoreholeData>) => Promise<Borehole | null>;
     deleteBorehole: (id: string) => Promise<boolean>;
     batchDelete: (ids: string[]) => Promise<{ success: number; failed: number }>;
-    batchImport: (projectId: string, boreholes: CreateBoreholeData[]) => Promise<BatchImportResult>;
-    batchImportLayers: (projectId: string, layers: LayerCsvRow[]) => Promise<BatchImportResult>;
-    batchImportProperties: (projectId: string, properties: PropertyCsvRow[]) => Promise<BatchImportResult>;
+    batchImport: (projectId: string, boreholes: CreateBoreholeData[], moduleId?: string) => Promise<BatchImportResult>;
+    batchImportLayers: (projectId: string, layers: LayerCsvRow[], moduleId?: string) => Promise<BatchImportResult>;
+    batchImportProperties: (projectId: string, properties: PropertyCsvRow[], moduleId?: string) => Promise<BatchImportResult>;
     uploadPhoto: (boreholeId: string, file: File, depth: number, caption?: string) => Promise<boolean>;
     deletePhoto: (boreholeId: string, photoId: string) => Promise<boolean>;
     fetchBoreholePhotos: (boreholeId: string) => Promise<Photo[]>;
@@ -141,12 +141,13 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
     filter: {},
 
     // Actions
-    fetchBoreholes: async (projectId?: string) => {
+    fetchBoreholes: async (projectId?: string, moduleId?: string) => {
         set({ status: 'loading', error: null });
 
         try {
-            const url = projectId
-                ? `${API_BASE}/api/borehole?projectId=${projectId}`
+            const query = moduleId ? `moduleId=${moduleId}` : projectId ? `projectId=${projectId}` : '';
+            const url = query
+                ? `${API_BASE}/api/borehole?${query}`
                 : `${API_BASE}/api/borehole`;
 
             const token = useAuthStore.getState().accessToken;
@@ -360,7 +361,7 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
         return { success, failed };
     },
 
-    batchImport: async (projectId: string, boreholes: CreateBoreholeData[]) => {
+    batchImport: async (projectId: string, boreholes: CreateBoreholeData[], moduleId?: string) => {
         try {
             const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/borehole/batch`, {
@@ -370,7 +371,7 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
                     ...(token && { 'Authorization': `Bearer ${token}` }),
                 },
                 credentials: 'include',
-                body: JSON.stringify({ projectId, boreholes }),
+                body: JSON.stringify({ projectId, ...(moduleId && { moduleId }), boreholes }),
             });
 
             if (!response.ok) {
@@ -389,7 +390,7 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
         }
     },
 
-    batchImportLayers: async (projectId: string, layers: LayerCsvRow[]) => {
+    batchImportLayers: async (projectId: string, layers: LayerCsvRow[], moduleId?: string) => {
         try {
             const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/borehole/batch-layers`, {
@@ -399,7 +400,7 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
                     ...(token && { 'Authorization': `Bearer ${token}` }),
                 },
                 credentials: 'include',
-                body: JSON.stringify({ projectId, layers }),
+                body: JSON.stringify({ projectId, ...(moduleId && { moduleId }), layers }),
             });
 
             if (!response.ok) {
@@ -415,7 +416,7 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
         }
     },
 
-    batchImportProperties: async (projectId: string, properties: PropertyCsvRow[]) => {
+    batchImportProperties: async (projectId: string, properties: PropertyCsvRow[], moduleId?: string) => {
         try {
             const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/borehole/batch-properties`, {
@@ -425,7 +426,7 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
                     ...(token && { 'Authorization': `Bearer ${token}` }),
                 },
                 credentials: 'include',
-                body: JSON.stringify({ projectId, properties }),
+                body: JSON.stringify({ projectId, ...(moduleId && { moduleId }), properties }),
             });
 
             if (!response.ok) {

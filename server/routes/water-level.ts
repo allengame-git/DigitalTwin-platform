@@ -58,7 +58,7 @@ const upload = multer({
 router.post('/', authenticate, upload.single('file'), async (req: Request, res: Response) => {
     try {
         const file = req.file;
-        const { projectId, name, sourceType = 'well', width = '512', method = 'linear', bounds } = req.body;
+        const { projectId, moduleId, name, sourceType = 'well', width = '512', method = 'linear', bounds } = req.body;
 
         if (!file) return res.status(400).json({ error: '請選擇檔案' });
         if (!projectId) {
@@ -120,6 +120,7 @@ router.post('/', authenticate, upload.single('file'), async (req: Request, res: 
                 const waterLevel = await prisma.waterLevel.create({
                     data: {
                         projectId,
+                        ...(moduleId && { moduleId }),
                         name: name || file.originalname,
                         sourceType,
                         filename: file.filename,
@@ -158,11 +159,15 @@ router.post('/', authenticate, upload.single('file'), async (req: Request, res: 
  */
 router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId } = req.query;
-        if (!projectId) return res.status(400).json({ error: '缺少 projectId' });
+        const { projectId, moduleId } = req.query;
+        if (!projectId && !moduleId) return res.status(400).json({ error: '缺少 projectId 或 moduleId' });
+
+        const where: any = {};
+        if (moduleId) where.moduleId = moduleId as string;
+        else if (projectId) where.projectId = projectId as string;
 
         const waterLevels = await prisma.waterLevel.findMany({
-            where: { projectId: projectId as string },
+            where,
             orderBy: { createdAt: 'desc' },
         });
 

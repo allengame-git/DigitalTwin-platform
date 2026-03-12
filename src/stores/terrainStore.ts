@@ -30,7 +30,7 @@ interface TerrainState {
     isLoading: boolean;
     error: string | null;
 
-    fetchTerrains: (projectId: string) => Promise<void>;
+    fetchTerrains: (projectId: string, moduleId?: string) => Promise<void>;
     uploadTerrain: (projectId: string, file: File, name?: string, method?: string, satellite?: File) => Promise<void>;
     setActiveTerrain: (id: string | null) => void;
     deleteTerrain: (id: string) => Promise<void>;
@@ -45,14 +45,18 @@ export const useTerrainStore = create<TerrainState>((set, get) => ({
     isLoading: false,
     error: null,
 
-    fetchTerrains: async (projectId: string) => {
+    fetchTerrains: async (projectId: string, moduleId?: string) => {
         set({ isLoading: true, error: null });
         try {
             const token = useAuthStore.getState().accessToken;
+            const params: any = {};
+            if (moduleId) params.moduleId = moduleId;
+            else params.projectId = projectId;
+
             const response = await axios.get<Terrain[]>(
                 `${API_BASE}/api/terrain`,
                 {
-                    params: { projectId },
+                    params,
                     withCredentials: true,
                     headers: {
                         ...(token && { 'Authorization': `Bearer ${token}` })

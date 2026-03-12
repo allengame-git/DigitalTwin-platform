@@ -102,7 +102,7 @@ router.post('/imagery', authenticate, upload.single('file'), async (req: Request
         }
 
         // 驗證必填 metadata
-        const { projectId, year, name, source, description, minX, maxX, minY, maxY } = req.body;
+        const { projectId, moduleId, year, name, source, description, minX, maxX, minY, maxY } = req.body;
 
         if (!projectId || !year || !name) {
             fs.unlinkSync(req.file.path);
@@ -182,6 +182,7 @@ router.post('/imagery', authenticate, upload.single('file'), async (req: Request
         const imagery = await prisma.imagery.create({
             data: {
                 projectId,
+                ...(moduleId && { moduleId }),
                 filename: finalFilename,
                 originalName: req.file.originalname,
                 year: yearNum,
@@ -213,13 +214,17 @@ router.post('/imagery', authenticate, upload.single('file'), async (req: Request
 // 取得已上傳列表
 router.get('/imagery', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId } = req.query;
-        if (!projectId) {
-            return res.status(400).json({ message: 'Missing projectId' });
+        const { projectId, moduleId } = req.query;
+        if (!projectId && !moduleId) {
+            return res.status(400).json({ message: 'Missing projectId or moduleId' });
         }
 
+        const where: any = {};
+        if (moduleId) where.moduleId = moduleId as string;
+        else if (projectId) where.projectId = projectId as string;
+
         const images = await prisma.imagery.findMany({
-            where: { projectId: projectId as string },
+            where,
             orderBy: { createdAt: 'desc' },
         });
 
@@ -323,7 +328,7 @@ router.post('/geophysics', authenticate, geophysicsUpload.single('file'), async 
         }
 
         const {
-            projectId,
+            projectId, moduleId,
             year, name, lineId, method, description,
             x1, y1, z1, x2, y2, z2,
             depthTop, depthBottom
@@ -379,6 +384,7 @@ router.post('/geophysics', authenticate, geophysicsUpload.single('file'), async 
         const geophysics = await prisma.geophysics.create({
             data: {
                 projectId,
+                ...(moduleId && { moduleId }),
                 filename: finalFilename,
                 originalName: req.file.originalname,
                 year: yearNum,
@@ -410,13 +416,17 @@ router.post('/geophysics', authenticate, geophysicsUpload.single('file'), async 
 // 取得地球物理探查資料列表
 router.get('/geophysics', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId } = req.query;
-        if (!projectId) {
-            return res.status(400).json({ message: 'Missing projectId' });
+        const { projectId, moduleId } = req.query;
+        if (!projectId && !moduleId) {
+            return res.status(400).json({ message: 'Missing projectId or moduleId' });
         }
 
+        const where: any = {};
+        if (moduleId) where.moduleId = moduleId as string;
+        else if (projectId) where.projectId = projectId as string;
+
         const data = await prisma.geophysics.findMany({
-            where: { projectId: projectId as string },
+            where,
             orderBy: { createdAt: 'desc' },
         });
         res.json({ success: true, data });

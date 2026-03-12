@@ -18,13 +18,18 @@ const router = Router();
 router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
         const projectId = req.query.projectId as string;
+        const moduleId = req.query.moduleId as string;
 
-        if (!projectId) {
-            return res.status(400).json({ success: false, error: 'projectId is required' });
+        if (!projectId && !moduleId) {
+            return res.status(400).json({ success: false, error: 'projectId or moduleId is required' });
         }
 
+        const where: any = {};
+        if (moduleId) where.moduleId = moduleId;
+        else if (projectId) where.projectId = projectId;
+
         const faultPlanes = await prisma.faultPlane.findMany({
-            where: { projectId: projectId as string },
+            where,
             include: {
                 coordinates: {
                     orderBy: { sortOrder: 'asc' }
@@ -74,7 +79,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response) => {
  */
 router.post('/', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId, name, type, dipAngle, dipDirection, depth, color, coordinates } = req.body;
+        const { projectId, moduleId, name, type, dipAngle, dipDirection, depth, color, coordinates } = req.body;
 
         if (!projectId || !name || !type || dipAngle === undefined || dipDirection === undefined || depth === undefined) {
             return res.status(400).json({
@@ -93,6 +98,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         const faultPlane = await prisma.faultPlane.create({
             data: {
                 projectId,
+                ...(moduleId && { moduleId }),
                 name,
                 type,
                 dipAngle: parseFloat(dipAngle),
@@ -212,7 +218,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response) => {
  */
 router.post('/batch-import', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId, faultPlanes } = req.body;
+        const { projectId, moduleId, faultPlanes } = req.body;
 
         if (!projectId) {
             return res.status(400).json({ success: false, error: 'projectId is required' });
@@ -242,6 +248,7 @@ router.post('/batch-import', authenticate, async (req: Request, res: Response) =
                 await prisma.faultPlane.create({
                     data: {
                         projectId,
+                        ...(moduleId && { moduleId }),
                         name: fp.name,
                         type: fp.type || 'normal',
                         dipAngle: parseFloat(fp.dipAngle),

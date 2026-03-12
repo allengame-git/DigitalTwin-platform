@@ -18,7 +18,11 @@ const TransformInputPanel = React.lazy(() => import('../components/facility/Tran
 const PlanViewFloating = React.lazy(() => import('../components/facility/PlanViewFloating'));
 const AnimationTimeline = React.lazy(() => import('../components/facility/AnimationTimeline'));
 
-export const FacilityPage: React.FC = () => {
+interface FacilityPageProps {
+    moduleId?: string;
+}
+
+export const FacilityPage: React.FC<FacilityPageProps> = ({ moduleId }) => {
     const { projectCode } = useParams<{ projectCode: string }>();
     const { projects, setActiveProject } = useProjectStore();
     const fetchScenes = useFacilityStore(state => state.fetchScenes);

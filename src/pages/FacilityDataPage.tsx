@@ -24,7 +24,11 @@ const tabItems: { key: FacilityTab; label: string; icon: React.ReactNode }[] = [
     { key: 'manager', label: '模型管理', icon: <Settings size={14} /> },
 ];
 
-export const FacilityDataPage: React.FC = () => {
+interface FacilityDataPageProps {
+    moduleId?: string;
+}
+
+export const FacilityDataPage: React.FC<FacilityDataPageProps> = ({ moduleId }) => {
     const user = useAuthStore(state => state.user);
     const { projectCode } = useParams<{ projectCode: string }>();
     const { activeProjectId, projects, fetchProjects, getProjectByCode, setActiveProject } = useProjectStore();

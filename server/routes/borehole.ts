@@ -50,10 +50,14 @@ const photoUpload = multer({
  */
 router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId } = req.query;
+        const { projectId, moduleId } = req.query;
+
+        const where: any = {};
+        if (moduleId) where.moduleId = moduleId as string;
+        else if (projectId) where.projectId = projectId as string;
 
         const boreholes = await prisma.borehole.findMany({
-            where: projectId ? { projectId: projectId as string } : undefined,
+            where: Object.keys(where).length > 0 ? where : undefined,
             include: {
                 layers: {
                     orderBy: { topDepth: 'asc' }
@@ -108,6 +112,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
     try {
         const {
             projectId,
+            moduleId,
             boreholeNo,
             name,
             x,
@@ -130,6 +135,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         const borehole = await prisma.borehole.create({
             data: {
                 projectId,
+                ...(moduleId && { moduleId }),
                 boreholeNo,
                 name,
                 x: parseFloat(x),
@@ -179,7 +185,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
  */
 router.post('/batch', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId, boreholes } = req.body;
+        const { projectId, moduleId, boreholes } = req.body;
 
         if (!Array.isArray(boreholes) || boreholes.length === 0) {
             return res.status(400).json({ error: '請提供鑽孔資料陣列' });
@@ -193,6 +199,7 @@ router.post('/batch', authenticate, async (req: Request, res: Response) => {
                 const created = await prisma.borehole.create({
                     data: {
                         projectId,
+                        ...(moduleId && { moduleId }),
                         boreholeNo: bh.boreholeNo,
                         name: bh.name,
                         x: parseFloat(bh.x),
@@ -355,7 +362,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response) => {
  */
 router.post('/batch-layers', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId, layers } = req.body;
+        const { projectId, moduleId, layers } = req.body;
 
         if (!Array.isArray(layers) || layers.length === 0) {
             return res.status(400).json({ error: '請提供地層資料陣列' });
@@ -375,9 +382,13 @@ router.post('/batch-layers', authenticate, async (req: Request, res: Response) =
 
         for (const [boreholeNo, boreholeNo_layers] of Object.entries(layersByBorehole)) {
             try {
-                // Find borehole by boreholeNo and projectId
+                // Find borehole by boreholeNo and moduleId/projectId
+                const boreholeWhere: any = { boreholeNo };
+                if (moduleId) boreholeWhere.moduleId = moduleId;
+                else if (projectId) boreholeWhere.projectId = projectId;
+
                 const borehole = await prisma.borehole.findFirst({
-                    where: { boreholeNo, projectId }
+                    where: boreholeWhere
                 });
 
                 if (!borehole) {
@@ -422,7 +433,7 @@ router.post('/batch-layers', authenticate, async (req: Request, res: Response) =
  */
 router.post('/batch-properties', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId, properties } = req.body;
+        const { projectId, moduleId, properties } = req.body;
 
         if (!Array.isArray(properties) || properties.length === 0) {
             return res.status(400).json({ error: '請提供物性資料陣列' });
@@ -442,9 +453,13 @@ router.post('/batch-properties', authenticate, async (req: Request, res: Respons
 
         for (const [boreholeNo, boreholeNo_props] of Object.entries(propsByBorehole)) {
             try {
-                // Find borehole by boreholeNo and projectId
+                // Find borehole by boreholeNo and moduleId/projectId
+                const propBoreholeWhere: any = { boreholeNo };
+                if (moduleId) propBoreholeWhere.moduleId = moduleId;
+                else if (projectId) propBoreholeWhere.projectId = projectId;
+
                 const borehole = await prisma.borehole.findFirst({
-                    where: { boreholeNo, projectId }
+                    where: propBoreholeWhere
                 });
 
                 if (!borehole) {

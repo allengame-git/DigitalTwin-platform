@@ -47,7 +47,11 @@ import { useLithologyStore } from '../stores/lithologyStore';
 import '../styles/data-management.css';
 
 
-export const DataManagementPage: React.FC = () => {
+interface DataManagementPageProps {
+    moduleId?: string;
+}
+
+export const DataManagementPage: React.FC<DataManagementPageProps> = ({ moduleId }) => {
     const user = useAuthStore(state => state.user);
     const { projectCode } = useParams<{ projectCode: string }>();
     const navigate = useNavigate();

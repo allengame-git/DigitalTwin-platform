@@ -17,6 +17,10 @@ const LoginPage = React.lazy(() => import('../pages/LoginPage'));
 const UnauthorizedPage = React.lazy(() => import('../pages/UnauthorizedPage'));
 const DashboardPage = React.lazy(() => import('../pages/DashboardPage'));
 
+// Dynamic module loaders
+const ModulePageLoader = React.lazy(() => import('../pages/ModulePageLoader'));
+const ModuleDataPageLoader = React.lazy(() => import('../pages/ModuleDataPageLoader'));
+
 // Lazy load placeholder pages
 const DataManagementPage = React.lazy(() => import('../pages/DataManagementPage'));
 const GeologyPage = React.lazy(() => import('../pages/GeologyPage'));
@@ -128,6 +132,25 @@ const router = createBrowserRouter([
                     </ProtectedRoute>
                 ),
             },
+            // Module-based routes (new dynamic loader)
+            {
+                path: '/project/:projectCode/module/:moduleId',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']} requiredModuleId>
+                        <ModulePageLoader />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: '/project/:projectCode/module/:moduleId/data',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
+                        <ModuleDataPageLoader />
+                    </ProtectedRoute>
+                ),
+            },
+
+            // Legacy project-scoped routes (kept for backward compatibility)
             {
                 path: '/project/:projectCode/geology',
                 element: (

@@ -65,8 +65,8 @@ interface FacilityState {
     error: string | null;
 
     // Scene actions
-    fetchScenes: (projectId: string, force?: boolean) => Promise<void>;
-    createScene: (data: { projectId: string; parentSceneId?: string; parentModelId?: string; name: string; description?: string }) => Promise<FacilityScene>;
+    fetchScenes: (projectId: string, force?: boolean, moduleId?: string) => Promise<void>;
+    createScene: (data: { projectId: string; moduleId?: string; parentSceneId?: string; parentModelId?: string; name: string; description?: string }) => Promise<FacilityScene>;
     updateScene: (id: string, data: Partial<Pick<FacilityScene, 'name' | 'description' | 'cameraPosition' | 'cameraTarget' | 'coordShiftX' | 'coordShiftY' | 'coordShiftZ' | 'coordRotation' | 'sortOrder' | 'sceneType' | 'parentModelId' | 'sceneBounds'>>) => Promise<void>;
     deleteScene: (id: string) => Promise<void>;
 
@@ -199,12 +199,16 @@ export const useFacilityStore = create<FacilityState>((set, get) => ({
     transitionModelId: null,
 
     // ===== Scene Actions =====
-    fetchScenes: async (projectId: string, force = false) => {
+    fetchScenes: async (projectId: string, force = false, moduleId?: string) => {
         // 同一專案不重複重置（避免重新進入頁面時場景閃爍重載），force=true 強制刷新
         if (!force && get().loadedProjectId === projectId) return;
         try {
+            const params: any = {};
+            if (moduleId) params.moduleId = moduleId;
+            else params.projectId = projectId;
+
             const res = await axios.get<FacilityScene[]>(`${API_BASE}/api/facility/scenes`, {
-                params: { projectId },
+                params,
                 headers: getAuthHeaders(),
                 withCredentials: true,
             });

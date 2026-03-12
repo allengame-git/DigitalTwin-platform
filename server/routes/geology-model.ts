@@ -71,13 +71,17 @@ const uploadFields = upload.fields([
  */
 router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId } = req.query;
-        if (!projectId) {
-            return res.status(400).json({ message: 'Missing projectId' });
+        const { projectId, moduleId } = req.query;
+        if (!projectId && !moduleId) {
+            return res.status(400).json({ message: 'Missing projectId or moduleId' });
         }
 
+        const where: any = {};
+        if (moduleId) where.moduleId = moduleId as string;
+        else if (projectId) where.projectId = projectId as string;
+
         const models = await prisma.geologyModel.findMany({
-            where: { projectId: projectId as string },
+            where,
             orderBy: [
                 { isActive: 'desc' },
                 { createdAt: 'desc' },
@@ -151,7 +155,7 @@ router.post('/', authenticate, uploadFields, async (req: Request, res: Response)
         }
 
         const {
-            projectId,
+            projectId, moduleId,
             version, year, name, description, sourceData,
         } = req.body;
 
@@ -177,6 +181,7 @@ router.post('/', authenticate, uploadFields, async (req: Request, res: Response)
         const model = await prisma.geologyModel.create({
             data: {
                 projectId,
+                ...(moduleId && { moduleId }),
                 filename: geoFile.filename,
                 originalName: geoFile.originalname,
                 version: version.trim(),

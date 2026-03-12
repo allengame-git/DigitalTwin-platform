@@ -17,14 +17,18 @@ const router = Router();
  */
 router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId } = req.query;
+        const { projectId, moduleId } = req.query;
 
-        if (!projectId) {
-            return res.status(400).json({ success: false, error: 'projectId is required' });
+        if (!projectId && !moduleId) {
+            return res.status(400).json({ success: false, error: 'projectId or moduleId is required' });
         }
 
+        const where: any = {};
+        if (moduleId) where.moduleId = moduleId as string;
+        else if (projectId) where.projectId = projectId as string;
+
         const attitudes = await prisma.attitude.findMany({
-            where: { projectId: projectId as string },
+            where,
             orderBy: { createdAt: 'desc' },
         });
 
@@ -41,7 +45,7 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
  */
 router.post('/', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId, x, y, z, strike, dip, dipDirection, description } = req.body;
+        const { projectId, moduleId, x, y, z, strike, dip, dipDirection, description } = req.body;
 
         if (!projectId || x === undefined || y === undefined || z === undefined ||
             strike === undefined || dip === undefined) {
@@ -65,6 +69,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         const attitude = await prisma.attitude.create({
             data: {
                 projectId,
+                ...(moduleId && { moduleId }),
                 x: parseFloat(x),
                 y: parseFloat(y),
                 z: parseFloat(z),
@@ -157,10 +162,10 @@ router.delete('/:id', authenticate, async (req: Request, res: Response) => {
  */
 router.post('/batch-import', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId, attitudes } = req.body;
+        const { projectId, moduleId, attitudes } = req.body;
 
-        if (!projectId) {
-            return res.status(400).json({ success: false, error: 'projectId is required' });
+        if (!projectId && !moduleId) {
+            return res.status(400).json({ success: false, error: 'projectId or moduleId is required' });
         }
 
         if (!attitudes || !Array.isArray(attitudes) || attitudes.length === 0) {
@@ -168,8 +173,12 @@ router.post('/batch-import', authenticate, async (req: Request, res: Response) =
         }
 
         // 取得專案現有資料以進行重複檢查
+        const existingWhere: any = {};
+        if (moduleId) existingWhere.moduleId = moduleId;
+        else if (projectId) existingWhere.projectId = projectId;
+
         const existingAttitudes = await prisma.attitude.findMany({
-            where: { projectId },
+            where: existingWhere,
             select: { x: true, y: true, z: true, strike: true, dip: true },
         });
 
@@ -217,6 +226,7 @@ router.post('/batch-import', authenticate, async (req: Request, res: Response) =
                     prisma.attitude.create({
                         data: {
                             projectId,
+                            ...(moduleId && { moduleId }),
                             x,
                             y,
                             z,

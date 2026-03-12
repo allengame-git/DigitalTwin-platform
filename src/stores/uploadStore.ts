@@ -198,19 +198,19 @@ export interface UploadState {
 
 export interface UploadActions {
     // 航照圖
-    fetchImageryFiles: () => Promise<void>;
+    fetchImageryFiles: (moduleId?: string) => Promise<void>;
     uploadImagery: (file: File, metadata: ImageryMetadata) => Promise<void>;
     deleteImagery: (id: string) => Promise<void>;
     setActiveImagery: (id: string | null) => void;
     getActiveImagery: () => UploadedFile | null;
     // 地球物理探查
-    fetchGeophysicsFiles: () => Promise<void>;
+    fetchGeophysicsFiles: (moduleId?: string) => Promise<void>;
     uploadGeophysics: (file: File, metadata: GeophysicsMetadata) => Promise<void>;
     deleteGeophysics: (id: string) => Promise<void>;
     setActiveGeophysics: (id: string | null) => void;
     getActiveGeophysics: () => GeophysicsFile | null;
     // 3D 地質模型
-    fetchGeologyModels: () => Promise<void>;
+    fetchGeologyModels: (moduleId?: string) => Promise<void>;
     uploadGeologyModel: (file: File, metadata: GeologyModelMetadata) => Promise<void>;
     deleteGeologyModel: (id: string) => Promise<void>;
     activateGeologyModel: (id: string) => Promise<void>;
@@ -235,12 +235,13 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
     // ===============================
     // 航照圖 Actions
     // ===============================
-    fetchImageryFiles: async () => {
+    fetchImageryFiles: async (moduleId?: string) => {
         try {
             const projectId = useProjectStore.getState().activeProjectId;
-            if (!projectId) return;
+            if (!projectId && !moduleId) return;
 
-            const res = await fetch(`${API_BASE}/api/upload/imagery?projectId=${projectId}`);
+            const query = moduleId ? `moduleId=${moduleId}` : `projectId=${projectId}`;
+            const res = await fetch(`${API_BASE}/api/upload/imagery?${query}`);
             const data = await res.json();
             if (data.success) {
                 set(state => ({
@@ -335,12 +336,13 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
     // ===============================
     // 地球物理探查 Actions
     // ===============================
-    fetchGeophysicsFiles: async () => {
+    fetchGeophysicsFiles: async (moduleId?: string) => {
         try {
             const projectId = useProjectStore.getState().activeProjectId;
-            if (!projectId) return;
+            if (!projectId && !moduleId) return;
 
-            const res = await fetch(`${API_BASE}/api/upload/geophysics?projectId=${projectId}`);
+            const query = moduleId ? `moduleId=${moduleId}` : `projectId=${projectId}`;
+            const res = await fetch(`${API_BASE}/api/upload/geophysics?${query}`);
             const data = await res.json();
             if (data.success) {
                 set({ geophysicsFiles: data.data });
@@ -438,12 +440,13 @@ export const useUploadStore = create<UploadState & UploadActions>((set, get) => 
     // ===============================
     // 3D 地質模型 Actions
     // ===============================
-    fetchGeologyModels: async () => {
+    fetchGeologyModels: async (moduleId?: string) => {
         try {
             const projectId = useProjectStore.getState().activeProjectId;
-            if (!projectId) return;
+            if (!projectId && !moduleId) return;
 
-            const res = await fetch(`${API_BASE}/api/geology-model?projectId=${projectId}`);
+            const query = moduleId ? `moduleId=${moduleId}` : `projectId=${projectId}`;
+            const res = await fetch(`${API_BASE}/api/geology-model?${query}`);
             const data = await res.json();
             if (data.success) {
                 const models = data.data as GeologyModelFile[];

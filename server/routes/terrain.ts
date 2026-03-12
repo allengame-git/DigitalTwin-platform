@@ -55,7 +55,7 @@ router.post('/', authenticate, terrainUpload, async (req: Request, res: Response
         const files = req.files as { [fieldname: string]: Express.Multer.File[] };
         const file = files?.file?.[0];
         const satelliteFile = files?.satellite?.[0];
-        const { projectId, name, width = '2048', method = 'linear' } = req.body;
+        const { projectId, moduleId, name, width = '2048', method = 'linear' } = req.body;
 
         if (!file) return res.status(400).json({ error: '請選擇檔案' });
         if (!projectId) {
@@ -145,6 +145,7 @@ router.post('/', authenticate, terrainUpload, async (req: Request, res: Response
                 const terrain = await prisma.terrain.create({
                     data: {
                         projectId,
+                        ...(moduleId && { moduleId }),
                         name: name || file.originalname,
                         filename: file.filename,
                         originalName: file.originalname,
@@ -188,11 +189,15 @@ router.post('/', authenticate, terrainUpload, async (req: Request, res: Response
  */
 router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId } = req.query;
-        if (!projectId) return res.status(400).json({ error: 'ProjectId required' });
+        const { projectId, moduleId } = req.query;
+        if (!projectId && !moduleId) return res.status(400).json({ error: 'ProjectId or moduleId required' });
+
+        const where: any = { isActive: true };
+        if (moduleId) where.moduleId = moduleId as string;
+        else if (projectId) where.projectId = projectId as string;
 
         const terrains = await prisma.terrain.findMany({
-            where: { projectId: projectId as string, isActive: true },
+            where,
             orderBy: { createdAt: 'desc' }
         });
 

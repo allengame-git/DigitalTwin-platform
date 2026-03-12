@@ -11,6 +11,8 @@ import { useAuthStore } from '../stores/authStore';
 import { useAdminStore } from '../stores/adminStore';
 import type { AdminUser, UserRole } from '../types/auth';
 import { usePageTracking } from '../hooks/usePageTracking';
+import type { Module } from '../stores/moduleStore';
+import { getModuleTypeConfig } from '../config/moduleRegistry';
 
 const ROLE_LABELS: Record<string, string> = {
     admin: '管理員',
@@ -63,13 +65,8 @@ export const AdminUsersPage: React.FC = () => {
 
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const ALL_MODULES = ['geology', 'facility', 'engineering', 'simulation'];
-    const MODULE_LABELS: Record<string, string> = {
-        geology: '地質資料',
-        facility: '設施導覽',
-        engineering: '工程設計',
-        simulation: '模擬分析',
-    };
+    // Dynamic modules per project (fetched when access modal opens)
+    const [projectModules, setProjectModules] = useState<Record<string, Module[]>>({});
 
     function accessAuthHeaders(): Record<string, string> {
         const token = useAuthStore.getState().accessToken;
@@ -188,14 +185,31 @@ export const AdminUsersPage: React.FC = () => {
             const projectsData = await projectsRes.json();
             const accessData = await accessRes.json();
 
+            let projects: { id: string; name: string; code: string }[] = [];
             if (projectsData.success) {
-                setAllProjects(projectsData.data.map((p: any) => ({ id: p.id, name: p.name, code: p.code })));
+                projects = projectsData.data.map((p: any) => ({ id: p.id, name: p.name, code: p.code }));
+                setAllProjects(projects);
             }
 
+            // Fetch modules for each project in parallel
+            const modulesMap: Record<string, Module[]> = {};
+            const moduleResults = await Promise.all(
+                projects.map(async (p) => {
+                    const res = await fetch(`/api/module?projectId=${p.id}`, { headers: accessAuthHeaders() });
+                    const data = await res.json();
+                    return { projectId: p.id, modules: data.success ? (data.data as Module[]) : [] };
+                })
+            );
+            for (const result of moduleResults) {
+                modulesMap[result.projectId] = result.modules;
+            }
+            setProjectModules(modulesMap);
+
+            // Use moduleIds (new format) from API response
             const map: Record<string, string[]> = {};
             if (accessData.success) {
                 for (const item of accessData.data) {
-                    map[item.projectId] = item.modules;
+                    map[item.projectId] = item.moduleIds || item.modules || [];
                 }
             }
             setAssignments(map);
@@ -212,20 +226,22 @@ export const AdminUsersPage: React.FC = () => {
             if (copy[projectId]) {
                 delete copy[projectId];
             } else {
-                copy[projectId] = [...ALL_MODULES];
+                // Select all module IDs for this project
+                const mods = projectModules[projectId] || [];
+                copy[projectId] = mods.map(m => m.id);
             }
             return copy;
         });
     };
 
-    const toggleModule = (projectId: string, moduleKey: string) => {
+    const toggleModule = (projectId: string, moduleId: string) => {
         setAssignments(prev => {
             const copy = { ...prev };
-            const modules = copy[projectId] || [];
-            if (modules.includes(moduleKey)) {
-                copy[projectId] = modules.filter(m => m !== moduleKey);
+            const ids = copy[projectId] || [];
+            if (ids.includes(moduleId)) {
+                copy[projectId] = ids.filter(id => id !== moduleId);
             } else {
-                copy[projectId] = [...modules, moduleKey];
+                copy[projectId] = [...ids, moduleId];
             }
             return copy;
         });
@@ -237,7 +253,7 @@ export const AdminUsersPage: React.FC = () => {
 
         try {
             const assignmentList = Object.entries(assignments)
-                .map(([projectId, modules]) => ({ projectId, modules }));
+                .map(([projectId, moduleIds]) => ({ projectId, moduleIds }));
 
             const res = await fetch(`/api/user-access/${accessModalUserId}/batch`, {
                 method: 'PUT',
@@ -631,23 +647,33 @@ export const AdminUsersPage: React.FC = () => {
                                                     marginLeft: '24px',
                                                     flexWrap: 'wrap',
                                                 }}>
-                                                    {ALL_MODULES.map(moduleKey => (
-                                                        <label key={moduleKey} style={{
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '4px',
-                                                            fontSize: '13px',
-                                                            cursor: 'pointer',
-                                                            color: '#475569',
-                                                        }}>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={modules.includes(moduleKey)}
-                                                                onChange={() => toggleModule(project.id, moduleKey)}
-                                                            />
-                                                            {MODULE_LABELS[moduleKey]}
-                                                        </label>
-                                                    ))}
+                                                    {(projectModules[project.id] || []).map(mod => {
+                                                        const typeConfig = getModuleTypeConfig(mod.type);
+                                                        const Icon = typeConfig?.icon;
+                                                        return (
+                                                            <label key={mod.id} style={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px',
+                                                                fontSize: '13px',
+                                                                cursor: 'pointer',
+                                                                color: '#475569',
+                                                            }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={modules.includes(mod.id)}
+                                                                    onChange={() => toggleModule(project.id, mod.id)}
+                                                                />
+                                                                {Icon && <Icon size={14} style={{ flexShrink: 0 }} />}
+                                                                {mod.name}
+                                                                {typeConfig && (
+                                                                    <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '2px' }}>
+                                                                        ({typeConfig.label})
+                                                                    </span>
+                                                                )}
+                                                            </label>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                         </div>

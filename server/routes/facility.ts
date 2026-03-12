@@ -29,11 +29,15 @@ const INTRO_IMAGES_DIR = path.join(FACILITY_DIR, 'intro-images');
 // GET /scenes?projectId=xxx
 router.get('/scenes', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId } = req.query;
-        if (!projectId) return res.status(400).json({ error: 'projectId required' });
+        const { projectId, moduleId } = req.query;
+        if (!projectId && !moduleId) return res.status(400).json({ error: 'projectId or moduleId required' });
+
+        const where: any = {};
+        if (moduleId) where.moduleId = moduleId as string;
+        else if (projectId) where.projectId = projectId as string;
 
         const scenes = await prisma.facilityScene.findMany({
-            where: { projectId: projectId as string },
+            where,
             orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
             include: {
                 models: {
@@ -53,7 +57,7 @@ router.get('/scenes', authenticate, async (req: Request, res: Response) => {
 // POST /scenes
 router.post('/scenes', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId, parentSceneId, parentModelId, name, description, sortOrder, sceneType } = req.body;
+        const { projectId, moduleId, parentSceneId, parentModelId, name, description, sortOrder, sceneType } = req.body;
         if (!projectId || !name) {
             return res.status(400).json({ error: 'projectId 和 name 為必填' });
         }
@@ -61,6 +65,7 @@ router.post('/scenes', authenticate, async (req: Request, res: Response) => {
         const scene = await prisma.facilityScene.create({
             data: {
                 projectId,
+                ...(moduleId && { moduleId }),
                 parentSceneId: parentSceneId || null,
                 parentModelId: parentModelId || null,
                 name,

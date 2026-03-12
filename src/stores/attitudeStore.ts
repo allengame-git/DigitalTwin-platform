@@ -51,7 +51,7 @@ interface AttitudeState {
 }
 
 interface AttitudeActions {
-    fetchAttitudes: (projectId: string) => Promise<void>;
+    fetchAttitudes: (projectId: string, moduleId?: string) => Promise<void>;
     createAttitude: (projectId: string, data: CreateAttitudeData) => Promise<AttitudeData | null>;
     updateAttitude: (id: string, data: Partial<CreateAttitudeData>) => Promise<AttitudeData | null>;
     deleteAttitude: (id: string) => Promise<boolean>;
@@ -70,11 +70,12 @@ export const useAttitudeStore = create<AttitudeStore>((set, get) => ({
     error: null,
 
     // Actions
-    fetchAttitudes: async (projectId: string) => {
+    fetchAttitudes: async (projectId: string, moduleId?: string) => {
         set({ status: 'loading', error: null });
         try {
             const token = useAuthStore.getState().accessToken;
-            const response = await fetch(`${API_BASE}/api/attitude?projectId=${projectId}`, {
+            const query = moduleId ? `moduleId=${moduleId}` : `projectId=${projectId}`;
+            const response = await fetch(`${API_BASE}/api/attitude?${query}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {},
             });
             const result = await response.json();

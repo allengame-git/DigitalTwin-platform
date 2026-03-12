@@ -58,7 +58,7 @@ interface FaultPlaneState {
 }
 
 interface FaultPlaneActions {
-    fetchFaultPlanes: (projectId: string) => Promise<void>;
+    fetchFaultPlanes: (projectId: string, moduleId?: string) => Promise<void>;
     createFaultPlane: (projectId: string, data: CreateFaultPlaneData) => Promise<FaultPlane | null>;
     updateFaultPlane: (id: string, data: Partial<CreateFaultPlaneData>) => Promise<FaultPlane | null>;
     deleteFaultPlane: (id: string) => Promise<boolean>;
@@ -77,11 +77,12 @@ export const useFaultPlaneStore = create<FaultPlaneStore>((set, get) => ({
     error: null,
 
     // Actions
-    fetchFaultPlanes: async (projectId: string) => {
+    fetchFaultPlanes: async (projectId: string, moduleId?: string) => {
         set({ status: 'loading', error: null });
         try {
             const token = useAuthStore.getState().accessToken;
-            const response = await fetch(`${API_BASE}/api/fault-plane?projectId=${projectId}`, {
+            const query = moduleId ? `moduleId=${moduleId}` : `projectId=${projectId}`;
+            const response = await fetch(`${API_BASE}/api/fault-plane?${query}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {},
             });
             const result = await response.json();
