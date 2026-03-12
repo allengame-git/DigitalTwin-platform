@@ -2,7 +2,7 @@
 
 本文件記錄專案目前的完成狀態、座標系統說明，以及後續待辦事項，供接手的 AI Agent 或開發人員參考。
 
-**最後更新**: 2026-03-12（岩性系統整合 G1 + 斷層面 Html Label G2 + 平面圖標記 bug 修復 + store auth 統一）
+**最後更新**: 2026-03-12（viewer 角色權限控制 + 岩性系統整合 G1 + 斷層面 Html Label G2 + store auth 統一）
 **當前分支**: `main`
 
 ---
@@ -571,6 +571,30 @@ clearViewPreset()        // CameraController 消費後清除
 - **ProtectedRoute**: `mustChangePassword` 自動導向 `/change-password`
 - **統一 Store**: 移除 `AuthContext`，14 個檔案遷移至 `useAuthStore`
 - **清理**: 刪除 `src/contexts/AuthContext.tsx`、`server/models/` 目錄（User.ts/Session.ts/Annotation.ts/InviteLink.ts）
+
+### 9. Viewer 角色權限控制 (2026-03-12) — 完整
+
+#### 9a. 角色與 DB
+- **UserRole enum**: `reviewer` → `viewer`（一般使用者），admin/engineer/viewer/public 四角色
+- **雙 junction table**: `UserProject`（userId+projectId unique）+ `UserProjectModule`（userProjectId+moduleKey unique）
+- **4 個可控模組**: `geology`, `facility`, `engineering`, `simulation`（moduleKey 用 String 免 enum migration）
+- **Cascade delete**: 刪 User/Project → 自動清 UserProject/UserProjectModule
+- **Migration**: `server/prisma/seed-viewer-migration.ts` 為既有 viewer 自動指派全部專案+全部模組
+
+#### 9b. 後端 API
+- **路由**: `server/routes/user-access.ts`，掛載在 `/api/user-access`，全部 `authenticate + authorize('admin', 'engineer')`
+- **端點**: GET /:userId/projects, PUT /:userId/projects/:projectId, DELETE /:userId/projects/:projectId, GET /project/:projectId/viewers, PUT /:userId/batch
+- **enforceProjectAccess middleware**: `server/middleware/auth.ts`，viewer 查 `UserProject` 存在才放行
+- **專案篩選**: `GET /api/project` viewer 走 `userProject.findMany` 只回傳被指派專案 + `allowedModules`
+
+#### 9c. 前端
+- **全域 rename**: 15 前端 + 3 後端檔案 `reviewer` → `viewer`，`ReviewerOnly` → `ViewerOnly`
+- **ProtectedRoute**: 新增 `requiredModule` prop，viewer 從 URL 取 projectCode 查 `allowedModules`
+- **AppRoutes**: 4 個模組路由加 `requiredModule="geology|facility|engineering|simulation"`
+- **ProjectDashboardPage**: `canAccessModule()` helper，viewer 只看到 `allowedModules` 內的卡片
+- **AdminUsersPage**: viewer 行「權限設定」按鈕 → Modal（專案 checkbox + 模組 checkbox），`/api/user-access/:userId/batch` 儲存
+- **admin/users 路由**: 從 `['admin']` 改為 `['admin', 'engineer']`，engineer 也能管理 viewer 權限
+- **projectStore**: `Project` interface 新增 `allowedModules?: string[]`
 
 ### 7. 安全審計與修復 (2026-03-06) — 完整
 

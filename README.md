@@ -758,6 +758,18 @@ npm run build
   - **標籤位置**: 斷層座標水平中心 + 最高高程上方 20m
   - **點擊互動**: 既有功能確認 — 點擊斷層 → 黃色高亮 + InspectorPanel 顯示傾角/傾向/深度/座標點數
 
+- [x] **Viewer 角色權限控制 (2026-03-12)**:
+  - **角色重新定義**: `reviewer` → `viewer`（一般使用者），per-project + per-module 細粒度存取控制
+  - **DB Schema**: 新增 `UserProject` + `UserProjectModule` 雙 junction table，`moduleKey` 用 String 免 enum migration
+  - **後端 API**: `/api/user-access` 5 個端點（GET/PUT/DELETE per-project, GET project viewers, PUT batch），`authenticate` + `authorize('admin', 'engineer')`
+  - **enforceProjectAccess middleware**: viewer 檢查 `UserProject` 記錄，admin/engineer 直接放行
+  - **專案篩選**: `GET /api/project` viewer 只回傳被指派專案 + `allowedModules` 欄位
+  - **前端路由守衛**: `ProtectedRoute` 新增 `requiredModule` prop，viewer 檢查 `allowedModules`
+  - **模組卡片**: `ProjectDashboardPage` 根據 `canAccessModule()` 條件渲染 4 個模組入口
+  - **權限管理 UI**: `AdminUsersPage` viewer 使用者行「權限設定」按鈕，Modal 可勾選專案/模組
+  - **Migration**: 既有 viewer 自動指派全部專案+模組，零斷線
+  - **全域 rename**: 15 前端 + 3 後端檔案 reviewer→viewer
+
 - [x] **第三輪安全審計發現 (2026-03-08, 尚未修復)**:
   - **V3-1 (High)**: `safeResolvePath` 對 DB 中以 `/uploads/...` 開頭的絕對路徑 URL 永遠 return null — `path.resolve(__dirname, '..', '/uploads/...')` 忽略前段路徑
   - **V3-2 (High)**: `terrain.ts` 檔案刪除路由無路徑邊界驗證（未使用 `safeResolvePath`）
