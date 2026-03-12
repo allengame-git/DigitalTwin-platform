@@ -8,6 +8,7 @@
 
 import React, { useMemo, useEffect } from 'react';
 import * as THREE from 'three';
+import { Html } from '@react-three/drei';
 import { useLayerStore } from '../../stores/layerStore';
 import { twd97ToWorld } from '../../utils/coordinates';
 import { useFaultPlaneStore, FaultPlane } from '../../stores/faultPlaneStore';
@@ -102,54 +103,102 @@ export function StructureLines() {
         }
     }, [activeProjectId, fetchFaultPlanes]);
 
-    // 建立斷層面幾何
+    // 建立斷層面幾何 + 標籤位置（座標中心點上方）
     const faultGeometries = useMemo(() => {
-        return faultPlanes.map((fault: FaultPlaneData) => ({
-            ...fault,
-            geometry: createFaultPlaneGeometry(
+        return faultPlanes.map((fault: FaultPlaneData) => {
+            const geometry = createFaultPlaneGeometry(
                 fault.coordinates,
                 fault.depth,
                 fault.dipAngle,
                 fault.dipDirection
-            ),
-        }));
+            );
+            // 計算標籤位置：所有座標點的中心，取最高 z（elevation）
+            let cx = 0, cy = 0, cz = 0, maxElev = -Infinity;
+            for (const c of fault.coordinates) {
+                cx += c.x; cy += c.y; cz += c.z;
+                if (c.z > maxElev) maxElev = c.z;
+            }
+            const n = fault.coordinates.length || 1;
+            const center = twd97ToWorld({ x: cx / n, y: cy / n, z: maxElev });
+            return { ...fault, geometry, labelPos: [center.x, center.y + 20, center.z] as [number, number, number] };
+        });
     }, [faultPlanes]);
 
     const handleFaultClick = (fault: FaultPlaneData) => {
         selectFault(selectedFaultId === fault.id ? null : fault.id);
     };
 
+    const typeLabel = (t: string) => t === 'normal' ? '正斷層' : t === 'reverse' ? '逆斷層' : '走滑斷層';
+
     return (
         <group visible={faultsLayer.visible}>
-            {faultGeometries.map((fault) => (
-                <mesh
-                    key={fault.id}
-                    geometry={fault.geometry}
-                    frustumCulled={false}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleFaultClick(fault);
-                    }}
-                    onPointerOver={(e) => {
-                        e.stopPropagation();
-                        document.body.style.cursor = 'pointer';
-                    }}
-                    onPointerOut={() => {
-                        document.body.style.cursor = 'auto';
-                    }}
-                >
-                    <meshBasicMaterial
-                        color={selectedFaultId === fault.id ? '#ffff00' : fault.color}
-                        transparent
-                        opacity={faultsLayer.opacity * 0.8}
-                        side={THREE.DoubleSide}
-                        depthWrite={true}
-                        polygonOffset={true}
-                        polygonOffsetFactor={-1}
-                        polygonOffsetUnits={-4}
-                    />
-                </mesh>
-            ))}
+            {faultGeometries.map((fault) => {
+                const isSel = selectedFaultId === fault.id;
+                return (
+                    <React.Fragment key={fault.id}>
+                        <mesh
+                            geometry={fault.geometry}
+                            frustumCulled={false}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleFaultClick(fault);
+                            }}
+                            onPointerOver={(e) => {
+                                e.stopPropagation();
+                                document.body.style.cursor = 'pointer';
+                            }}
+                            onPointerOut={() => {
+                                document.body.style.cursor = 'auto';
+                            }}
+                        >
+                            <meshBasicMaterial
+                                color={isSel ? '#ffff00' : fault.color}
+                                transparent
+                                opacity={faultsLayer.opacity * 0.8}
+                                side={THREE.DoubleSide}
+                                depthWrite={true}
+                                polygonOffset={true}
+                                polygonOffsetFactor={-1}
+                                polygonOffsetUnits={-4}
+                            />
+                        </mesh>
+
+                        {/* 斷層名稱浮動標籤 */}
+                        <Html
+                            position={fault.labelPos}
+                            center
+                            distanceFactor={800}
+                            occlude={false}
+                            style={{ pointerEvents: 'none' }}
+                        >
+                            <div style={{
+                                background: isSel ? 'rgba(37,99,235,0.92)' : 'rgba(30,30,30,0.82)',
+                                color: 'white',
+                                padding: '3px 8px',
+                                borderRadius: 4,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap',
+                                letterSpacing: '0.02em',
+                                borderLeft: `3px solid ${fault.color}`,
+                                backdropFilter: 'blur(4px)',
+                                boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                                userSelect: 'none',
+                            }}>
+                                {fault.name}
+                                <span style={{
+                                    marginLeft: 6,
+                                    fontSize: 9,
+                                    opacity: 0.7,
+                                    fontWeight: 400,
+                                }}>
+                                    {typeLabel(fault.type)}
+                                </span>
+                            </div>
+                        </Html>
+                    </React.Fragment>
+                );
+            })}
         </group>
     );
 }

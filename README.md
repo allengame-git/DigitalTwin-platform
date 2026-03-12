@@ -738,6 +738,26 @@ npm run build
   - **FacilityUploadSection 統一**: Lucide icons 取代 emoji、按鈕改用 `dm-btn-primary`/`dm-btn-secondary`/`dm-btn-danger` 標準類、刪除 Modal 統一紅色標題 + X 關閉按鈕
   - **Tab 狀態提升**: 水平 Tab bar 移除，改由 FacilityDataPage sidebar 管理 `activeTab` 透過 prop 傳入
 
+- [x] **平面圖標記編輯 (2026-03-10)**:
+  - **DB Schema**: `FacilityModel` 新增 `planX Float?`、`planY Float?`、`planVisible Boolean @default(true)`
+  - **API**: `PUT /api/facility/models/:id/plan-marker`，含 planX/planY 範圍驗證（0~100）+ planVisible 型別驗證
+  - **PlanViewFloating.tsx**: 編輯模式（右上角 toggle）、拖曳標記到自訂位置、眼睛按鈕切換可見性
+  - **樂觀更新**: 拖曳即時更新 + debounce 300ms 寫 API，失敗自動 rollback
+  - **FacilityPage.tsx**: Lobby 場景左下角「平面圖」開啟按鈕
+  - **Bug 修復**: stale closure 改用 `getState()` 取最新 models、debounce timer unmount 清理
+
+- [x] **岩性系統整合 G1 (2026-03-12)**:
+  - **Auth 修復**: `lithologyStore` 所有 6 個 fetch 加 `Authorization: Bearer` header（原本只有 `credentials: 'include'` → 401）
+  - **地質模組 store auth 統一**: `attitudeStore`/`boreholeStore`/`faultPlaneStore` 的 GET 請求同步加 auth header
+  - **3D 即時著色**: `GeologyTiles.tsx` capMaterial（剖面 ShaderMaterial）uniforms 隨 palette 變化即時同步，岩性顏色編輯後剖面即時反映
+  - **lith_id 對應**: Python `geology_mesh_builder.py` 的 voxel `lith_id` → vertex color R channel → shader 動態查表 `ProjectLithology.lithId`，修完 auth 後正常運作
+
+- [x] **斷層面功能完善 G2 (2026-03-12)**:
+  - **3D 名稱標籤**: `StructureLines.tsx` 每個斷層面上方浮動 `Html` 標籤，顯示斷層名稱 + 類型（正斷層/逆斷層/走滑斷層）
+  - **視覺設計**: 深色半透明背景、左側斷層顏色色帶、選取時藍色高亮、`distanceFactor={800}` 距離縮放
+  - **標籤位置**: 斷層座標水平中心 + 最高高程上方 20m
+  - **點擊互動**: 既有功能確認 — 點擊斷層 → 黃色高亮 + InspectorPanel 顯示傾角/傾向/深度/座標點數
+
 - [x] **第三輪安全審計發現 (2026-03-08, 尚未修復)**:
   - **V3-1 (High)**: `safeResolvePath` 對 DB 中以 `/uploads/...` 開頭的絕對路徑 URL 永遠 return null — `path.resolve(__dirname, '..', '/uploads/...')` 忽略前段路徑
   - **V3-2 (High)**: `terrain.ts` 檔案刪除路由無路徑邊界驗證（未使用 `safeResolvePath`）
