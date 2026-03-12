@@ -4,11 +4,13 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import * as THREE from 'three';
 import { useProjectStore } from '../stores/projectStore';
 import { useFacilityStore } from '../stores/facilityStore';
-import { facilityCanvasEl } from '../components/facility/FacilityCaptureHandler';
+import { useReviewStore } from '../stores/reviewStore';
+import { facilityCanvasEl, facilityCameraRef, facilityControlsRef } from '../components/facility/FacilityCaptureHandler';
+import { useReviewScreenshot } from '../hooks/useReviewScreenshot';
 import type { FacilityScene } from '../types/facility';
 
 const FacilityCanvas = React.lazy(() => import('../components/facility/FacilityCanvas'));
@@ -17,6 +19,10 @@ const FacilityInfoPanel = React.lazy(() => import('../components/facility/Facili
 const TransformInputPanel = React.lazy(() => import('../components/facility/TransformInputPanel'));
 const PlanViewFloating = React.lazy(() => import('../components/facility/PlanViewFloating'));
 const AnimationTimeline = React.lazy(() => import('../components/facility/AnimationTimeline'));
+const ReviewModePanel = React.lazy(() => import('../components/review/ReviewModePanel'));
+const ReviewMarkerDetail = React.lazy(() => import('../components/review/ReviewMarkerDetail'));
+const ReviewMarkerForm = React.lazy(() => import('../components/review/ReviewMarkerForm'));
+const ReviewMarkerPin = React.lazy(() => import('../components/review/ReviewMarkerPin'));
 
 interface FacilityPageProps {
     moduleId?: string;
@@ -24,7 +30,8 @@ interface FacilityPageProps {
 
 export const FacilityPage: React.FC<FacilityPageProps> = ({ moduleId }) => {
     const { projectCode } = useParams<{ projectCode: string }>();
-    const { projects, setActiveProject } = useProjectStore();
+    const [searchParams] = useSearchParams();
+    const { projects, setActiveProject, activeProjectId } = useProjectStore();
     const fetchScenes = useFacilityStore(state => state.fetchScenes);
     const enterScene = useFacilityStore(state => state.enterScene);
     const selectModel = useFacilityStore(state => state.selectModel);
@@ -50,6 +57,82 @@ export const FacilityPage: React.FC<FacilityPageProps> = ({ moduleId }) => {
     const togglePlanView = useFacilityStore(state => state.togglePlanView);
     const showPlanView = useFacilityStore(state => state.showPlanView);
     const hasPlanImage = !!(currentScene?.planImageUrl || currentScene?.autoPlanImageUrl);
+
+    // Review mode state
+    const reviewModeActive = useReviewStore((s) => s.reviewMode);
+    const activeSessionId = useReviewStore((s) => s.activeSessionId);
+    const reviewMarkers = useReviewStore((s) => s.markers);
+    const selectedMarkerId = useReviewStore((s) => s.selectedMarkerId);
+    const enterReviewMode = useReviewStore((s) => s.enterReviewMode);
+    const selectReviewMarker = useReviewStore((s) => s.selectMarker);
+
+    const effectiveModuleId = moduleId || 'facility';
+
+    const moduleMarkers = useMemo(
+        () => reviewMarkers.filter((m) => m.moduleId === effectiveModuleId),
+        [reviewMarkers, effectiveModuleId],
+    );
+    const selectedMarker = useMemo(
+        () => reviewMarkers.find((m) => m.id === selectedMarkerId) ?? null,
+        [reviewMarkers, selectedMarkerId],
+    );
+
+    const [showMarkerForm, setShowMarkerForm] = useState(false);
+    const [reviewScreenshotBlob, setReviewScreenshotBlob] = useState<Blob | null>(null);
+    const [capturedCamera, setCapturedCamera] = useState<{
+        position: { x: number; y: number; z: number };
+        target: { x: number; y: number; z: number };
+    } | null>(null);
+
+    // Canvas ref for screenshot
+    const reviewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (facilityCanvasEl && reviewCanvasRef.current !== facilityCanvasEl) {
+                reviewCanvasRef.current = facilityCanvasEl;
+            }
+        }, 500);
+        return () => clearInterval(interval);
+    }, []);
+    const { capture: captureReview } = useReviewScreenshot(reviewCanvasRef);
+
+    // URL query 自動進入審查模式
+    useEffect(() => {
+        const reviewSessionId = searchParams.get('review');
+        const markerId = searchParams.get('marker');
+        if (reviewSessionId && !reviewModeActive) {
+            enterReviewMode(reviewSessionId);
+            if (markerId) {
+                setTimeout(() => selectReviewMarker(markerId), 500);
+            }
+        }
+    }, [searchParams, reviewModeActive, enterReviewMode, selectReviewMarker]);
+
+    const handleAddReviewMarker = useCallback(() => {
+        const blob = captureReview();
+        setReviewScreenshotBlob(blob);
+        const cam = facilityCameraRef;
+        const ctrl = facilityControlsRef;
+        const camPos = cam ? { x: cam.position.x, y: cam.position.y, z: cam.position.z } : { x: 0, y: 0, z: 0 };
+        const camTarget = ctrl?.target
+            ? { x: ctrl.target.x, y: ctrl.target.y, z: ctrl.target.z }
+            : { x: 0, y: 0, z: 0 };
+        setCapturedCamera({ position: camPos, target: camTarget });
+        setShowMarkerForm(true);
+    }, [captureReview]);
+
+    const handleReviewFlyTo = useCallback(
+        (_position: [number, number, number], _target: [number, number, number]) => {
+            const ctrl = facilityControlsRef;
+            const cam = facilityCameraRef;
+            if (ctrl && cam) {
+                cam.position.set(..._position);
+                if (ctrl.target) ctrl.target.set(..._target);
+                ctrl.update?.();
+            }
+        },
+        [],
+    );
 
     // GLB 載入進度 (N6)
     const [loadProgress, setLoadProgress] = useState(100);
@@ -190,14 +273,47 @@ export const FacilityPage: React.FC<FacilityPageProps> = ({ moduleId }) => {
     return (
         <div style={{ width: '100vw', height: '100vh', display: 'flex', overflow: 'hidden' }}>
             {!isLobby && (
-                <React.Suspense fallback={null}>
-                    <FacilitySidebar />
-                </React.Suspense>
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <React.Suspense fallback={null}>
+                            <FacilitySidebar />
+                        </React.Suspense>
+                    </div>
+                    {/* 審查模式面板嵌在側邊欄底部 */}
+                    {reviewModeActive && activeProjectId && (
+                        <div style={{
+                            borderRight: '1px solid #e5e7eb',
+                            background: '#fff',
+                            flexShrink: 0,
+                            maxHeight: '40vh',
+                            overflow: 'auto',
+                        }}>
+                            <React.Suspense fallback={null}>
+                                <ReviewModePanel
+                                    projectId={activeProjectId}
+                                    moduleId={effectiveModuleId}
+                                    onFlyTo={handleReviewFlyTo}
+                                />
+                            </React.Suspense>
+                        </div>
+                    )}
+                </div>
             )}
             <div style={{ flex: 1, position: 'relative' }}>
                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
                     <React.Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666' }}>載入中...</div>}>
-                        <FacilityCanvas />
+                        <FacilityCanvas>
+                            {/* 審查標記 3D Pins */}
+                            {reviewModeActive && moduleMarkers.map((m) => (
+                                <React.Suspense key={m.id} fallback={null}>
+                                    <ReviewMarkerPin
+                                        marker={m}
+                                        isSelected={m.id === selectedMarkerId}
+                                        onClick={() => selectReviewMarker(m.id === selectedMarkerId ? null : m.id)}
+                                    />
+                                </React.Suspense>
+                            ))}
+                        </FacilityCanvas>
                     </React.Suspense>
                 </div>
                 {/* GLB 載入進度條 (N6) */}
@@ -385,6 +501,93 @@ export const FacilityPage: React.FC<FacilityPageProps> = ({ moduleId }) => {
                         截圖
                     </button>
                 </div>
+                )}
+
+                {/* 審查模式：toggle 按鈕（未進入審查模式時顯示，非 Lobby） */}
+                {!isLobby && !reviewModeActive && (
+                    <button
+                        onClick={() => enterReviewMode('')}
+                        title="進入審查模式"
+                        style={{
+                            position: 'absolute',
+                            top: 16,
+                            right: 16,
+                            zIndex: 50,
+                            background: 'rgba(234,88,12,0.9)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 8,
+                            padding: '7px 14px',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            backdropFilter: 'blur(8px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            boxShadow: '0 2px 8px rgba(234,88,12,0.3)',
+                        }}
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                            <circle cx="12" cy="10" r="3" />
+                        </svg>
+                        審查模式
+                    </button>
+                )}
+
+                {/* 審查模式：新增標記按鈕 */}
+                {!isLobby && reviewModeActive && activeSessionId && (
+                    <button
+                        onClick={handleAddReviewMarker}
+                        title="在目前視角新增標記"
+                        style={{
+                            position: 'absolute',
+                            top: 16,
+                            right: 16,
+                            zIndex: 50,
+                            background: 'rgba(234,88,12,0.92)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 8,
+                            padding: '8px 16px',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            boxShadow: '0 2px 12px rgba(234,88,12,0.3)',
+                        }}
+                    >
+                        + 新增標記
+                    </button>
+                )}
+
+                {/* 審查標記詳情面板 */}
+                {reviewModeActive && selectedMarker && (
+                    <React.Suspense fallback={null}>
+                        <ReviewMarkerDetail
+                            marker={selectedMarker}
+                            onClose={() => selectReviewMarker(null)}
+                        />
+                    </React.Suspense>
+                )}
+
+                {/* 新增標記表單 */}
+                {showMarkerForm && activeSessionId && capturedCamera && (
+                    <React.Suspense fallback={null}>
+                        <ReviewMarkerForm
+                            screenshotBlob={reviewScreenshotBlob}
+                            position={capturedCamera.target}
+                            cameraPosition={capturedCamera.position}
+                            cameraTarget={capturedCamera.target}
+                            moduleId={effectiveModuleId}
+                            sessionId={activeSessionId}
+                            onClose={() => setShowMarkerForm(false)}
+                            onCreated={() => setShowMarkerForm(false)}
+                        />
+                    </React.Suspense>
                 )}
             </div>
         </div>

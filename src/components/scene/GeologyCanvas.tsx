@@ -27,6 +27,7 @@ import { PerformanceMonitor } from './PerformanceMonitor';
 import { GeophysicsPlane } from './GeophysicsPlane';
 import { CameraController } from './CameraController';
 import { WaterLevelSurface } from './WaterLevelSurface';
+import { GeologyCaptureHandler } from './GeologyCaptureHandler';
 import { useAttitudeStore } from '../../stores/attitudeStore';
 import { useWaterLevelStore } from '../../stores/waterLevelStore';
 
@@ -35,9 +36,11 @@ interface GeologyCanvasProps {
     showStats?: boolean;
     /** Canvas 樣式 */
     style?: React.CSSProperties;
+    /** Canvas 內部額外 children（如 ReviewMarkerPin） */
+    children?: React.ReactNode;
 }
 
-export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) {
+export function GeologyCanvas({ showStats = false, style, children }: GeologyCanvasProps) {
     const { fetchBoreholes, status } = useBoreholeStore();
     const { activeProjectId } = useProjectStore();
     const { attitudes, fetchAttitudes } = useAttitudeStore();
@@ -73,6 +76,7 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
                     stencil: true, // For Stencil Cap Rendering
                     powerPreference: RENDERER_CONFIG.powerPreference,
                     logarithmicDepthBuffer: RENDERER_CONFIG.logarithmicDepthBuffer,
+                    preserveDrawingBuffer: true, // 截圖必要
                 }}
             >
                 <Suspense fallback={null}>
@@ -114,6 +118,10 @@ export function GeologyCanvas({ showStats = false, style }: GeologyCanvasProps) 
 
                 <PerformanceMonitor />
                 <CameraController />
+                <GeologyCaptureHandler />
+
+                {/* Review marker pins (from parent) */}
+                {children}
 
                 {/* 比例尺計算器 (Canvas 內部) */}
                 <ScaleBarCalculator onScaleChange={handleScaleChange} />

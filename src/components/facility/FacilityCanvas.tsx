@@ -22,7 +22,12 @@ function MarqueeCameraSync() {
     return null;
 }
 
-export function FacilityCanvas() {
+interface FacilityCanvasProps {
+    /** Canvas 內部額外 children（如 ReviewMarkerPin） */
+    children?: React.ReactNode;
+}
+
+export function FacilityCanvas({ children }: FacilityCanvasProps = {}) {
     const isLoading = useFacilityStore(state => state.isLoading);
     const selectModel = useFacilityStore(state => state.selectModel);
     const { pixelsPerMeter, handleScaleChange } = useScaleBar();
@@ -95,6 +100,9 @@ export function FacilityCanvas() {
                 <MarqueeCameraSync />
                 <ScaleBarCalculator onScaleChange={handleScaleChange} />
                 <FacilityNorthArrowCalculator onRotationChange={handleRotationChange} />
+
+                {/* Review marker pins (from parent) */}
+                {children}
             </Canvas>
 
             {rect && <MarqueeOverlay rect={rect} />}
