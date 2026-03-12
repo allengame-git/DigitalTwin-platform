@@ -281,6 +281,16 @@ function GeologyMesh({
     }, [volumeTexture, volumeMeta, geology3dLayer.opacity]);
 
     // ============================================================
+    // Sync cap material uniforms when palette changes
+    // ============================================================
+    useEffect(() => {
+        if (!capMaterial) return;
+        capMaterial.uniforms.uLithColors.value = palette.colors;
+        capMaterial.uniforms.uLithIds.value = palette.ids;
+        capMaterial.uniforms.uLithCount.value = palette.count;
+    }, [capMaterial, palette]);
+
+    // ============================================================
     // Apply clipping & Dynamic Coloring to display mesh
     // ============================================================
     useEffect(() => {

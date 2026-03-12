@@ -5,8 +5,14 @@
 
 import { create } from 'zustand';
 import type { RequestStatus } from '../types/api';
+import { useAuthStore } from './authStore';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+function authHeaders(): Record<string, string> {
+    const token = useAuthStore.getState().accessToken;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export interface ProjectLithology {
     id: string;
@@ -42,7 +48,7 @@ export const useLithologyStore = create<LithologyState & LithologyActions>((set,
         set({ status: 'loading', error: null });
         try {
             const response = await fetch(`${API_BASE}/api/lithology?projectId=${projectId}`, {
-                credentials: 'include',
+                headers: authHeaders(),
             });
 
             if (!response.ok) {
@@ -63,8 +69,7 @@ export const useLithologyStore = create<LithologyState & LithologyActions>((set,
         try {
             const response = await fetch(`${API_BASE}/api/lithology`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
                 body: JSON.stringify({ projectId, ...data }),
             });
 
@@ -90,8 +95,7 @@ export const useLithologyStore = create<LithologyState & LithologyActions>((set,
         try {
             const response = await fetch(`${API_BASE}/api/lithology/batch`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
                 body: JSON.stringify({ projectId, lithologies: data }),
             });
 
@@ -119,8 +123,7 @@ export const useLithologyStore = create<LithologyState & LithologyActions>((set,
         try {
             const response = await fetch(`${API_BASE}/api/lithology/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
                 body: JSON.stringify(data),
             });
 
@@ -145,7 +148,7 @@ export const useLithologyStore = create<LithologyState & LithologyActions>((set,
         try {
             const response = await fetch(`${API_BASE}/api/lithology/${id}`, {
                 method: 'DELETE',
-                credentials: 'include',
+                headers: authHeaders(),
             });
 
             if (!response.ok) {
@@ -169,8 +172,7 @@ export const useLithologyStore = create<LithologyState & LithologyActions>((set,
         try {
             const response = await fetch(`${API_BASE}/api/lithology/init-defaults`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
                 body: JSON.stringify({ projectId }),
             });
 

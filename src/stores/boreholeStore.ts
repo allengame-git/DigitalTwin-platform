@@ -149,7 +149,10 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
                 ? `${API_BASE}/api/borehole?projectId=${projectId}`
                 : `${API_BASE}/api/borehole`;
 
-            const response = await fetch(url, { credentials: 'include' });
+            const token = useAuthStore.getState().accessToken;
+            const response = await fetch(url, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
 
             if (!response.ok) {
                 throw new Error('Failed to fetch boreholes');
@@ -171,8 +174,9 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
         set({ status: 'loading' });
 
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/borehole/${id}`, {
-                credentials: 'include'
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
             });
 
             if (!response.ok) {
@@ -514,8 +518,9 @@ export const useBoreholeStore = create<BoreholeState & BoreholeActions>((set, ge
 
     fetchBoreholePhotos: async (boreholeId: string) => {
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/borehole/${boreholeId}`, {
-                credentials: 'include',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
             });
 
             if (!response.ok) throw new Error('載入照片失敗');

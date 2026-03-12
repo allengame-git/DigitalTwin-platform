@@ -73,8 +73,9 @@ export const useAttitudeStore = create<AttitudeStore>((set, get) => ({
     fetchAttitudes: async (projectId: string) => {
         set({ status: 'loading', error: null });
         try {
+            const token = useAuthStore.getState().accessToken;
             const response = await fetch(`${API_BASE}/api/attitude?projectId=${projectId}`, {
-                credentials: 'include',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
             });
             const result = await response.json();
 
