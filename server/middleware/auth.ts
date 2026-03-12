@@ -165,6 +165,10 @@ export function verifyRefreshToken(token: string): JwtPayload | null {
  * Enforce project-level access for viewer role
  * admin/engineer → pass through
  * viewer → check UserProject exists
+ *
+ * Checks both req.params and req.query for the projectId key,
+ * so it works with both URL param routes (/:projectId/...) and
+ * query param routes (?projectId=xxx).
  */
 export function enforceProjectAccess(projectIdParam: string = 'projectId') {
     return async (
@@ -184,9 +188,11 @@ export function enforceProjectAccess(projectIdParam: string = 'projectId') {
         }
 
         // viewer: check UserProject record
-        const projectId = req.params[projectIdParam] as string;
+        const projectId = (req.params[projectIdParam] as string)
+            || (req.query[projectIdParam] as string);
         if (!projectId) {
-            next();
+            // No projectId in request — deny by default for viewer
+            res.status(403).json({ message: '缺少專案 ID，無法驗證存取權限' });
             return;
         }
 

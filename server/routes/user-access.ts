@@ -133,6 +133,16 @@ router.delete('/:userId/projects/:projectId', async (req: AuthenticatedRequest, 
     const userId = req.params['userId'] as string;
     const projectId = req.params['projectId'] as string;
 
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+        res.status(404).json({ success: false, message: '使用者不存在' });
+        return;
+    }
+    if (user.role !== 'viewer') {
+        res.status(400).json({ success: false, message: '只能管理 viewer 角色的專案存取權限' });
+        return;
+    }
+
     await prisma.userProject.deleteMany({ where: { userId, projectId } });
 
     res.json({ success: true });

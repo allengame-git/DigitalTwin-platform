@@ -92,8 +92,46 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         const projectCode = projectIdx >= 0 ? pathParts[projectIdx + 1] : undefined;
 
         if (projectCode) {
-            const project = useProjectStore.getState().getProjectByCode(projectCode);
+            const { projects, loading: projectsLoading } = useProjectStore.getState();
+            const project = projects.find(p => p.code === projectCode);
+
+            // Projects not yet loaded — show loading instead of granting access
+            if (!project && (projectsLoading || projects.length === 0)) {
+                return fallback ? (
+                    <>{fallback}</>
+                ) : (
+                    <div className="protected-loading">
+                        <style>{`
+                            .protected-loading {
+                                min-height: 100vh;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                background: #f5f5f5;
+                            }
+                            .loading-spinner {
+                                width: 48px;
+                                height: 48px;
+                                border: 4px solid #e5e5e5;
+                                border-top-color: #2563eb;
+                                border-radius: 50%;
+                                animation: spin 1s linear infinite;
+                            }
+                            @keyframes spin {
+                                to { transform: rotate(360deg); }
+                            }
+                        `}</style>
+                        <div className="loading-spinner" />
+                    </div>
+                );
+            }
+
             if (project?.allowedModules && !project.allowedModules.includes(requiredModule)) {
+                return <Navigate to={`/project/${projectCode}`} replace />;
+            }
+
+            // Project found but no allowedModules — viewer has no module list → deny
+            if (project && !project.allowedModules) {
                 return <Navigate to={`/project/${projectCode}`} replace />;
             }
         }

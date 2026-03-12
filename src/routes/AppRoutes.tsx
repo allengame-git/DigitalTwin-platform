@@ -186,7 +186,7 @@ const router = createBrowserRouter([
             },
 
             // ============================================
-            // Legacy routes (向後相容，無專案範圍)
+            // Legacy routes (向後相容，無專案範圍 — viewer 不可用)
             // ============================================
             {
                 path: '/data',
@@ -199,7 +199,7 @@ const router = createBrowserRouter([
             {
                 path: '/geology',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
                         <GeologyPage />
                     </ProtectedRoute>
                 ),
@@ -207,7 +207,7 @@ const router = createBrowserRouter([
             {
                 path: '/engineering',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
                         <EngineeringPage />
                     </ProtectedRoute>
                 ),
@@ -215,7 +215,7 @@ const router = createBrowserRouter([
             {
                 path: '/simulation',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
                         <SimulationPage />
                     </ProtectedRoute>
                 ),
@@ -223,7 +223,7 @@ const router = createBrowserRouter([
             {
                 path: '/annotations',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'viewer', 'engineer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
                         <AnnotationsPage />
                     </ProtectedRoute>
                 ),

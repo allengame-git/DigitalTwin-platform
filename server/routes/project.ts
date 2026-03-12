@@ -8,7 +8,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { z } from "zod";
-import { authenticate, AuthenticatedRequest } from '../middleware/auth';
+import { authenticate, authorize, enforceProjectAccess, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -78,9 +78,10 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
  * GET /api/project/:id
  * 取得單一專案
  */
-router.get('/:id', authenticate, async (req: Request, res: Response) => {
+router.get('/:id', authenticate, enforceProjectAccess('id'), async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
+        const authReq = req as AuthenticatedRequest;
         const project = await prisma.project.findUnique({
             where: { id },
             include: {
@@ -99,6 +100,15 @@ router.get('/:id', authenticate, async (req: Request, res: Response) => {
             return res.status(404).json({ success: false, error: 'Project not found' });
         }
 
+        // viewer: attach allowedModules
+        if (authReq.user?.role === 'viewer') {
+            const up = await prisma.userProject.findUnique({
+                where: { userId_projectId: { userId: authReq.user.userId, projectId: id } },
+                include: { modules: { select: { moduleKey: true } } },
+            });
+            return res.json({ success: true, data: { ...project, allowedModules: up?.modules.map(m => m.moduleKey) || [] } });
+        }
+
         res.json({ success: true, data: project });
     } catch (error) {
         console.error('Error fetching project:', error);
@@ -113,6 +123,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response) => {
 router.get('/code/:code', authenticate, async (req: Request, res: Response) => {
     try {
         const code = req.params.code as string;
+        const authReq = req as AuthenticatedRequest;
         const project = await prisma.project.findUnique({
             where: { code },
             include: {
@@ -131,6 +142,18 @@ router.get('/code/:code', authenticate, async (req: Request, res: Response) => {
             return res.status(404).json({ success: false, error: 'Project not found' });
         }
 
+        // viewer: check access by project.id
+        if (authReq.user?.role === 'viewer') {
+            const up = await prisma.userProject.findUnique({
+                where: { userId_projectId: { userId: authReq.user.userId, projectId: project.id } },
+                include: { modules: { select: { moduleKey: true } } },
+            });
+            if (!up) {
+                return res.status(403).json({ success: false, error: '您沒有此專案的存取權限' });
+            }
+            return res.json({ success: true, data: { ...project, allowedModules: up.modules.map(m => m.moduleKey) } });
+        }
+
         res.json({ success: true, data: project });
     } catch (error) {
         console.error('Error fetching project by code:', error);
@@ -142,7 +165,7 @@ router.get('/code/:code', authenticate, async (req: Request, res: Response) => {
  * POST /api/project
  * 建立專案
  */
-router.post('/', authenticate, async (req: Request, res: Response) => {
+router.post('/', authenticate, authorize('admin', 'engineer'), async (req: Request, res: Response) => {
     try {
         const { name, code, description, originX, originY } = req.body;
 
@@ -182,7 +205,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
  * PUT /api/project/:id
  * 更新專案
  */
-router.put('/:id', authenticate, async (req: Request, res: Response) => {
+router.put('/:id', authenticate, authorize('admin', 'engineer'), async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
         const updateProjectSchema = z.object({
@@ -219,7 +242,7 @@ router.put('/:id', authenticate, async (req: Request, res: Response) => {
  * DELETE /api/project/:id
  * 刪除專案 (Cascade - 需 admin 權限)
  */
-router.delete('/:id', authenticate, async (req: Request, res: Response) => {
+router.delete('/:id', authenticate, authorize('admin'), async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
         const { confirmName } = req.body;

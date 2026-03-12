@@ -237,7 +237,6 @@ export const AdminUsersPage: React.FC = () => {
 
         try {
             const assignmentList = Object.entries(assignments)
-                .filter(([_, modules]) => modules.length > 0)
                 .map(([projectId, modules]) => ({ projectId, modules }));
 
             const res = await fetch(`/api/user-access/${accessModalUserId}/batch`, {
