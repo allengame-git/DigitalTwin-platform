@@ -14,7 +14,10 @@ import type { UserRole } from '../../types/auth';
 interface ProtectedRouteProps {
     children: ReactNode;
     allowedRoles?: UserRole[];
+    /** Legacy: module type string (e.g. 'geology'). Checked against allowedModules. */
     requiredModule?: string;
+    /** When true, extract moduleId from URL (/project/:code/module/:moduleId) and check against allowedModules */
+    requiredModuleId?: boolean;
     redirectTo?: string;
     fallback?: ReactNode;
 }
@@ -23,6 +26,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     children,
     allowedRoles,
     requiredModule,
+    requiredModuleId,
     redirectTo = '/login',
     fallback,
 }) => {
@@ -86,7 +90,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
 
     // Check module permission for viewer
-    if (requiredModule && user.role === 'viewer') {
+    if ((requiredModule || requiredModuleId) && user.role === 'viewer') {
         const pathParts = location.pathname.split('/');
         const projectIdx = pathParts.indexOf('project');
         const projectCode = projectIdx >= 0 ? pathParts[projectIdx + 1] : undefined;
@@ -126,13 +130,27 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                 );
             }
 
-            if (project?.allowedModules && !project.allowedModules.includes(requiredModule)) {
+            // Project found but no allowedModules — viewer has no module list -> deny
+            if (project && !project.allowedModules) {
                 return <Navigate to={`/project/${projectCode}`} replace />;
             }
 
-            // Project found but no allowedModules — viewer has no module list → deny
-            if (project && !project.allowedModules) {
-                return <Navigate to={`/project/${projectCode}`} replace />;
+            if (project?.allowedModules) {
+                if (requiredModuleId) {
+                    // New: extract moduleId from URL pattern /project/:code/module/:moduleId
+                    const moduleIdx = pathParts.indexOf('module');
+                    const moduleId = moduleIdx >= 0 ? pathParts[moduleIdx + 1] : undefined;
+                    if (moduleId && !project.allowedModules.includes(moduleId)) {
+                        return <Navigate to={`/project/${projectCode}`} replace />;
+                    }
+                    // No moduleId in URL — can't validate, deny for safety
+                    if (!moduleId) {
+                        return <Navigate to={`/project/${projectCode}`} replace />;
+                    }
+                } else if (requiredModule && !project.allowedModules.includes(requiredModule)) {
+                    // Legacy: check module type string
+                    return <Navigate to={`/project/${projectCode}`} replace />;
+                }
             }
         }
     }

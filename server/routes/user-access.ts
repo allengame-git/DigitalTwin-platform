@@ -3,6 +3,9 @@
  *
  * Manages viewer project assignments and module permissions.
  * All routes require authenticate + authorize('admin', 'engineer').
+ *
+ * Migration note: transitioning from moduleKey (string) to moduleId (UUID FK).
+ * Both formats accepted during transition; moduleId takes priority.
  */
 
 import { Router, Response } from 'express';
@@ -11,10 +14,62 @@ import prisma from '../lib/prisma';
 
 const router = Router();
 
-const VALID_MODULES = ['geology', 'facility', 'engineering', 'simulation'];
-
 // All routes require admin or engineer role
 router.use(authenticate, authorize('admin', 'engineer'));
+
+/**
+ * Resolve module identifiers to validated Module records.
+ * Accepts either moduleIds (UUIDs) or legacy moduleKeys (type strings).
+ * Returns validated Module records from DB.
+ */
+async function resolveModules(
+    body: { moduleIds?: string[]; modules?: string[] },
+    projectId: string
+): Promise<{ valid: { id: string; type: string }[]; error?: string }> {
+    const { moduleIds, modules } = body;
+
+    if (moduleIds && Array.isArray(moduleIds) && moduleIds.length > 0) {
+        // New format: moduleIds are UUIDs referencing Module table
+        const dbModules = await prisma.module.findMany({
+            where: { id: { in: moduleIds }, projectId },
+            select: { id: true, type: true },
+        });
+        const foundIds = new Set(dbModules.map(m => m.id));
+        const invalid = moduleIds.filter(id => !foundIds.has(id));
+        if (invalid.length > 0) {
+            return { valid: [], error: `無效的模組 ID：${invalid.join(', ')}` };
+        }
+        return { valid: dbModules };
+    }
+
+    if (modules && Array.isArray(modules) && modules.length > 0) {
+        // Legacy format: module type strings — resolve to Module records by type
+        const dbModules = await prisma.module.findMany({
+            where: { type: { in: modules }, projectId },
+            select: { id: true, type: true },
+        });
+        const foundTypes = new Set(dbModules.map(m => m.type));
+        const unresolved = modules.filter(m => !foundTypes.has(m));
+        if (unresolved.length > 0) {
+            return { valid: [], error: `無法解析的模組類型：${unresolved.join(', ')}（該專案可能尚未建立對應模組）` };
+        }
+        return { valid: dbModules };
+    }
+
+    // Empty — no modules assigned
+    return { valid: [] };
+}
+
+/**
+ * Format UserProjectModule records for API response.
+ * Returns both moduleIds (new) and modules (legacy) for backward compatibility.
+ */
+function formatModulesResponse(modules: Array<{ moduleId: string | null; moduleKey: string | null }>) {
+    return {
+        moduleIds: modules.map(m => m.moduleId).filter((id): id is string => id !== null),
+        modules: modules.map(m => m.moduleKey).filter((k): k is string => k !== null),
+    };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /:userId/projects — Get viewer's project assignments with modules
@@ -36,17 +91,21 @@ router.get('/:userId/projects', async (req: AuthenticatedRequest, res: Response)
         where: { userId },
         include: {
             project: { select: { id: true, name: true, code: true } },
-            modules: true,
+            modules: { select: { moduleId: true, moduleKey: true } },
         },
         orderBy: { createdAt: 'asc' },
     });
 
-    const data = userProjects.map((up) => ({
-        projectId: up.projectId,
-        project: up.project,
-        modules: up.modules.map((m) => m.moduleKey),
-        createdAt: up.createdAt,
-    }));
+    const data = userProjects.map((up) => {
+        const { moduleIds, modules } = formatModulesResponse(up.modules);
+        return {
+            projectId: up.projectId,
+            project: up.project,
+            moduleIds,
+            modules, // backward compat
+            createdAt: up.createdAt,
+        };
+    });
 
     res.json({ success: true, data });
 });
@@ -57,16 +116,15 @@ router.get('/:userId/projects', async (req: AuthenticatedRequest, res: Response)
 router.put('/:userId/projects/:projectId', async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.params['userId'] as string;
     const projectId = req.params['projectId'] as string;
-    const { modules } = req.body as { modules: string[] };
+    const { moduleIds, modules } = req.body as { moduleIds?: string[]; modules?: string[] };
 
-    if (!Array.isArray(modules)) {
-        res.status(400).json({ success: false, message: 'modules 必須是陣列' });
+    // Validate input: at least one format provided (or empty = remove all modules)
+    if (moduleIds !== undefined && !Array.isArray(moduleIds)) {
+        res.status(400).json({ success: false, message: 'moduleIds 必須是陣列' });
         return;
     }
-
-    const invalidModules = modules.filter((m) => !VALID_MODULES.includes(m));
-    if (invalidModules.length > 0) {
-        res.status(400).json({ success: false, message: `無效的模組：${invalidModules.join(', ')}` });
+    if (modules !== undefined && !Array.isArray(modules)) {
+        res.status(400).json({ success: false, message: 'modules 必須是陣列' });
         return;
     }
 
@@ -86,6 +144,13 @@ router.put('/:userId/projects/:projectId', async (req: AuthenticatedRequest, res
         return;
     }
 
+    // Resolve and validate modules
+    const resolved = await resolveModules({ moduleIds, modules }, projectId);
+    if (resolved.error) {
+        res.status(400).json({ success: false, message: resolved.error });
+        return;
+    }
+
     const createdBy = req.user?.userId;
 
     // Upsert UserProject
@@ -98,11 +163,12 @@ router.put('/:userId/projects/:projectId', async (req: AuthenticatedRequest, res
     // Delete existing modules then recreate
     await prisma.userProjectModule.deleteMany({ where: { userProjectId: userProject.id } });
 
-    if (modules.length > 0) {
+    if (resolved.valid.length > 0) {
         await prisma.userProjectModule.createMany({
-            data: modules.map((moduleKey) => ({
+            data: resolved.valid.map((mod) => ({
                 userProjectId: userProject.id,
-                moduleKey,
+                moduleId: mod.id,
+                moduleKey: mod.type, // backward compat
             })),
         });
     }
@@ -111,16 +177,18 @@ router.put('/:userId/projects/:projectId', async (req: AuthenticatedRequest, res
         where: { id: userProject.id },
         include: {
             project: { select: { id: true, name: true, code: true } },
-            modules: true,
+            modules: { select: { moduleId: true, moduleKey: true } },
         },
     });
 
+    const fmt = formatModulesResponse(updated!.modules);
     res.json({
         success: true,
         data: {
             projectId: updated!.projectId,
             project: updated!.project,
-            modules: updated!.modules.map((m) => m.moduleKey),
+            moduleIds: fmt.moduleIds,
+            modules: fmt.modules, // backward compat
             createdAt: updated!.createdAt,
         },
     });
@@ -167,17 +235,21 @@ router.get('/project/:projectId/viewers', async (req: AuthenticatedRequest, res:
         },
         include: {
             user: { select: { id: true, name: true, email: true, role: true, status: true } },
-            modules: true,
+            modules: { select: { moduleId: true, moduleKey: true } },
         },
         orderBy: { createdAt: 'asc' },
     });
 
-    const data = userProjects.map((up) => ({
-        userId: up.userId,
-        user: up.user,
-        modules: up.modules.map((m) => m.moduleKey),
-        createdAt: up.createdAt,
-    }));
+    const data = userProjects.map((up) => {
+        const { moduleIds, modules } = formatModulesResponse(up.modules);
+        return {
+            userId: up.userId,
+            user: up.user,
+            moduleIds,
+            modules, // backward compat
+            createdAt: up.createdAt,
+        };
+    });
 
     res.json({ success: true, data });
 });
@@ -187,24 +259,13 @@ router.get('/project/:projectId/viewers', async (req: AuthenticatedRequest, res:
 // ─────────────────────────────────────────────────────────────────────────────
 router.put('/:userId/batch', async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.params['userId'] as string;
-    const { assignments } = req.body as { assignments: { projectId: string; modules: string[] }[] };
+    const { assignments } = req.body as {
+        assignments: { projectId: string; moduleIds?: string[]; modules?: string[] }[];
+    };
 
     if (!Array.isArray(assignments)) {
         res.status(400).json({ success: false, message: 'assignments 必須是陣列' });
         return;
-    }
-
-    // Validate all modules up front
-    for (const assignment of assignments) {
-        if (!Array.isArray(assignment.modules)) {
-            res.status(400).json({ success: false, message: 'assignments[].modules 必須是陣列' });
-            return;
-        }
-        const invalid = assignment.modules.filter((m) => !VALID_MODULES.includes(m));
-        if (invalid.length > 0) {
-            res.status(400).json({ success: false, message: `無效的模組：${invalid.join(', ')}` });
-            return;
-        }
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -217,8 +278,30 @@ router.put('/:userId/batch', async (req: AuthenticatedRequest, res: Response) =>
         return;
     }
 
+    // Validate and resolve all modules up front
+    const resolvedAssignments: { projectId: string; validModules: { id: string; type: string }[] }[] = [];
+    for (const assignment of assignments) {
+        if (assignment.moduleIds !== undefined && !Array.isArray(assignment.moduleIds)) {
+            res.status(400).json({ success: false, message: 'assignments[].moduleIds 必須是陣列' });
+            return;
+        }
+        if (assignment.modules !== undefined && !Array.isArray(assignment.modules)) {
+            res.status(400).json({ success: false, message: 'assignments[].modules 必須是陣列' });
+            return;
+        }
+        const resolved = await resolveModules(
+            { moduleIds: assignment.moduleIds, modules: assignment.modules },
+            assignment.projectId
+        );
+        if (resolved.error) {
+            res.status(400).json({ success: false, message: resolved.error });
+            return;
+        }
+        resolvedAssignments.push({ projectId: assignment.projectId, validModules: resolved.valid });
+    }
+
     const createdBy = req.user?.userId;
-    const assignedProjectIds = assignments.map((a) => a.projectId);
+    const assignedProjectIds = resolvedAssignments.map((a) => a.projectId);
 
     await prisma.$transaction(async (tx) => {
         // Delete UserProjects NOT in the new assignment list (cascade deletes modules)
@@ -229,7 +312,7 @@ router.put('/:userId/batch', async (req: AuthenticatedRequest, res: Response) =>
             },
         });
 
-        for (const { projectId, modules } of assignments) {
+        for (const { projectId, validModules } of resolvedAssignments) {
             const userProject = await tx.userProject.upsert({
                 where: { userId_projectId: { userId, projectId } },
                 create: { userId, projectId, createdBy },
@@ -238,11 +321,12 @@ router.put('/:userId/batch', async (req: AuthenticatedRequest, res: Response) =>
 
             await tx.userProjectModule.deleteMany({ where: { userProjectId: userProject.id } });
 
-            if (modules.length > 0) {
+            if (validModules.length > 0) {
                 await tx.userProjectModule.createMany({
-                    data: modules.map((moduleKey) => ({
+                    data: validModules.map((mod) => ({
                         userProjectId: userProject.id,
-                        moduleKey,
+                        moduleId: mod.id,
+                        moduleKey: mod.type, // backward compat
                     })),
                 });
             }
@@ -254,19 +338,23 @@ router.put('/:userId/batch', async (req: AuthenticatedRequest, res: Response) =>
         where: { userId },
         include: {
             project: { select: { id: true, name: true, code: true } },
-            modules: true,
+            modules: { select: { moduleId: true, moduleKey: true } },
         },
         orderBy: { createdAt: 'asc' },
     });
 
     res.json({
         success: true,
-        data: userProjects.map((up) => ({
-            projectId: up.projectId,
-            project: up.project,
-            modules: up.modules.map((m) => m.moduleKey),
-            createdAt: up.createdAt,
-        })),
+        data: userProjects.map((up) => {
+            const { moduleIds, modules } = formatModulesResponse(up.modules);
+            return {
+                projectId: up.projectId,
+                project: up.project,
+                moduleIds,
+                modules, // backward compat
+                createdAt: up.createdAt,
+            };
+        }),
     });
 });
 

@@ -41,15 +41,18 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
                             }
                         }
                     },
-                    modules: { select: { moduleKey: true } },
+                    modules: { select: { moduleId: true, moduleKey: true } },
                 },
                 orderBy: { createdAt: 'desc' },
             });
 
-            projects = userProjects.map(up => ({
-                ...up.project,
-                allowedModules: up.modules.map(m => m.moduleKey),
-            }));
+            projects = userProjects.map(up => {
+                // Prefer moduleId (new); fall back to moduleKey during transition
+                const allowedModules = up.modules
+                    .map(m => m.moduleId ?? m.moduleKey)
+                    .filter((v): v is string => v !== null);
+                return { ...up.project, allowedModules };
+            });
         } else {
             // admin/engineer: all projects
             projects = await prisma.project.findMany({
@@ -104,9 +107,12 @@ router.get('/:id', authenticate, enforceProjectAccess('id'), async (req: Request
         if (authReq.user?.role === 'viewer') {
             const up = await prisma.userProject.findUnique({
                 where: { userId_projectId: { userId: authReq.user.userId, projectId: id } },
-                include: { modules: { select: { moduleKey: true } } },
+                include: { modules: { select: { moduleId: true, moduleKey: true } } },
             });
-            return res.json({ success: true, data: { ...project, allowedModules: up?.modules.map(m => m.moduleKey) || [] } });
+            const allowedModules = (up?.modules ?? [])
+                .map(m => m.moduleId ?? m.moduleKey)
+                .filter((v): v is string => v !== null);
+            return res.json({ success: true, data: { ...project, allowedModules } });
         }
 
         res.json({ success: true, data: project });
@@ -146,12 +152,15 @@ router.get('/code/:code', authenticate, async (req: Request, res: Response) => {
         if (authReq.user?.role === 'viewer') {
             const up = await prisma.userProject.findUnique({
                 where: { userId_projectId: { userId: authReq.user.userId, projectId: project.id } },
-                include: { modules: { select: { moduleKey: true } } },
+                include: { modules: { select: { moduleId: true, moduleKey: true } } },
             });
             if (!up) {
                 return res.status(403).json({ success: false, error: '您沒有此專案的存取權限' });
             }
-            return res.json({ success: true, data: { ...project, allowedModules: up.modules.map(m => m.moduleKey) } });
+            const allowedModules = up.modules
+                .map(m => m.moduleId ?? m.moduleKey)
+                .filter((v): v is string => v !== null);
+            return res.json({ success: true, data: { ...project, allowedModules } });
         }
 
         res.json({ success: true, data: project });
