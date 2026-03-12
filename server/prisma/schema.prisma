@@ -29,8 +29,42 @@ model Project {
   waterLevels    WaterLevel[]
   facilityScenes FacilityScene[]
   userProjects   UserProject[]
+  modules        Module[]
 
   @@map("projects")
+}
+
+/// 模組實例（每個專案可有多個同類型模組）
+model Module {
+  id          String   @id @default(uuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type        String   // 'geology' | 'facility' | 'engineering' | 'simulation' | future types
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+
+  // Data relations
+  boreholes      Borehole[]
+  geologyModels  GeologyModel[]
+  faultPlanes    FaultPlane[]
+  attitudes      Attitude[]
+  terrains       Terrain[]
+  waterLevels    WaterLevel[]
+  imageries      Imagery[]
+  geophysics     Geophysics[]
+  lithologies    ProjectLithology[]
+  facilityScenes FacilityScene[]
+
+  // Viewer permissions
+  userAccess UserProjectModule[]
+
+  @@index([projectId])
+  @@index([projectId, type])
+  @@map("modules")
 }
 
 /// 專案岩性設定
@@ -44,9 +78,12 @@ model ProjectLithology {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  moduleId  String?
+  module    Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, code])
   @@unique([projectId, lithId])
+  @@index([moduleId])
   @@map("project_lithologies")
 }
 
@@ -70,7 +107,10 @@ model Imagery {
   minY         Float?
   projectId    String?
   project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  moduleId     String?
+  module       Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
+  @@index([moduleId])
   @@map("imagery")
 }
 
@@ -99,7 +139,10 @@ model Geophysics {
   updatedAt    DateTime @updatedAt
   projectId    String?
   project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  moduleId     String?
+  module       Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
+  @@index([moduleId])
   @@map("geophysics")
 }
 
@@ -136,7 +179,10 @@ model GeologyModel {
   demFilePath        String?
   demOriginalName    String?
   project            Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  moduleId           String?
+  module             Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
+  @@index([moduleId])
   @@map("geology_models")
 }
 
@@ -160,8 +206,11 @@ model Borehole {
   photos      BoreholePhoto[]
   properties  BoreholeProperty[]
   project     Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  moduleId    String?
+  module      Module?            @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, boreholeNo])
+  @@index([moduleId])
   @@map("boreholes")
 }
 
@@ -221,7 +270,10 @@ model FaultPlane {
   updatedAt    DateTime          @updatedAt
   coordinates  FaultCoordinate[]
   project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  moduleId     String?
+  module       Module?           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
+  @@index([moduleId])
   @@map("fault_planes")
 }
 
@@ -251,7 +303,10 @@ model Attitude {
   description  String?
   createdAt    DateTime @default(now())
   project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  moduleId     String?
+  module       Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
+  @@index([moduleId])
   @@map("attitudes")
 }
 
@@ -278,7 +333,10 @@ model Terrain {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  moduleId     String?
+  module       Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
+  @@index([moduleId])
   @@map("terrains")
 }
 
@@ -305,7 +363,10 @@ model WaterLevel {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  moduleId     String?
+  module       Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
+  @@index([moduleId])
   @@map("water_levels")
 }
 
@@ -344,12 +405,15 @@ model FacilityScene {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
   project             Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  moduleId            String?
+  module              Module?         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   parentScene         FacilityScene?  @relation("SceneHierarchy", fields: [parentSceneId], references: [id], onDelete: Cascade)
   childScenes         FacilityScene[] @relation("SceneHierarchy")
   parentModel         FacilityModel?  @relation("ModelChildScenes", fields: [parentModelId], references: [id], onDelete: SetNull)
   models              FacilityModel[] @relation("SceneModels")
 
   @@index([projectId])
+  @@index([moduleId])
   @@index([parentSceneId])
   @@index([parentModelId])
   @@map("facility_scenes")
@@ -521,9 +585,12 @@ model UserProject {
 model UserProjectModule {
   id            String      @id @default(uuid())
   userProjectId String
-  moduleKey     String
+  moduleKey     String?     // deprecated: kept during migration, will be removed
+  moduleId      String?
   userProject   UserProject @relation(fields: [userProjectId], references: [id], onDelete: Cascade)
+  module        Module?     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   @@unique([userProjectId, moduleKey])
+  @@index([moduleId])
   @@map("user_project_modules")
 }
