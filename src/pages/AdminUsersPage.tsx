@@ -15,7 +15,7 @@ import { usePageTracking } from '../hooks/usePageTracking';
 const ROLE_LABELS: Record<string, string> = {
     admin: '管理員',
     engineer: '工程師',
-    reviewer: '審查委員',
+    viewer: '一般使用者',
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
@@ -53,7 +53,28 @@ export const AdminUsersPage: React.FC = () => {
     });
     const [formError, setFormError] = useState<string | null>(null);
 
+    // Viewer access modal
+    const [accessModalUserId, setAccessModalUserId] = useState<string | null>(null);
+    const [accessModalUserName, setAccessModalUserName] = useState('');
+    const [allProjects, setAllProjects] = useState<{ id: string; name: string; code: string }[]>([]);
+    const [assignments, setAssignments] = useState<Record<string, string[]>>({});
+    const [accessLoading, setAccessLoading] = useState(false);
+    const [accessSaving, setAccessSaving] = useState(false);
+
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const ALL_MODULES = ['geology', 'facility', 'engineering', 'simulation'];
+    const MODULE_LABELS: Record<string, string> = {
+        geology: '地質資料',
+        facility: '設施導覽',
+        engineering: '工程設計',
+        simulation: '模擬分析',
+    };
+
+    function accessAuthHeaders(): Record<string, string> {
+        const token = useAuthStore.getState().accessToken;
+        return token ? { Authorization: `Bearer ${token}` } : {};
+    }
 
     useEffect(() => {
         fetchUsers();
@@ -153,6 +174,91 @@ export const AdminUsersPage: React.FC = () => {
         }
     };
 
+    const handleOpenAccessModal = async (u: AdminUser) => {
+        setAccessModalUserId(u.id);
+        setAccessModalUserName(u.name);
+        setAccessLoading(true);
+        setOpenDropdownId(null);
+
+        try {
+            const [projectsRes, accessRes] = await Promise.all([
+                fetch('/api/project', { headers: accessAuthHeaders() }),
+                fetch(`/api/user-access/${u.id}/projects`, { headers: accessAuthHeaders() }),
+            ]);
+            const projectsData = await projectsRes.json();
+            const accessData = await accessRes.json();
+
+            if (projectsData.success) {
+                setAllProjects(projectsData.data.map((p: any) => ({ id: p.id, name: p.name, code: p.code })));
+            }
+
+            const map: Record<string, string[]> = {};
+            if (accessData.success) {
+                for (const item of accessData.data) {
+                    map[item.projectId] = item.modules;
+                }
+            }
+            setAssignments(map);
+        } catch (err) {
+            console.error('Failed to load access data:', err);
+        } finally {
+            setAccessLoading(false);
+        }
+    };
+
+    const toggleProject = (projectId: string) => {
+        setAssignments(prev => {
+            const copy = { ...prev };
+            if (copy[projectId]) {
+                delete copy[projectId];
+            } else {
+                copy[projectId] = [...ALL_MODULES];
+            }
+            return copy;
+        });
+    };
+
+    const toggleModule = (projectId: string, moduleKey: string) => {
+        setAssignments(prev => {
+            const copy = { ...prev };
+            const modules = copy[projectId] || [];
+            if (modules.includes(moduleKey)) {
+                copy[projectId] = modules.filter(m => m !== moduleKey);
+            } else {
+                copy[projectId] = [...modules, moduleKey];
+            }
+            return copy;
+        });
+    };
+
+    const handleSaveAccess = async () => {
+        if (!accessModalUserId) return;
+        setAccessSaving(true);
+
+        try {
+            const assignmentList = Object.entries(assignments)
+                .filter(([_, modules]) => modules.length > 0)
+                .map(([projectId, modules]) => ({ projectId, modules }));
+
+            const res = await fetch(`/api/user-access/${accessModalUserId}/batch`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', ...accessAuthHeaders() },
+                body: JSON.stringify({ assignments: assignmentList }),
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                setAccessModalUserId(null);
+            } else {
+                alert(data.error || '儲存失敗');
+            }
+        } catch (err) {
+            alert('儲存失敗');
+        } finally {
+            setAccessSaving(false);
+        }
+    };
+
     const handleToggleDisable = async (u: AdminUser) => {
         setOpenDropdownId(null);
         const action = u.status === 'active' ? '停用' : '啟用';
@@ -231,7 +337,7 @@ export const AdminUsersPage: React.FC = () => {
                 .role-badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; }
                 .role-admin { background: #fef3c7; color: #92400e; }
                 .role-engineer { background: #dbeafe; color: #1e40af; }
-                .role-reviewer { background: #dcfce7; color: #166534; }
+                .role-viewer { background: #dcfce7; color: #166534; }
                 .status-badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; }
                 .action-btn { padding: 6px 12px; background: transparent; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #475569; cursor: pointer; margin-right: 8px; }
                 .action-btn:hover { background: #f1f5f9; }
@@ -335,7 +441,7 @@ export const AdminUsersPage: React.FC = () => {
                             <option value="">全部角色</option>
                             <option value="admin">管理員</option>
                             <option value="engineer">工程師</option>
-                            <option value="reviewer">審查委員</option>
+                            <option value="viewer">一般使用者</option>
                         </select>
                         <select
                             className="admin-filter"
@@ -426,6 +532,14 @@ export const AdminUsersPage: React.FC = () => {
                                                                 >
                                                                     編輯
                                                                 </button>
+                                                                {u.role === 'viewer' && (
+                                                                    <button
+                                                                        className="action-dropdown-item"
+                                                                        onClick={() => handleOpenAccessModal(u)}
+                                                                    >
+                                                                        權限設定
+                                                                    </button>
+                                                                )}
                                                                 <button
                                                                     className="action-dropdown-item"
                                                                     onClick={() => handleResetPassword(u.id)}
@@ -461,6 +575,108 @@ export const AdminUsersPage: React.FC = () => {
             </main>
 
             {/* User Modal (Add/Edit) or Temp Password Display */}
+            {accessModalUserId && (
+                <div className="modal-overlay" onClick={() => setAccessModalUserId(null)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ width: '560px', maxHeight: '80vh', overflow: 'auto' }}>
+                        <h3 className="modal-title">
+                            權限設定 — {accessModalUserName}
+                        </h3>
+
+                        {accessLoading ? (
+                            <div className="loading-container">
+                                <div className="loading-spinner" />
+                                載入中...
+                            </div>
+                        ) : (
+                            <>
+                                <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
+                                    勾選專案和模組來設定此使用者的存取權限
+                                </div>
+
+                                {allProjects.map(project => {
+                                    const isChecked = !!assignments[project.id];
+                                    const modules = assignments[project.id] || [];
+
+                                    return (
+                                        <div key={project.id} style={{
+                                            border: '1px solid #e2e8f0',
+                                            borderRadius: '8px',
+                                            padding: '12px 16px',
+                                            marginBottom: '8px',
+                                            background: isChecked ? '#f8fafc' : '#fff',
+                                        }}>
+                                            <label style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                cursor: 'pointer',
+                                                fontWeight: 500,
+                                                fontSize: '14px',
+                                            }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => toggleProject(project.id)}
+                                                />
+                                                {project.name}
+                                                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 400 }}>
+                                                    ({project.code})
+                                                </span>
+                                            </label>
+
+                                            {isChecked && (
+                                                <div style={{
+                                                    display: 'flex',
+                                                    gap: '12px',
+                                                    marginTop: '8px',
+                                                    marginLeft: '24px',
+                                                    flexWrap: 'wrap',
+                                                }}>
+                                                    {ALL_MODULES.map(moduleKey => (
+                                                        <label key={moduleKey} style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px',
+                                                            fontSize: '13px',
+                                                            cursor: 'pointer',
+                                                            color: '#475569',
+                                                        }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={modules.includes(moduleKey)}
+                                                                onChange={() => toggleModule(project.id, moduleKey)}
+                                                            />
+                                                            {MODULE_LABELS[moduleKey]}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+
+                                <div className="modal-actions">
+                                    <button
+                                        type="button"
+                                        className="action-btn"
+                                        onClick={() => setAccessModalUserId(null)}
+                                    >
+                                        取消
+                                    </button>
+                                    <button
+                                        className="admin-btn"
+                                        onClick={handleSaveAccess}
+                                        disabled={accessSaving}
+                                    >
+                                        {accessSaving ? '儲存中...' : '儲存'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {isEditModalOpen && (
                 <div className="modal-overlay" onClick={() => { setIsEditModalOpen(false); setTempPassword(null); }}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -525,7 +741,7 @@ export const AdminUsersPage: React.FC = () => {
                                         >
                                             <option value="admin">管理員</option>
                                             <option value="engineer">工程師</option>
-                                            <option value="reviewer">審查委員</option>
+                                            <option value="viewer">一般使用者</option>
                                         </select>
                                     </div>
                                     {modalMode === 'add' && (

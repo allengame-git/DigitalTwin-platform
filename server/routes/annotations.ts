@@ -103,12 +103,12 @@ router.get('/:id', authenticate, (req: AuthenticatedRequest, res: Response) => {
 
 /**
  * POST /annotations
- * Create a new annotation (reviewers only)
+ * Create a new annotation (viewers/engineers)
  */
 router.post(
     '/',
     authenticate,
-    authorize('reviewer', 'engineer'),
+    authorize('viewer', 'engineer'),
     (req: AuthenticatedRequest, res: Response) => {
         const { projectId, type, content, position, cameraState } = req.body;
 
@@ -146,7 +146,7 @@ router.post(
 router.patch(
     '/:id',
     authenticate,
-    authorize('reviewer', 'engineer'),
+    authorize('viewer', 'engineer'),
     (req: AuthenticatedRequest, res: Response) => {
         const id = req.params.id as string;
         const annotation = annotations.get(id);
@@ -175,7 +175,7 @@ router.patch(
 router.delete(
     '/:id',
     authenticate,
-    authorize('reviewer', 'engineer'),
+    authorize('viewer', 'engineer'),
     (req: AuthenticatedRequest, res: Response) => {
         const id = req.params.id as string;
         const annotation = annotations.get(id);

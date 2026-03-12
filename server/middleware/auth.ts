@@ -8,6 +8,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { UserRole } from '@prisma/client';
+import prisma from '../lib/prisma';
 
 const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production'
     ? (() => { throw new Error('JWT_SECRET is required in production'); })()
@@ -158,4 +159,56 @@ export function verifyRefreshToken(token: string): JwtPayload | null {
     } catch {
         return null;
     }
+}
+
+/**
+ * Enforce project-level access for viewer role
+ * admin/engineer → pass through
+ * viewer → check UserProject exists
+ */
+export function enforceProjectAccess(projectIdParam: string = 'projectId') {
+    return async (
+        req: AuthenticatedRequest,
+        res: Response,
+        next: NextFunction
+    ): Promise<void> => {
+        if (!req.user) {
+            res.status(401).json({ message: '未認證' });
+            return;
+        }
+
+        // admin/engineer pass through
+        if (req.user.role === 'admin' || req.user.role === 'engineer') {
+            next();
+            return;
+        }
+
+        // viewer: check UserProject record
+        const projectId = req.params[projectIdParam] as string;
+        if (!projectId) {
+            next();
+            return;
+        }
+
+        try {
+            const access = await prisma.userProject.findUnique({
+                where: {
+                    userId_projectId: {
+                        userId: req.user.userId,
+                        projectId,
+                    },
+                },
+            });
+
+            if (!access) {
+                res.status(403).json({ message: '您沒有此專案的存取權限' });
+                return;
+            }
+
+            next();
+        } catch (error) {
+            console.error('Error checking project access:', error);
+            res.status(500).json({ message: '權限檢查失敗' });
+        }
+    };
 }

@@ -14,7 +14,7 @@ import { RoleBasedUI } from '../components/auth/RoleBasedUI';
 const ROLE_LABELS: Record<string, string> = {
     admin: '管理員',
     engineer: '工程師',
-    reviewer: '審查委員',
+    viewer: '一般使用者',
 };
 
 export const ProjectDashboardPage: React.FC = () => {
@@ -39,6 +39,16 @@ export const ProjectDashboardPage: React.FC = () => {
             setActiveProject(project.id);
         }
     }, [project, setActiveProject]);
+
+    // 判斷模組是否可存取
+    const canAccessModule = (moduleKey: string) => {
+        if (!user) return false;
+        if (user.role === 'admin' || user.role === 'engineer') return true;
+        if (user.role === 'viewer' && project?.allowedModules) {
+            return project.allowedModules.includes(moduleKey);
+        }
+        return false;
+    };
 
     // 專案不存在
     if (projects.length > 0 && !project) {
@@ -150,6 +160,7 @@ export const ProjectDashboardPage: React.FC = () => {
                     gap: '20px'
                 }}>
                     {/* 地質資料 */}
+                    {canAccessModule('geology') && (
                     <div
                         onClick={() => navigate(`/project/${projectCode}/geology`)}
                         style={{
@@ -179,8 +190,10 @@ export const ProjectDashboardPage: React.FC = () => {
                             檢視鑽孔資料、地層分布與地質構造
                         </p>
                     </div>
+                    )}
 
                     {/* 設施導覽 */}
+                    {canAccessModule('facility') && (
                     <div
                         onClick={() => navigate(`/project/${projectCode}/facility`)}
                         style={{
@@ -210,8 +223,10 @@ export const ProjectDashboardPage: React.FC = () => {
                             互動式 3D 設施導覽，支援多層巢狀場景與模型資訊
                         </p>
                     </div>
+                    )}
 
                     {/* 工程設計 */}
+                    {canAccessModule('engineering') && (
                     <div
                         onClick={() => navigate(`/project/${projectCode}/engineering`)}
                         style={{
@@ -241,8 +256,10 @@ export const ProjectDashboardPage: React.FC = () => {
                             檢視壩體、廠房與隧道設計模型
                         </p>
                     </div>
+                    )}
 
                     {/* 模擬分析 */}
+                    {canAccessModule('simulation') && (
                     <div
                         onClick={() => navigate(`/project/${projectCode}/simulation`)}
                         style={{
@@ -272,6 +289,7 @@ export const ProjectDashboardPage: React.FC = () => {
                             檢視流場、應力與水位模擬結果
                         </p>
                     </div>
+                    )}
 
                     {/* 審查標註 */}
                     <div

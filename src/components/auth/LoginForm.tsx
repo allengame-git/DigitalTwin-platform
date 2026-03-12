@@ -1,7 +1,7 @@
 /**
  * LoginForm Component
  * 
- * Login form for engineers and reviewers.
+ * Login form for engineers and viewers.
  * @see specs/4-user-roles-system/spec.md FR-19
  */
 

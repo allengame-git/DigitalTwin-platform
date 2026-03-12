@@ -5,7 +5,7 @@
  * @see specs/4-user-roles-system/spec.md
  */
 
-export type UserRole = 'engineer' | 'reviewer' | 'public' | 'admin';
+export type UserRole = 'engineer' | 'viewer' | 'public' | 'admin';
 
 export interface User {
     id: string;
@@ -107,7 +107,7 @@ export interface UserSession {
  */
 export const SESSION_TIMEOUT: Record<Exclude<UserRole, 'public'>, number> = {
     engineer: 8 * 60 * 60 * 1000,  // 8 hours
-    reviewer: 1 * 60 * 60 * 1000,  // 1 hour
+    viewer: 1 * 60 * 60 * 1000,  // 1 hour
     admin: 8 * 60 * 60 * 1000,     // 8 hours
 };
 

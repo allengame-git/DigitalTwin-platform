@@ -111,7 +111,7 @@ const router = createBrowserRouter([
             {
                 path: '/',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']}>
                         <DashboardPage />
                     </ProtectedRoute>
                 ),
@@ -123,7 +123,7 @@ const router = createBrowserRouter([
             {
                 path: '/project/:projectCode',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']}>
                         <ProjectDashboardPage />
                     </ProtectedRoute>
                 ),
@@ -131,7 +131,7 @@ const router = createBrowserRouter([
             {
                 path: '/project/:projectCode/geology',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']} requiredModule="geology">
                         <GeologyPage />
                     </ProtectedRoute>
                 ),
@@ -139,7 +139,7 @@ const router = createBrowserRouter([
             {
                 path: '/project/:projectCode/facility',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']} requiredModule="facility">
                         <FacilityPage />
                     </ProtectedRoute>
                 ),
@@ -147,7 +147,7 @@ const router = createBrowserRouter([
             {
                 path: '/project/:projectCode/engineering',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']} requiredModule="engineering">
                         <EngineeringPage />
                     </ProtectedRoute>
                 ),
@@ -155,7 +155,7 @@ const router = createBrowserRouter([
             {
                 path: '/project/:projectCode/simulation',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']} requiredModule="simulation">
                         <SimulationPage />
                     </ProtectedRoute>
                 ),
@@ -179,7 +179,7 @@ const router = createBrowserRouter([
             {
                 path: '/project/:projectCode/annotations',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'reviewer', 'engineer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'viewer', 'engineer']}>
                         <AnnotationsPage />
                     </ProtectedRoute>
                 ),
@@ -199,7 +199,7 @@ const router = createBrowserRouter([
             {
                 path: '/geology',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']}>
                         <GeologyPage />
                     </ProtectedRoute>
                 ),
@@ -207,7 +207,7 @@ const router = createBrowserRouter([
             {
                 path: '/engineering',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']}>
                         <EngineeringPage />
                     </ProtectedRoute>
                 ),
@@ -215,7 +215,7 @@ const router = createBrowserRouter([
             {
                 path: '/simulation',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'reviewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']}>
                         <SimulationPage />
                     </ProtectedRoute>
                 ),
@@ -223,7 +223,7 @@ const router = createBrowserRouter([
             {
                 path: '/annotations',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'reviewer', 'engineer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'viewer', 'engineer']}>
                         <AnnotationsPage />
                     </ProtectedRoute>
                 ),
@@ -243,7 +243,7 @@ const router = createBrowserRouter([
             {
                 path: '/admin/users',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin']}>
+                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
                         <AdminUsersPage />
                     </ProtectedRoute>
                 ),

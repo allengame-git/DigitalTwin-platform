@@ -75,13 +75,13 @@ export const EngineerOnly: React.FC<{ children: ReactNode; fallback?: ReactNode 
 );
 
 /**
- * Show content only for reviewers
+ * Show content only for viewers
  */
-export const ReviewerOnly: React.FC<{ children: ReactNode; fallback?: ReactNode }> = ({
+export const ViewerOnly: React.FC<{ children: ReactNode; fallback?: ReactNode }> = ({
     children,
     fallback,
 }) => (
-    <RoleBasedUI allowedRoles={['reviewer']} fallback={fallback}>
+    <RoleBasedUI allowedRoles={['viewer']} fallback={fallback}>
         {children}
     </RoleBasedUI>
 );
@@ -93,7 +93,7 @@ export const AuthenticatedOnly: React.FC<{ children: ReactNode; fallback?: React
     children,
     fallback,
 }) => (
-    <RoleBasedUI allowedRoles={['admin', 'engineer', 'reviewer']} fallback={fallback}>
+    <RoleBasedUI allowedRoles={['admin', 'engineer', 'viewer']} fallback={fallback}>
         {children}
     </RoleBasedUI>
 );
@@ -143,7 +143,7 @@ export function useRoleCheck() {
     return {
         isAdmin: user?.role === 'admin',
         isEngineer: user?.role === 'engineer',
-        isReviewer: user?.role === 'reviewer',
+        isViewer: user?.role === 'viewer',
         isPublic: user?.role === 'public',
         hasRole,
         canView: (permission: FeatureKey) =>

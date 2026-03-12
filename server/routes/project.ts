@@ -8,7 +8,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { z } from "zod";
-import { authenticate } from '../middleware/auth';
+import { authenticate, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -16,21 +16,57 @@ const router = Router();
  * GET /api/project
  * 取得所有專案
  */
-router.get('/', authenticate, async (_req: Request, res: Response) => {
+router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
-        const projects = await prisma.project.findMany({
-            orderBy: { createdAt: 'desc' },
-            include: {
-                _count: {
-                    select: {
-                        geologyModels: true,
-                        imagery: true,
-                        geophysics: true,
-                        boreholes: true,
+        const authReq = req as AuthenticatedRequest;
+        const userRole = authReq.user?.role;
+        const userId = authReq.user?.userId;
+
+        let projects;
+
+        if (userRole === 'viewer' && userId) {
+            // viewer: only return projects with UserProject records + allowedModules
+            const userProjects = await prisma.userProject.findMany({
+                where: { userId },
+                include: {
+                    project: {
+                        include: {
+                            _count: {
+                                select: {
+                                    geologyModels: true,
+                                    imagery: true,
+                                    geophysics: true,
+                                    boreholes: true,
+                                }
+                            }
+                        }
+                    },
+                    modules: { select: { moduleKey: true } },
+                },
+                orderBy: { createdAt: 'desc' },
+            });
+
+            projects = userProjects.map(up => ({
+                ...up.project,
+                allowedModules: up.modules.map(m => m.moduleKey),
+            }));
+        } else {
+            // admin/engineer: all projects
+            projects = await prisma.project.findMany({
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    _count: {
+                        select: {
+                            geologyModels: true,
+                            imagery: true,
+                            geophysics: true,
+                            boreholes: true,
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
+
         res.json({ success: true, data: projects });
     } catch (error) {
         console.error('Error fetching projects:', error);

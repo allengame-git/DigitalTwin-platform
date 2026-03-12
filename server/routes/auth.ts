@@ -22,7 +22,7 @@ const MAX_SESSIONS = 3;
 // Session timeout by role (ms)
 const SESSION_TIMEOUT: Record<string, number> = {
     engineer: 8 * 60 * 60 * 1000,
-    reviewer: 1 * 60 * 60 * 1000,
+    viewer: 1 * 60 * 60 * 1000,
     admin: 8 * 60 * 60 * 1000,
 };
 

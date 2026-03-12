@@ -32,7 +32,7 @@ const settingSections: SettingSection[] = [
 const ROLE_LABELS: Record<string, string> = {
     admin: '管理員',
     engineer: '工程師',
-    reviewer: '審查委員',
+    viewer: '一般使用者',
 };
 
 const AUDIT_ACTION_LABELS: Record<string, string> = {

@@ -28,6 +28,7 @@ model Project {
   terrains      Terrain[]
   waterLevels    WaterLevel[]
   facilityScenes FacilityScene[]
+  userProjects   UserProject[]
 
   @@map("projects")
 }
@@ -423,7 +424,7 @@ model FacilityModelInfo {
 
 enum UserRole {
   engineer
-  reviewer
+  viewer
   public
   admin
 }
@@ -451,6 +452,7 @@ model User {
   lastLoginAt        DateTime?
   sessions           Session[]
   auditLogs          AuditLog[]
+  userProjects       UserProject[]
 
   @@map("users")
 }
@@ -499,4 +501,29 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model UserProject {
+  id        String   @id @default(uuid())
+  userId    String
+  projectId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  createdBy String?
+
+  modules   UserProjectModule[]
+
+  @@unique([userId, projectId])
+  @@map("user_projects")
+}
+
+model UserProjectModule {
+  id            String      @id @default(uuid())
+  userProjectId String
+  moduleKey     String
+  userProject   UserProject @relation(fields: [userProjectId], references: [id], onDelete: Cascade)
+
+  @@unique([userProjectId, moduleKey])
+  @@map("user_project_modules")
 }

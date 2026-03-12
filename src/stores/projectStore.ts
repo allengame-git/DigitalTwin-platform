@@ -26,6 +26,7 @@ export interface Project {
         geophysics: number;
         boreholes: number;
     };
+    allowedModules?: string[];  // viewer: 被允許的模組 key 列表
 }
 
 interface ProjectStore {

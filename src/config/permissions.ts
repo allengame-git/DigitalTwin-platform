@@ -62,7 +62,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, FeatureKey[]> = {
         'tool:slicing',
         'admin:invites',
     ],
-    reviewer: [
+    viewer: [
         // View + Annotation only
         'view:geology',
         'view:engineering',
@@ -83,7 +83,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, FeatureKey[]> = {
  * Features hidden from specific roles
  */
 export const HIDDEN_FEATURES: Partial<Record<UserRole, FeatureKey[]>> = {
-    reviewer: [
+    viewer: [
         'view:rawData',
         'tool:measure',
         'tool:export',

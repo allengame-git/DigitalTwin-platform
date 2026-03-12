@@ -8,11 +8,13 @@
 import React, { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { useProjectStore } from '../../stores/projectStore';
 import type { UserRole } from '../../types/auth';
 
 interface ProtectedRouteProps {
     children: ReactNode;
     allowedRoles?: UserRole[];
+    requiredModule?: string;
     redirectTo?: string;
     fallback?: ReactNode;
 }
@@ -20,6 +22,7 @@ interface ProtectedRouteProps {
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     children,
     allowedRoles,
+    requiredModule,
     redirectTo = '/login',
     fallback,
 }) => {
@@ -79,6 +82,20 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     if (allowedRoles && allowedRoles.length > 0) {
         if (!allowedRoles.includes(user.role)) {
             return <Navigate to="/unauthorized" state={{ from: location }} replace />;
+        }
+    }
+
+    // Check module permission for viewer
+    if (requiredModule && user.role === 'viewer') {
+        const pathParts = location.pathname.split('/');
+        const projectIdx = pathParts.indexOf('project');
+        const projectCode = projectIdx >= 0 ? pathParts[projectIdx + 1] : undefined;
+
+        if (projectCode) {
+            const project = useProjectStore.getState().getProjectByCode(projectCode);
+            if (project?.allowedModules && !project.allowedModules.includes(requiredModule)) {
+                return <Navigate to={`/project/${projectCode}`} replace />;
+            }
         }
     }
 

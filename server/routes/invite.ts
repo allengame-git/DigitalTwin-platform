@@ -11,7 +11,7 @@ import { authenticate, authorize, generateAccessToken, generateRefreshToken, Aut
 
 const SESSION_TIMEOUT: Record<string, number> = {
     engineer: 8 * 60 * 60 * 1000,  // 8 hours
-    reviewer: 1 * 60 * 60 * 1000,  // 1 hour
+    viewer: 1 * 60 * 60 * 1000,  // 1 hour
     admin: 8 * 60 * 60 * 1000,     // 8 hours
 };
 
@@ -26,8 +26,8 @@ const inviteLinks = new Map<string, {
     createdBy: string;
 }>();
 
-// Simulated reviewer users created from invites
-let nextReviewerId = 100;
+// Simulated viewer users created from invites
+let nextViewerId = 100;
 
 /**
  * POST /invite/generate
@@ -92,15 +92,15 @@ router.post('/validate', (req: Request, res: Response) => {
         return;
     }
 
-    // Create temporary reviewer user
-    const reviewerId = `reviewer-${++nextReviewerId}`;
-    invite.usedBy = reviewerId;
+    // Create temporary viewer user
+    const viewerId = `viewer-${++nextViewerId}`;
+    invite.usedBy = viewerId;
 
     const user = {
-        id: reviewerId,
-        email: `reviewer-${nextReviewerId}@invited.local`,
-        name: `審查委員 #${nextReviewerId}`,
-        role: 'reviewer' as const,
+        id: viewerId,
+        email: `viewer-${nextViewerId}@invited.local`,
+        name: `一般使用者 #${nextViewerId}`,
+        role: 'viewer' as const,
     };
 
     const accessToken = generateAccessToken(user.id, user.email, user.role);
@@ -111,7 +111,7 @@ router.post('/validate', (req: Request, res: Response) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: SESSION_TIMEOUT.reviewer,
+        maxAge: SESSION_TIMEOUT.viewer,
     });
 
     res.json({

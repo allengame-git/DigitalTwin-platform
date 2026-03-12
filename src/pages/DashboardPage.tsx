@@ -13,7 +13,7 @@ import { useProjectStore, Project } from '../stores/projectStore';
 const ROLE_LABELS: Record<string, string> = {
   admin: '管理員',
   engineer: '工程師',
-  reviewer: '審查委員',
+  viewer: '一般使用者',
   public: '訪客',
 };
 
@@ -169,7 +169,7 @@ export const DashboardPage: React.FC = () => {
           color: #1e40af;
         }
         
-        .role-reviewer {
+        .role-viewer {
           background: #dcfce7;
           color: #166534;
         }
@@ -470,7 +470,7 @@ export const DashboardPage: React.FC = () => {
 
 
         {/* 審查功能區 */}
-        <RoleBasedUI allowedRoles={['admin', 'reviewer', 'engineer']}>
+        <RoleBasedUI allowedRoles={['admin', 'viewer', 'engineer']}>
           <div className="dashboard-section">
             <h2 className="dashboard-section-title">審查功能</h2>
             <div className="dashboard-grid">

@@ -2,7 +2,7 @@
  * Annotation Page
  * 
  * Main page for viewing and managing annotations.
- * Only accessible to reviewers.
+ * Only accessible to viewers.
  * @see specs/4-user-roles-system/spec.md FR-10, FR-11
  */
 

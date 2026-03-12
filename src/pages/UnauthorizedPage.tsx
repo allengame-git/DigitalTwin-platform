@@ -220,7 +220,7 @@ export const UnauthorizedPage: React.FC = () => {
             <span className="unauthorized-user-name">{user.name}</span>
             <span className="unauthorized-user-role">
               {user.role === 'engineer' ? 'Engineer' :
-                user.role === 'reviewer' ? 'Reviewer' :
+                user.role === 'viewer' ? 'Viewer' :
                   user.role === 'admin' ? 'Admin' : 'Public'}
             </span>
           </div>

@@ -87,7 +87,7 @@ export const useAuthStore = create<AuthStore>()(
                 set({ isLoading: true, error: null });
                 try {
                     const response = await authApi.validateInvite(token);
-                    const sessionExpiry = Date.now() + SESSION_TIMEOUT.reviewer;
+                    const sessionExpiry = Date.now() + SESSION_TIMEOUT.viewer;
 
                     set({
                         user: response.user,
