@@ -5,7 +5,7 @@
  * 專案 Dashboard - 顯示專案資訊和功能入口
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -13,6 +13,23 @@ import { useModuleStore, type Module, type ModuleStats } from '../stores/moduleS
 import { getModuleTypeConfig, getAvailableModuleTypes, MODULE_TYPES } from '../config/moduleRegistry';
 import { RoleBasedUI } from '../components/auth/RoleBasedUI';
 import { Plus, Pencil, Trash2, GripVertical, X, Database, MessageSquareText } from 'lucide-react';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    TouchSensor,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+    SortableContext,
+    sortableKeyboardCoordinates,
+    rectSortingStrategy,
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const ROLE_LABELS: Record<string, string> = {
     admin: '管理員',
@@ -369,6 +386,135 @@ const DeleteModuleModal: React.FC<DeleteModuleModalProps> = ({ mod, onClose }) =
     );
 };
 
+// ──────────────────────── Sortable Module Card ────────────────────────
+
+interface SortableModuleCardProps {
+    mod: Module;
+    projectCode: string;
+    isAdmin: boolean;
+    isAdminOrEngineer: boolean;
+    isDragEnabled: boolean;
+    onEdit: (mod: Module) => void;
+    onDelete: (mod: Module) => void;
+}
+
+const SortableModuleCard: React.FC<SortableModuleCardProps> = ({
+    mod, projectCode, isAdmin, isAdminOrEngineer, isDragEnabled, onEdit, onDelete,
+}) => {
+    const navigate = useNavigate();
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: mod.id, disabled: !isDragEnabled });
+
+    const style: React.CSSProperties = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        background: '#fff',
+        borderRadius: '12px',
+        padding: '24px',
+        border: isDragging ? '2px solid #2563eb' : '1px solid #e2e8f0',
+        cursor: 'pointer',
+        position: 'relative',
+    };
+
+    const config = getModuleTypeConfig(mod.type);
+    const IconComponent = config?.icon;
+    const bgColor = TYPE_BG_COLORS[mod.type] || '#f1f5f9';
+
+    return (
+        <div ref={setNodeRef} style={style}>
+            {/* Admin/Engineer actions */}
+            {isAdminOrEngineer && (
+                <div style={{
+                    position: 'absolute', top: '12px', right: '12px',
+                    display: 'flex', gap: '4px', alignItems: 'center',
+                }}>
+                    {isAdmin && isDragEnabled && (
+                        <span
+                            {...attributes}
+                            {...listeners}
+                            style={{ color: '#94a3b8', cursor: 'grab', touchAction: 'none', padding: '4px' }}
+                            title="拖曳排序"
+                        >
+                            <GripVertical size={16} />
+                        </span>
+                    )}
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(mod); }}
+                        style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: '#94a3b8', padding: '4px',
+                        }}
+                        title="編輯模組"
+                    >
+                        <Pencil size={15} />
+                    </button>
+                    {isAdmin && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onDelete(mod); }}
+                            style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                color: '#94a3b8', padding: '4px',
+                            }}
+                            title="刪除模組"
+                        >
+                            <Trash2 size={15} />
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* Card body — clickable */}
+            <div onClick={() => navigate(`/project/${projectCode}/module/${mod.id}`)}>
+                <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '12px',
+                    background: bgColor,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '16px',
+                }}>
+                    {IconComponent && <IconComponent size={24} />}
+                </div>
+                <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>
+                    {mod.name}
+                </h3>
+                <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5 }}>
+                    {mod.description || config?.description || ''}
+                </p>
+            </div>
+
+            {/* Data management link */}
+            {isAdminOrEngineer && DATA_PAGE_TYPES.has(mod.type) && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/project/${projectCode}/module/${mod.id}/data`);
+                    }}
+                    style={{
+                        marginTop: '12px',
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        fontSize: '12px', color: '#6366f1',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        padding: 0,
+                    }}
+                >
+                    <Database size={13} />
+                    資料管理
+                </button>
+            )}
+        </div>
+    );
+};
+
 // ──────────────────────── Main Page ────────────────────────
 
 export const ProjectDashboardPage: React.FC = () => {
@@ -419,6 +565,40 @@ export const ProjectDashboardPage: React.FC = () => {
 
     const isAdmin = user?.role === 'admin';
     const isAdminOrEngineer = user?.role === 'admin' || user?.role === 'engineer';
+
+    // DnD sensors
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    );
+
+    // Visible modules (filtered by access)
+    const visibleModules = useMemo(
+        () => modules.filter(mod => canAccessModule(mod.id)),
+        [modules, canAccessModule],
+    );
+
+    const moduleIds = useMemo(() => visibleModules.map(m => m.id), [visibleModules]);
+
+    const reorderModules = useModuleStore(state => state.reorderModules);
+
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const oldIndex = visibleModules.findIndex(m => m.id === active.id);
+        const newIndex = visibleModules.findIndex(m => m.id === over.id);
+        if (oldIndex < 0 || newIndex < 0) return;
+
+        // Build new order array
+        const reordered = [...visibleModules];
+        const [moved] = reordered.splice(oldIndex, 1);
+        reordered.splice(newIndex, 0, moved);
+
+        const orders = reordered.map((m, i) => ({ id: m.id, sortOrder: i }));
+        reorderModules(orders);
+    }, [visibleModules, reorderModules]);
 
     // 專案不存在
     if (projects.length > 0 && !project) {
@@ -524,111 +704,30 @@ export const ProjectDashboardPage: React.FC = () => {
                 </div>
 
                 {/* 功能卡片 */}
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                >
+                <SortableContext items={moduleIds} strategy={rectSortingStrategy}>
                 <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                     gap: '20px'
                 }}>
                     {/* Dynamic module cards */}
-                    {modules.map((mod) => {
-                        if (!canAccessModule(mod.id)) return null;
-                        const config = getModuleTypeConfig(mod.type);
-                        const IconComponent = config?.icon;
-                        const bgColor = TYPE_BG_COLORS[mod.type] || '#f1f5f9';
-
-                        return (
-                            <div
-                                key={mod.id}
-                                style={{
-                                    background: '#fff',
-                                    borderRadius: '12px',
-                                    padding: '24px',
-                                    border: '1px solid #e2e8f0',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    position: 'relative',
-                                }}
-                            >
-                                {/* Admin/Engineer actions */}
-                                {isAdminOrEngineer && (
-                                    <div style={{
-                                        position: 'absolute', top: '12px', right: '12px',
-                                        display: 'flex', gap: '4px', alignItems: 'center',
-                                    }}>
-                                        {isAdmin && (
-                                            <span style={{ color: '#cbd5e1', cursor: 'default' }}>
-                                                <GripVertical size={16} />
-                                            </span>
-                                        )}
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setEditingModule(mod); }}
-                                            style={{
-                                                background: 'none', border: 'none', cursor: 'pointer',
-                                                color: '#94a3b8', padding: '4px',
-                                            }}
-                                            title="編輯模組"
-                                        >
-                                            <Pencil size={15} />
-                                        </button>
-                                        {isAdmin && (
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setDeletingModule(mod); }}
-                                                style={{
-                                                    background: 'none', border: 'none', cursor: 'pointer',
-                                                    color: '#94a3b8', padding: '4px',
-                                                }}
-                                                title="刪除模組"
-                                            >
-                                                <Trash2 size={15} />
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Card body — clickable */}
-                                <div onClick={() => navigate(`/project/${projectCode}/module/${mod.id}`)}>
-                                    <div style={{
-                                        width: '48px',
-                                        height: '48px',
-                                        borderRadius: '12px',
-                                        background: bgColor,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        marginBottom: '16px',
-                                    }}>
-                                        {IconComponent && <IconComponent size={24} />}
-                                    </div>
-                                    <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>
-                                        {mod.name}
-                                    </h3>
-                                    <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5 }}>
-                                        {mod.description || config?.description || ''}
-                                    </p>
-                                </div>
-
-                                {/* Data management link */}
-                                {isAdminOrEngineer && DATA_PAGE_TYPES.has(mod.type) && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            navigate(`/project/${projectCode}/module/${mod.id}/data`);
-                                        }}
-                                        style={{
-                                            marginTop: '12px',
-                                            display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                            fontSize: '12px', color: '#6366f1',
-                                            background: 'none', border: 'none', cursor: 'pointer',
-                                            padding: 0,
-                                        }}
-                                    >
-                                        <Database size={13} />
-                                        資料管理
-                                    </button>
-                                )}
-                            </div>
-                        );
-                    })}
+                    {visibleModules.map((mod) => (
+                        <SortableModuleCard
+                            key={mod.id}
+                            mod={mod}
+                            projectCode={projectCode || ''}
+                            isAdmin={isAdmin}
+                            isAdminOrEngineer={isAdminOrEngineer}
+                            isDragEnabled={isAdmin}
+                            onEdit={setEditingModule}
+                            onDelete={setDeletingModule}
+                        />
+                    ))}
 
                     {/* 審查標註 (non-module, keep as-is) */}
                     <div
@@ -685,6 +784,8 @@ export const ProjectDashboardPage: React.FC = () => {
                         </div>
                     )}
                 </div>
+                </SortableContext>
+                </DndContext>
             </main>
 
             {/* Modals */}
