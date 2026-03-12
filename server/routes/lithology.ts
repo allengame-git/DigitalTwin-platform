@@ -62,14 +62,14 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
     try {
         const { projectId, moduleId, lithId, code, name, color } = req.body;
 
-        if (!projectId || !lithId || !code || !name || !color) {
-            return res.status(400).json({ error: '缺少必填欄位' });
+        if (!projectId || !moduleId || !lithId || !code || !name || !color) {
+            return res.status(400).json({ error: '缺少必填欄位（需提供 projectId、moduleId、lithId、code、name、color）' });
         }
 
         const lithology = await prisma.projectLithology.create({
             data: {
                 projectId,
-                ...(moduleId && { moduleId }),
+                moduleId,
                 lithId: parseInt(lithId),
                 code: code.trim().toUpperCase(),
                 name: name.trim(),
@@ -171,15 +171,15 @@ router.delete('/:id', authenticate, async (req: Request, res: Response) => {
  */
 router.post('/init-defaults', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId } = req.body;
+        const { projectId, moduleId } = req.body;
 
-        if (!projectId) {
-            return res.status(400).json({ error: '缺少 projectId 參數' });
+        if (!projectId || !moduleId) {
+            return res.status(400).json({ error: '缺少 projectId 或 moduleId 參數' });
         }
 
         // 檢查是否已有岩性資料
         const existing = await prisma.projectLithology.count({
-            where: { projectId }
+            where: { projectId, moduleId }
         });
 
         if (existing > 0) {
@@ -190,6 +190,7 @@ router.post('/init-defaults', authenticate, async (req: Request, res: Response) 
         const created = await prisma.projectLithology.createMany({
             data: DEFAULT_LITHOLOGIES.map(l => ({
                 projectId,
+                moduleId,
                 lithId: l.lithId,
                 code: l.code,
                 name: l.name,
@@ -213,10 +214,10 @@ router.post('/init-defaults', authenticate, async (req: Request, res: Response) 
  */
 router.post('/batch', authenticate, async (req: Request, res: Response) => {
     try {
-        const { projectId, lithologies } = req.body;
+        const { projectId, moduleId, lithologies } = req.body;
 
-        if (!projectId || !Array.isArray(lithologies) || lithologies.length === 0) {
-            return res.status(400).json({ error: '無效的請求資料' });
+        if (!projectId || !moduleId || !Array.isArray(lithologies) || lithologies.length === 0) {
+            return res.status(400).json({ error: '無效的請求資料（需提供 projectId、moduleId 及 lithologies）' });
         }
 
         // 檢查 projectId
@@ -242,6 +243,7 @@ router.post('/batch', authenticate, async (req: Request, res: Response) => {
                 await tx.projectLithology.create({
                     data: {
                         projectId,
+                        moduleId,
                         lithId: parseInt(item.lithId),
                         code: item.code.trim().toUpperCase(),
                         name: item.name.trim(),

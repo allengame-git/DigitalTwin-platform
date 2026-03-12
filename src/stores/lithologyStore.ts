@@ -30,11 +30,11 @@ interface LithologyState {
 
 interface LithologyActions {
     fetchLithologies: (projectId: string, moduleId?: string) => Promise<void>;
-    createLithology: (projectId: string, data: Omit<ProjectLithology, 'id'>) => Promise<ProjectLithology | null>;
-    importLithologies: (projectId: string, data: Omit<ProjectLithology, 'id'>[]) => Promise<number | null>;
+    createLithology: (projectId: string, moduleId: string, data: Omit<ProjectLithology, 'id'>) => Promise<ProjectLithology | null>;
+    importLithologies: (projectId: string, moduleId: string, data: Omit<ProjectLithology, 'id'>[]) => Promise<number | null>;
     updateLithology: (id: string, data: Partial<ProjectLithology>) => Promise<ProjectLithology | null>;
     deleteLithology: (id: string) => Promise<boolean>;
-    initDefaults: (projectId: string) => Promise<boolean>;
+    initDefaults: (projectId: string, moduleId: string) => Promise<boolean>;
     getLithologyByCode: (code: string) => ProjectLithology | undefined;
     getLithologyById: (lithId: number) => ProjectLithology | undefined;
 }
@@ -66,12 +66,12 @@ export const useLithologyStore = create<LithologyState & LithologyActions>((set,
         }
     },
 
-    createLithology: async (projectId: string, data: Omit<ProjectLithology, 'id'>) => {
+    createLithology: async (projectId: string, moduleId: string, data: Omit<ProjectLithology, 'id'>) => {
         try {
             const response = await fetch(`${API_BASE}/api/lithology`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                body: JSON.stringify({ projectId, ...data }),
+                body: JSON.stringify({ projectId, moduleId, ...data }),
             });
 
             if (!response.ok) {
@@ -91,13 +91,13 @@ export const useLithologyStore = create<LithologyState & LithologyActions>((set,
         }
     },
 
-    importLithologies: async (projectId: string, data: Omit<ProjectLithology, 'id'>[]) => {
+    importLithologies: async (projectId: string, moduleId: string, data: Omit<ProjectLithology, 'id'>[]) => {
         set({ status: 'loading', error: null });
         try {
             const response = await fetch(`${API_BASE}/api/lithology/batch`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                body: JSON.stringify({ projectId, lithologies: data }),
+                body: JSON.stringify({ projectId, moduleId, lithologies: data }),
             });
 
             if (!response.ok) {
@@ -169,12 +169,12 @@ export const useLithologyStore = create<LithologyState & LithologyActions>((set,
         }
     },
 
-    initDefaults: async (projectId: string) => {
+    initDefaults: async (projectId: string, moduleId: string) => {
         try {
             const response = await fetch(`${API_BASE}/api/lithology/init-defaults`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                body: JSON.stringify({ projectId }),
+                body: JSON.stringify({ projectId, moduleId }),
             });
 
             if (!response.ok) {

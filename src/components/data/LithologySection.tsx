@@ -6,10 +6,12 @@
 import React, { useState, useEffect } from 'react';
 import { useLithologyStore, ProjectLithology } from '../../stores/lithologyStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useModuleStore } from '../../stores/moduleStore';
 
 const LithologySection: React.FC = () => {
     const { lithologies, status, fetchLithologies, createLithology, importLithologies, updateLithology, deleteLithology, initDefaults, error } = useLithologyStore();
     const { activeProjectId } = useProjectStore();
+    const { activeModuleId } = useModuleStore();
 
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -80,8 +82,8 @@ const LithologySection: React.FC = () => {
                         <button
                             className="dm-btn dm-btn-secondary"
                             onClick={() => {
-                                if (activeProjectId) {
-                                    initDefaults(activeProjectId);
+                                if (activeProjectId && activeModuleId) {
+                                    initDefaults(activeProjectId, activeModuleId);
                                 }
                             }}
                         >

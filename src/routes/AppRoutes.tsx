@@ -21,15 +21,9 @@ const DashboardPage = React.lazy(() => import('../pages/DashboardPage'));
 const ModulePageLoader = React.lazy(() => import('../pages/ModulePageLoader'));
 const ModuleDataPageLoader = React.lazy(() => import('../pages/ModuleDataPageLoader'));
 
-// Lazy load placeholder pages
-const DataManagementPage = React.lazy(() => import('../pages/DataManagementPage'));
-const GeologyPage = React.lazy(() => import('../pages/GeologyPage'));
-const EngineeringPage = React.lazy(() => import('../pages/PlaceholderPages').then(m => ({ default: m.EngineeringPage })));
-const SimulationPage = React.lazy(() => import('../pages/PlaceholderPages').then(m => ({ default: m.SimulationPage })));
+// Lazy load pages
 const AnnotationsPage = React.lazy(() => import('../pages/AnnotationsPage'));
 const ProjectDashboardPage = React.lazy(() => import('../pages/ProjectDashboardPage'));
-const FacilityPage = React.lazy(() => import('../pages/FacilityPage'));
-const FacilityDataPage = React.lazy(() => import('../pages/FacilityDataPage'));
 const ChangePasswordPage = React.lazy(() => import('../pages/ChangePasswordPage'));
 
 // Admin pages
@@ -150,103 +144,10 @@ const router = createBrowserRouter([
                 ),
             },
 
-            // Legacy project-scoped routes (kept for backward compatibility)
-            {
-                path: '/project/:projectCode/geology',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']} requiredModule="geology">
-                        <GeologyPage />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: '/project/:projectCode/facility',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']} requiredModule="facility">
-                        <FacilityPage />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: '/project/:projectCode/engineering',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']} requiredModule="engineering">
-                        <EngineeringPage />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: '/project/:projectCode/simulation',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer', 'viewer']} requiredModule="simulation">
-                        <SimulationPage />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: '/project/:projectCode/data',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
-                        <DataManagementPage />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: '/project/:projectCode/facility-data',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
-                        <FacilityDataPage />
-                    </ProtectedRoute>
-                ),
-            },
             {
                 path: '/project/:projectCode/annotations',
                 element: (
                     <ProtectedRoute allowedRoles={['admin', 'viewer', 'engineer']}>
-                        <AnnotationsPage />
-                    </ProtectedRoute>
-                ),
-            },
-
-            // ============================================
-            // Legacy routes (向後相容，無專案範圍 — viewer 不可用)
-            // ============================================
-            {
-                path: '/data',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
-                        <DataManagementPage />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: '/geology',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
-                        <GeologyPage />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: '/engineering',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
-                        <EngineeringPage />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: '/simulation',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
-                        <SimulationPage />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: '/annotations',
-                element: (
-                    <ProtectedRoute allowedRoles={['admin', 'engineer']}>
                         <AnnotationsPage />
                     </ProtectedRoute>
                 ),

@@ -21,6 +21,8 @@
     ],
     "exclude": [
         "node_modules",
-        "dist"
+        "dist",
+        "prisma/migrate-to-modules.ts",
+        "prisma/seed-viewer-migration.ts"
     ]
 }

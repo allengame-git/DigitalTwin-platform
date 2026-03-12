@@ -3,9 +3,6 @@
  *
  * Manages viewer project assignments and module permissions.
  * All routes require authenticate + authorize('admin', 'engineer').
- *
- * Migration note: transitioning from moduleKey (string) to moduleId (UUID FK).
- * Both formats accepted during transition; moduleId takes priority.
  */
 
 import { Router, Response } from 'express';
@@ -19,7 +16,7 @@ router.use(authenticate, authorize('admin', 'engineer'));
 
 /**
  * Resolve module identifiers to validated Module records.
- * Accepts either moduleIds (UUIDs) or legacy moduleKeys (type strings).
+ * Accepts moduleIds (UUIDs) or legacy module type strings.
  * Returns validated Module records from DB.
  */
 async function resolveModules(
@@ -62,12 +59,10 @@ async function resolveModules(
 
 /**
  * Format UserProjectModule records for API response.
- * Returns both moduleIds (new) and modules (legacy) for backward compatibility.
  */
-function formatModulesResponse(modules: Array<{ moduleId: string | null; moduleKey: string | null }>) {
+function formatModulesResponse(modules: Array<{ moduleId: string }>) {
     return {
-        moduleIds: modules.map(m => m.moduleId).filter((id): id is string => id !== null),
-        modules: modules.map(m => m.moduleKey).filter((k): k is string => k !== null),
+        moduleIds: modules.map(m => m.moduleId),
     };
 }
 
@@ -91,18 +86,17 @@ router.get('/:userId/projects', async (req: AuthenticatedRequest, res: Response)
         where: { userId },
         include: {
             project: { select: { id: true, name: true, code: true } },
-            modules: { select: { moduleId: true, moduleKey: true } },
+            modules: { select: { moduleId: true } },
         },
         orderBy: { createdAt: 'asc' },
     });
 
     const data = userProjects.map((up) => {
-        const { moduleIds, modules } = formatModulesResponse(up.modules);
+        const { moduleIds } = formatModulesResponse(up.modules);
         return {
             projectId: up.projectId,
             project: up.project,
             moduleIds,
-            modules, // backward compat
             createdAt: up.createdAt,
         };
     });
@@ -168,7 +162,6 @@ router.put('/:userId/projects/:projectId', async (req: AuthenticatedRequest, res
             data: resolved.valid.map((mod) => ({
                 userProjectId: userProject.id,
                 moduleId: mod.id,
-                moduleKey: mod.type, // backward compat
             })),
         });
     }
@@ -177,7 +170,7 @@ router.put('/:userId/projects/:projectId', async (req: AuthenticatedRequest, res
         where: { id: userProject.id },
         include: {
             project: { select: { id: true, name: true, code: true } },
-            modules: { select: { moduleId: true, moduleKey: true } },
+            modules: { select: { moduleId: true } },
         },
     });
 
@@ -188,7 +181,6 @@ router.put('/:userId/projects/:projectId', async (req: AuthenticatedRequest, res
             projectId: updated!.projectId,
             project: updated!.project,
             moduleIds: fmt.moduleIds,
-            modules: fmt.modules, // backward compat
             createdAt: updated!.createdAt,
         },
     });
@@ -235,18 +227,17 @@ router.get('/project/:projectId/viewers', async (req: AuthenticatedRequest, res:
         },
         include: {
             user: { select: { id: true, name: true, email: true, role: true, status: true } },
-            modules: { select: { moduleId: true, moduleKey: true } },
+            modules: { select: { moduleId: true } },
         },
         orderBy: { createdAt: 'asc' },
     });
 
     const data = userProjects.map((up) => {
-        const { moduleIds, modules } = formatModulesResponse(up.modules);
+        const { moduleIds } = formatModulesResponse(up.modules);
         return {
             userId: up.userId,
             user: up.user,
             moduleIds,
-            modules, // backward compat
             createdAt: up.createdAt,
         };
     });
@@ -326,7 +317,6 @@ router.put('/:userId/batch', async (req: AuthenticatedRequest, res: Response) =>
                     data: validModules.map((mod) => ({
                         userProjectId: userProject.id,
                         moduleId: mod.id,
-                        moduleKey: mod.type, // backward compat
                     })),
                 });
             }
@@ -338,7 +328,7 @@ router.put('/:userId/batch', async (req: AuthenticatedRequest, res: Response) =>
         where: { userId },
         include: {
             project: { select: { id: true, name: true, code: true } },
-            modules: { select: { moduleId: true, moduleKey: true } },
+            modules: { select: { moduleId: true } },
         },
         orderBy: { createdAt: 'asc' },
     });
@@ -346,12 +336,11 @@ router.put('/:userId/batch', async (req: AuthenticatedRequest, res: Response) =>
     res.json({
         success: true,
         data: userProjects.map((up) => {
-            const { moduleIds, modules } = formatModulesResponse(up.modules);
+            const { moduleIds } = formatModulesResponse(up.modules);
             return {
                 projectId: up.projectId,
                 project: up.project,
                 moduleIds,
-                modules, // backward compat
                 createdAt: up.createdAt,
             };
         }),
